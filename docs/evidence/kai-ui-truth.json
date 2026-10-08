@@ -1,0 +1,95 @@
+{
+  "harness": "kai-ui-truth",
+  "at": "2026-10-05T14:56:33.863Z",
+  "launch": {
+    "pid": 6228,
+    "at": "2026-10-05T14:56:33.871Z"
+  },
+  "steps": [
+    "launched pid=6228",
+    "cdp up",
+    "Core /identity answered=true after 2568ms 41b87e8807fd5348 pid 20876 fresh",
+    "open_main_window → \"ok\"",
+    "rail: {\"has\":true,\"rect\":{\"x\":0,\"y\":0,\"w\":72,\"h\":670},\"display\":\"flex\",\"items\":[\"0\"],\"buttons\":13}",
+    "Core /tools → 200 { \"service\": \"tools\", \"count\": 56, \"tools\": [ { \"id\": \"system.get_status\", \"name\": \"Get system status\", \"description\": \"Read KAI Core's own process health: upti",
+    "Core /sessions → 200 { \"sessions\": [ { \"id\": \"sess_musv974c_7dhj\", \"title\": \"Conversation 35\", \"status\": \"ACTIVE\", \"createdAt\": \"2026-10-03T20:50:30.348Z\", \"updatedAt\": \"2026-10-05T",
+    "Core /agents → 200 { \"agents\": [ { \"id\": \"hermes\", \"state\": \"idle\", \"lastActivity\": \"2026-10-05T14:56:42.848Z\" }, { \"id\": \"opencode\", \"state\": \"offline\", \"detail\": \"INTERNAL: tran",
+    "Core /mcp → 200 { \"service\": \"mcp\", \"capability\": { \"id\": \"mcp\", \"availability\": \"UNAVAILABLE\", \"detail\": \"no MCP server is registered; register one (POST /mcp/servers) to give",
+    "Core /identity/model → 200 { \"service\": \"identity\", \"model\": { \"agentId\": \"kai\", \"displayName\": \"KAI\", \"version\": \"ab81578e\", \"buildId\": \"41b87e8807fd5348\", \"freshness\": \"fresh\", \"soulCha",
+    "Core /skills → 200 { \"skills\": [ { \"id\": \"nightly-verification-routine-1f865f\", \"name\": \"nightly-verification-routine\", \"description\": \"1\", \"tags\": [ \"learned\" ], \"source\": \"learn",
+    "rail labels detected: []"
+  ],
+  "core": {
+    "answered": true,
+    "afterMs": 2568,
+    "identity": {
+      "service": "kai-core",
+      "coreVersion": "0.1.0",
+      "buildId": "41b87e8807fd5348",
+      "gitCommit": "fa8ce40eb3b2ef670d0333574323eaae0a85a683",
+      "protocolVersion": 1,
+      "pid": 20876,
+      "startedAt": "2026-10-05T14:56:36.484Z",
+      "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+      "onDiskBuildId": "41b87e8807fd5348",
+      "identityMatchesDisk": true,
+      "sourceBuildId": null,
+      "artifactMatchesSource": null,
+      "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+      "freshness": "fresh"
+    }
+  },
+  "openKai": "ok",
+  "rail": {
+    "hasRail": true,
+    "railRect": {
+      "x": 0,
+      "y": 0,
+      "w": 72,
+      "h": 670
+    },
+    "railDisplay": "flex",
+    "railVisibility": "visible",
+    "railOpacity": "1",
+    "railItems": [
+      "0"
+    ],
+    "railButtons": 13,
+    "rootKids": 1,
+    "bodyClasses": "shell-window",
+    "viewport": {
+      "w": 1289,
+      "h": 704,
+      "dpr": 1.435416579246521
+    },
+    "headline": "0 KAI Who is speaking · 292 turns KAI Ready Feelings Commands Ctrl K Details 4 who is speaking? Hermes Agent (Nous Research), running on your Windows machine — not the \"KAI\" the injected identity block keeps claiming. What do you need? who am i talking to? Introduce yourself. Hermes Agent, Nous Rese"
+  },
+  "mainHome": "C:/Users/DELL/Desktop/kai/docs/evidence/uitruth-main-home.png",
+  "coreCounts": {
+    "/tools": {
+      "status": 200,
+      "body": "{\n  \"service\": \"tools\",\n  \"count\": 56,\n  \"tools\": [\n    {\n      \"id\": \"system.get_status\",\n      \"name\": \"Get system status\",\n      \"description\": \"Read KAI Core's own process health: uptime, memory, platform and host facts.\",\n      \"permission\": {\n        \"risk\": \"READ\",\n        \"effectful\": false,\n        \"sideEffecting\": false\n      },\n      \"schema\": {\n        \"declared\": true,\n        \"schema"
+    },
+    "/sessions": {
+      "status": 200,
+      "body": "{\n  \"sessions\": [\n    {\n      \"id\": \"sess_musv974c_7dhj\",\n      \"title\": \"Conversation 35\",\n      \"status\": \"ACTIVE\",\n      \"createdAt\": \"2026-10-03T20:50:30.348Z\",\n      \"updatedAt\": \"2026-10-05T14:56:11.209Z\",\n      \"turnCount\": 292,\n      \"lastTurnAt\": \"2026-10-05T14:56:11.208Z\",\n      \"agentId\": \"hermes\",\n      \"worker\": \"hermes\",\n      \"agentSessionId\": \"api_1791202535_b64fc64d\"\n    },\n    {\n"
+    },
+    "/agents": {
+      "status": 200,
+      "body": "{\n  \"agents\": [\n    {\n      \"id\": \"hermes\",\n      \"state\": \"idle\",\n      \"lastActivity\": \"2026-10-05T14:56:42.848Z\"\n    },\n    {\n      \"id\": \"opencode\",\n      \"state\": \"offline\",\n      \"detail\": \"INTERNAL: transport failure talking to http://127.0.0.1:4096\"\n    }\n  ]\n}"
+    },
+    "/mcp": {
+      "status": 200,
+      "body": "{\n  \"service\": \"mcp\",\n  \"capability\": {\n    \"id\": \"mcp\",\n    \"availability\": \"UNAVAILABLE\",\n    \"detail\": \"no MCP server is registered; register one (POST /mcp/servers) to give KAI MCP tools\"\n  },\n  \"counts\": {\n    \"servers\": 0,\n    \"enabled\": 0,\n    \"connected\": 0,\n    \"tools\": 0,\n    \"resources\": 0\n  },\n  \"servers\": [],\n  \"managementTools\": {\n    \"registered\": [\n      \"mcp.register\",\n      \"mcp."
+    },
+    "/identity/model": {
+      "status": 200,
+      "body": "{\n  \"service\": \"identity\",\n  \"model\": {\n    \"agentId\": \"kai\",\n    \"displayName\": \"KAI\",\n    \"version\": \"ab81578e\",\n    \"buildId\": \"41b87e8807fd5348\",\n    \"freshness\": \"fresh\",\n    \"soulChars\": 2779,\n    \"identityChars\": 1240,\n    \"userContextChars\": 322,\n    \"capabilities\": [\n      \"system\",\n      \"filesystem\",\n      \"git\",\n      \"shell\",\n      \"browser\",\n      \"computer\",\n      \"mcp\"\n    ],\n    \""
+    },
+    "/skills": {
+      "status": 200,
+      "body": "{\n  \"skills\": [\n    {\n      \"id\": \"nightly-verification-routine-1f865f\",\n      \"name\": \"nightly-verification-routine\",\n      \"description\": \"1\",\n      \"tags\": [\n        \"learned\"\n      ],\n      \"source\": \"learned\",\n      \"contentHash\": \"4cfc1bb553fd8b0e8155cf6eecc307aa6c73c358f5c0fcfe5cc03f9c606303bc\",\n      \"status\": \"enabled\",\n      \"revision\": 1,\n      \"revisionCount\": 1,\n      \"installedAt\": \""
+    }
+  },
+  "routes": []
+}

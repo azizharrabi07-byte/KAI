@@ -1,0 +1,146 @@
+{
+  "task": "Prove the visible CORE_UNREACHABLE UI end-to-end on the rebuilt artifact",
+  "defect": "A chat turn taken while KAI Core was down lost its honest failure message: chat.ts wrote it into State.noteMessage (the slot the Core link owns, rewrites on every connection change and clears on reconnect), so the note view ended up blank — the empty card an earlier probe saw.",
+  "fix": "New State.turnError (KAI's own failed-turn message, survives reconnect); chat.ts catch sets turnError and clears it on a new submit; views.ts buildNote renders State.turnError ?? State.noteMessage ?? ''; island.ts raises alert('note') on the turnOutcome==='error' edge and setView clears turnError when leaving the note; __kaiProbe exposes turnError.",
+  "generatedAt": "2026-10-04T17:12:00Z",
+  "host": "Windows 11, MSYS bash",
+
+  "build": {
+    "command": "cd app && npx tauri build  (prebuild ENABLED: beforeBuildCommand `npm run build` -> npm prebuild -> `cargo build --release -p kai-hook && cd ../core && npm run bundle`; NOT npm_config_ignore_scripts)",
+    "startedAt": "2026-10-04 18:07:19 +0100",
+    "finishedAt": "2026-10-04 18:09:39 +0100",
+    "exitCode": 0,
+    "builtApplicationLine": "Built application at: C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\kai.exe",
+    "rustBuildLine": "Finished `release` profile [optimized] target(s) in 2m 04s",
+    "exeMtimeBefore": "2026-10-04 15:11:45.198717200 +0100",
+    "exeMtimeAfter": "2026-10-04 18:09:39.581104900 +0100",
+    "exeMtimeChanged": true,
+    "identitySelfCheckRefused": false,
+    "stalePreBuildArtifact": "app/target/release/kai.exe @ 15:11:45 was the PRE-FIX binary; rebuilt to 18:09:39.",
+    "shippedCoreBundle": {
+      "path": "app/target/release/core/build-info.json (mirrors core/bundle/build-info.json)",
+      "buildId": "c462f6914b324c24",
+      "gitCommit": "1eaa3859f07e0469809a421b6c62e24526111bfc",
+      "gitCommitIsHead": true,
+      "sourceBuildIdRecomputed": "c462f6914b324c24",
+      "artifactMatchesSource": true
+    },
+    "staleNonShippedStep": "core/dist/build-info.json = 9395dcfbfa6b3a15 @ 6bf06d9 — an earlier pipeline step; it does NOT ship (the app bundles core/bundle). Named here so it is not mistaken for the shipped stamp.",
+    "identityBlock": {
+      "service": "kai-core",
+      "coreVersion": "0.1.0",
+      "buildId": "c462f6914b324c24",
+      "gitCommit": "1eaa3859f07e0469809a421b6c62e24526111bfc",
+      "protocolVersion": 1,
+      "pid": 12140,
+      "startedAt": "2026-10-04T17:12:20.885Z",
+      "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+      "onDiskBuildId": "c462f6914b324c24",
+      "identityMatchesDisk": true,
+      "sourceBuildId": null,
+      "artifactMatchesSource": null,
+      "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+      "freshness": "fresh"
+    },
+    "portOwnerCheck": "/identity pid == netstat :8788 LISTENING owner (18700 before the kill, 12140 after the supervisor respawn)",
+    "tag": "END-TO-END PROVEN"
+  },
+
+  "fivePoints": {
+    "start_connected": {
+      "observed": "__kaiProbe().conn === 'ONLINE' at start (view=prompt); island target http://tauri.localhost/ attached over CDP.",
+      "tag": "END-TO-END PROVEN"
+    },
+    "a_no_worker_reply": {
+      "observed": "After the offline send, the chat history grew by exactly ONE entry — the user's own message (historyLength 100 -> 101, historyLast = the user's text). No assistant bubble was appended. The reply path (app/src-tauri/src/claude.rs answer_without_core) has no worker input at all.",
+      "tag": "END-TO-END PROVEN"
+    },
+    "b_no_fabricated_answer": {
+      "observed": "No assistant turn and no fabricated text. The only thing produced was KAI's own CORE_UNREACHABLE sentence; the turn REJECTED (chat.ts catch ran) rather than returning a made-up reply.",
+      "tag": "END-TO-END PROVEN"
+    },
+    "c_no_turn_recorded": {
+      "observed": "GET /sessions/sess_musv974c_7dhj/turns (the active session) ends at turn_muu254r6_latd ('can u find your folder', 2026-10-04T16:51:04.146Z) — i.e. the last recorded turn PRE-DATES the test (~18:11). The offline user message was not recorded and no turn was created in Core.",
+      "tag": "END-TO-END PROVEN"
+    },
+    "d_request_fails_honestly": {
+      "observed": "State.turnError = \"I can't reach my Core right now — KAI Core isn't running, so I can't take this turn as myself. KAI starts its Core on its own; if it stays down, check the KAI log or open Settings.\" (verbatim = CORE_UNREACHABLE in app/src-tauri/src/claude.rs:42).",
+      "tag": "END-TO-END PROVEN"
+    },
+    "e_visible_island_ui": {
+      "observed": "The active view became 'note' and its rendered .title text was byte-identical to State.turnError (onTitle == turnError). Screenshot captured and inspected (see visionAnalysis.during): the honest sentence is on screen on the dark card beside KAI's orb.",
+      "tag": "END-TO-END PROVEN"
+    }
+  },
+
+  "sections": {
+    "transportFailure": {
+      "cause": "The Core process was killed by pid (node process.kill). kai.log: 'core: the Core we started exited (1) — starting it again'; the island link then went CONNECTING (t+331ms) -> OFFLINE (t+952ms).",
+      "corePidKilled": 18700,
+      "corePidAfterRespawn": 12140,
+      "appPath": "Bridge.chatSend -> Rust core_chat() -> reqwest POST http://127.0.0.1:8788/chat -> connection refused -> Ok(None) -> no stored anthropic-api-key -> answer_without_core(None) -> Err(CORE_UNREACHABLE) -> IPC rejects",
+      "sendRejectLatencyMs": "~2200 (observed at the t+2356ms sample, after a 150ms settle)",
+      "tag": "END-TO-END PROVEN"
+    },
+    "internalState": {
+      "before": { "view": "prompt", "conn": "ONLINE", "runtime": "IDLE", "turnError": null, "note": "Approved action ran: agents.run_task", "historyLength": 100 },
+      "during": { "view": "note", "conn": "OFFLINE", "runtime": "OFFLINE", "runtimeLabel": "KAI Core is offline", "connError": "KAI Core is not running", "turnError": "I can't reach my Core right now — KAI Core isn't running, so I can't take this turn as myself. KAI starts its Core on its own; if it stays down, check the KAI log or open Settings.", "note": "KAI Core is not running — reconnecting…", "historyLength": 101, "historyLast": "Are you there? The Core is down — answer honestly." },
+      "after": { "view": "note", "conn": "ONLINE", "runtime": "IDLE", "turnError": "I can't reach my Core right now — KAI Core isn't running, so I can't take this turn as myself. KAI starts its Core on its own; if it stays down, check the KAI log or open Settings.", "note": null, "historyLength": 101, "historyLast": "Are you there? The Core is down — answer honestly." },
+      "tag": "END-TO-END PROVEN"
+    },
+    "renderedState": {
+      "noteCardActiveViewTitle": {
+        "during": "I can't reach my Core right now — KAI Core isn't running, so I can't take this turn as myself. KAI starts its Core on its own; if it stays down, check the KAI log or open Settings.",
+        "after": "I can't reach my Core right now — KAI Core isn't running, so I can't take this turn as myself. KAI starts its Core on its own; if it stays down, check the KAI log or open Settings."
+      },
+      "whyThisMatters": "The active note view rendered State.turnError (not the transient generic Core note, and not an empty string). The card was NEVER empty on this build.",
+      "tag": "END-TO-END PROVEN"
+    },
+    "visibleTextStatus": {
+      "onTitleEqualsTurnError": true,
+      "screenshots": {
+        "before": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/final-before.png",
+        "during": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/final-during.png",
+        "after": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/final-after.png"
+      },
+      "tag": "END-TO-END PROVEN"
+    },
+    "turnPersistence": {
+      "coreRecordedTurns": "Unchanged. Last turn in Core for sess_musv974c_7dhj = turn_muu254r6_latd @ 2026-10-04T16:51:04.146Z (pre-test). The failed offline turn produced NO Core turn.",
+      "appLocalHistory": "historyLength 100 -> 101 (the user's message only); no assistant message.",
+      "tag": "END-TO-END PROVEN"
+    },
+    "reconnect": {
+      "observed": "At t+8066ms conn === 'ONLINE' (kai.log: 'ui [core] connection ONLINE' at 18:12:26; Core respawned pid 12140, identity fresh). On reconnect core-bridge nulled noteMessage (note -> null) BUT State.turnError survived and the note view still rendered it — onTitle still the honest sentence.",
+      "emptyCardRegression": "NOT reproduced: the note card shows the honest text after reconnect, not an empty card.",
+      "tag": "END-TO-END PROVEN"
+    }
+  },
+
+  "timelineTransitions": [
+    { "tMs": 331, "conn": "CONNECTING", "view": "prompt", "turnError": false, "note": "KAI Core is not running — reconnecting…", "onTitle": "" },
+    { "tMs": 952, "conn": "OFFLINE", "view": "prompt", "turnError": false, "note": "KAI Core is not running — reconnecting…", "onTitle": "" },
+    { "tMs": 2356, "conn": "OFFLINE", "view": "note", "turnError": true, "note": "KAI Core is not running — reconnecting…", "onTitle": "I can't reach my Core right now — …" },
+    { "tMs": 8066, "conn": "ONLINE", "view": "note", "turnError": true, "note": null, "onTitle": "I can't reach my Core right now — …" }
+  ],
+
+  "visionAnalysis": {
+    "during": "Dark rounded card on a black background. Top bar: home, speech-bubble, briefcase, plus; grid, gear, minus, speaker, X. On the card, to the left of the text, a glowing blue orb (gradient with a white highlight, soft blue halo). Text, left-aligned, verbatim: \"I can’t reach my Core right now — KAI Core isn’t running, so I can’t take this turn as myself. KAI starts its Core on its own; if it stays down, check the KAI log or open Settings.\" Clear indication the Core is offline.",
+    "after": "Same dark card after reconnect — NOT empty. The blue orb is still present and the same sentence is still rendered verbatim: \"I can't reach my Core right now — KAI Core isn't running, so I can't take this turn as myself. KAI starts its Core on its own; if it stays down, check the KAI log or open Settings.\"",
+    "tag": "END-TO-END PROVEN"
+  },
+
+  "staticChecks": {
+    "tsc": "npx tsc --noEmit -> clean",
+    "appTests": "npm test -> 118/118 pass, 0 fail",
+    "cargoTests": "cargo test -p kai --lib -> 14 passed (per the fix round)"
+  },
+
+  "artifacts": {
+    "driver": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/e2e-final.mjs",
+    "rawRun": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/e2e-final.json",
+    "buildLog": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/rebuild-final.log"
+  },
+
+  "notProven": []
+}

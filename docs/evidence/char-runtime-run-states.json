@@ -1,0 +1,278 @@
+{
+  "phase": "states",
+  "at": "2026-10-04T13:40:06.996Z",
+  "record": [
+    {
+      "state": "IDLE",
+      "note": "Stop→SUCCESS held 4s→safeguard returned to IDLE",
+      "engineState": "success",
+      "orbPose": "success",
+      "cfgBadge": null,
+      "canvasOpacity": "0",
+      "runtime": "SUCCESS",
+      "runtimeLabel": "KAI finished",
+      "mode": "hidden",
+      "view": "overview",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 29,
+        "y": 0,
+        "w": 184,
+        "h": 0
+      },
+      "shotBytes": 135
+    },
+    {
+      "state": "THINKING",
+      "note": "UserPromptSubmit → turn.started → THINKING",
+      "engineState": "thinking",
+      "orbPose": "thinking",
+      "cfgBadge": "dots",
+      "canvasOpacity": "1",
+      "runtime": "THINKING",
+      "runtimeLabel": "KAI is thinking…",
+      "mode": "compact",
+      "view": "overview",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 215,
+        "y": 0,
+        "w": 292,
+        "h": 33
+      },
+      "shotBytes": 9458
+    },
+    {
+      "state": "RESEARCHING",
+      "note": "PreToolUse{WebSearch} → item.started → RESEARCHING",
+      "engineState": "researching",
+      "orbPose": "scan",
+      "cfgBadge": null,
+      "canvasOpacity": "1",
+      "runtime": "RESEARCHING",
+      "runtimeLabel": "KAI is researching…",
+      "mode": "compact",
+      "view": "overview",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 217,
+        "y": 0,
+        "w": 288,
+        "h": 32
+      },
+      "shotBytes": 9536
+    },
+    {
+      "state": "BROWSING",
+      "note": "PreToolUse{WebFetch} → item.started → BROWSING",
+      "engineState": "browsing",
+      "orbPose": "toolcall",
+      "cfgBadge": null,
+      "canvasOpacity": "1",
+      "runtime": "BROWSING",
+      "runtimeLabel": "KAI is browsing…",
+      "mode": "compact",
+      "view": "overview",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 217,
+        "y": 0,
+        "w": 288,
+        "h": 32
+      },
+      "shotBytes": 9474
+    },
+    {
+      "state": "CODING",
+      "note": "PreToolUse{Write} → item.started → CODING",
+      "engineState": "coding",
+      "orbPose": "working",
+      "cfgBadge": null,
+      "canvasOpacity": "1",
+      "runtime": "CODING",
+      "runtimeLabel": "KAI is coding…",
+      "mode": "compact",
+      "view": "overview",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 217,
+        "y": 0,
+        "w": 288,
+        "h": 32
+      },
+      "shotBytes": 9868
+    },
+    {
+      "state": "USING_CLI",
+      "note": "PreToolUse{Bash} → item.started → USING_CLI (control)",
+      "engineState": "using_cli",
+      "orbPose": "executing",
+      "cfgBadge": null,
+      "canvasOpacity": "1",
+      "runtime": "USING_CLI",
+      "runtimeLabel": "KAI is running a command…",
+      "mode": "compact",
+      "view": "overview",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 217,
+        "y": 0,
+        "w": 288,
+        "h": 32
+      },
+      "shotBytes": 9759
+    },
+    {
+      "state": "MULTI_AGENT_step1_A_start",
+      "note": "SubagentStart(A) → subagent.started → ONE live",
+      "engineState": "delegating",
+      "orbPose": "multiagent",
+      "cfgBadge": null,
+      "canvasOpacity": "1",
+      "runtime": "DELEGATING",
+      "runtimeLabel": "KAI is working through a worker…",
+      "mode": "compact",
+      "view": "overview",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 217,
+        "y": 0,
+        "w": 288,
+        "h": 32
+      },
+      "shotBytes": 9954
+    },
+    {
+      "state": "MULTI_AGENT_step2_B_start",
+      "note": "SubagentStart(B) → subagent.started → TWO live",
+      "engineState": "multi_agent",
+      "orbPose": "multiagent",
+      "cfgBadge": null,
+      "canvasOpacity": "1",
+      "runtime": "MULTI_AGENT",
+      "runtimeLabel": "KAI is running several workers…",
+      "mode": "compact",
+      "view": "overview",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 217,
+        "y": 0,
+        "w": 288,
+        "h": 32
+      },
+      "shotBytes": 9664
+    },
+    {
+      "state": "MULTI_AGENT_step3_A_stop",
+      "note": "SubagentStop(A) while B runs → MUST REMAIN MULTI_AGENT",
+      "engineState": "multi_agent",
+      "orbPose": "multiagent",
+      "cfgBadge": null,
+      "canvasOpacity": "1",
+      "runtime": "MULTI_AGENT",
+      "runtimeLabel": "KAI is running several workers…",
+      "mode": "compact",
+      "view": "overview",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 217,
+        "y": 0,
+        "w": 288,
+        "h": 32
+      },
+      "shotBytes": 9715
+    },
+    {
+      "state": "MULTI_AGENT_step4_B_stop",
+      "note": "SubagentStop(B) → last stop → EXITS MULTI_AGENT",
+      "engineState": "working",
+      "orbPose": "working",
+      "cfgBadge": "dots",
+      "canvasOpacity": "1",
+      "runtime": "WORKING",
+      "runtimeLabel": "KAI is working…",
+      "mode": "compact",
+      "view": "overview",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 217,
+        "y": 0,
+        "w": 288,
+        "h": 32
+      },
+      "shotBytes": 9904
+    },
+    {
+      "multiAgentFourStep": {
+        "step1": "DELEGATING",
+        "step2": "MULTI_AGENT",
+        "step3": "MULTI_AGENT",
+        "step4": "WORKING",
+        "step1Pose": "multiagent",
+        "step2Pose": "multiagent",
+        "step3Pose": "multiagent",
+        "step4Pose": "working"
+      }
+    },
+    {
+      "state": "SUCCESS",
+      "note": "Stop → turn.completed → SUCCESS (bounded hold)",
+      "engineState": "success",
+      "orbPose": "success",
+      "cfgBadge": null,
+      "canvasOpacity": "1",
+      "runtime": "SUCCESS",
+      "runtimeLabel": "KAI finished",
+      "mode": "compact",
+      "view": "overview",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 217,
+        "y": 0,
+        "w": 288,
+        "h": 32
+      },
+      "shotBytes": 10088
+    },
+    {
+      "state": "ERROR",
+      "note": "StopFailure → turn.failed → ERROR (bounded hold)",
+      "engineState": "error",
+      "orbPose": "error",
+      "cfgBadge": "dot",
+      "canvasOpacity": "1",
+      "runtime": "ERROR",
+      "runtimeLabel": "KAI hit an error",
+      "mode": "compact",
+      "view": "overview",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 217,
+        "y": 0,
+        "w": 288,
+        "h": 32
+      },
+      "shotBytes": 9720
+    },
+    {
+      "state": "WAITING_APPROVAL",
+      "note": "PermissionRequest → request.opened → WAITING_APPROVAL (sticky)",
+      "engineState": "waiting_approval",
+      "orbPose": "needsuser",
+      "cfgBadge": null,
+      "canvasOpacity": "1",
+      "runtime": "WAITING_APPROVAL",
+      "runtimeLabel": "KAI needs your approval",
+      "mode": "compact",
+      "view": "overview",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 217,
+        "y": 0,
+        "w": 288,
+        "h": 32
+      },
+      "shotBytes": 9782
+    }
+  ]
+}

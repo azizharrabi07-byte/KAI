@@ -1,0 +1,120 @@
+{
+  "capabilities": [
+    {
+      "id": "system",
+      "name": "System and state inspection",
+      "availability": "AVAILABLE",
+      "risk": "READ",
+      "provider": "kai",
+      "supportedActions": [
+        "system.get_status",
+        "agents.list",
+        "missions.list",
+        "memory.list"
+      ]
+    },
+    {
+      "id": "browser",
+      "name": "Browser (semantic-first)",
+      "availability": "UNAVAILABLE",
+      "risk": "EXTERNAL",
+      "provider": "kai",
+      "supportedActions": [
+        "open",
+        "navigate",
+        "find",
+        "inspect",
+        "click",
+        "type",
+        "select",
+        "scroll",
+        "wait",
+        "read",
+        "back",
+        "forward",
+        "new_tab",
+        "close_tab",
+        "switch_tab",
+        "observe"
+      ],
+      "requirements": [
+        "a real CDP transport over the installed Edge/Chrome; semantic-first, screenshots only as a fallback"
+      ]
+    },
+    {
+      "id": "computer",
+      "name": "Computer use (CUA)",
+      "availability": "UNAVAILABLE",
+      "risk": "DESTRUCTIVE",
+      "provider": "kai",
+      "supportedActions": [
+        "click",
+        "type",
+        "keypress",
+        "scroll",
+        "observe",
+        "inspect",
+        "windows"
+      ],
+      "requirements": [
+        "cua-driver 0.28.2 over MCP stdio, connected lazily on first use"
+      ]
+    },
+    {
+      "id": "filesystem",
+      "name": "Filesystem",
+      "availability": "UNAVAILABLE",
+      "risk": "WRITE",
+      "provider": "kai",
+      "supportedActions": [
+        "read",
+        "list",
+        "write"
+      ],
+      "requirements": [
+        "node fs is available; a write is WRITE and parks for a human by default"
+      ]
+    },
+    {
+      "id": "git",
+      "name": "Git (read-only)",
+      "availability": "UNAVAILABLE",
+      "risk": "READ",
+      "provider": "kai",
+      "supportedActions": [
+        "status",
+        "log",
+        "diff"
+      ],
+      "requirements": [
+        "the git CLI is on PATH"
+      ]
+    },
+    {
+      "id": "shell",
+      "name": "Shell (program execution)",
+      "availability": "UNAVAILABLE",
+      "risk": "DESTRUCTIVE",
+      "provider": "kai",
+      "supportedActions": [
+        "run"
+      ],
+      "requirements": [
+        "run a program with an explicit argument list; DESTRUCTIVE, so the default policy parks it for a human"
+      ]
+    },
+    {
+      "id": "mcp",
+      "name": "MCP servers and tools",
+      "availability": "UNAVAILABLE",
+      "risk": "EXTERNAL",
+      "provider": "kai",
+      "supportedActions": [
+        "call"
+      ],
+      "requirements": [
+        "no MCP server is configured or connected"
+      ]
+    }
+  ]
+}

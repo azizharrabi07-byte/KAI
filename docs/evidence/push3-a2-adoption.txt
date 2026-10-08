@@ -1,0 +1,42 @@
+################ 0. clean slate ################
+  kai.exe: none
+  Core processes: none
+
+################ 1. a Core that is ALREADY running (the precondition) ################
+$ Start-Process node core/bundle/server.js   # by hand, on purpose
+  hand-started Core pid: 1884
+  netstat:   TCP    127.0.0.1:8788         0.0.0.0:0              LISTENING       1884
+  GET /state: {
+  "ok": true,
+  "startedAt": "2026-10-02T10:04:55.763Z",
+  "uptimeMs": 1199,
+  "database
+  Core processes now: 1884 
+
+################ 2. now start the app ################
+$ powershell -File docs/evidence/launch-cdp.ps1
+kai.exe started with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222
+  kai.exe: 6976 
+
+$ grep 'core:' kai.log | tail -4
+2026-10-02 10:57:37 core: adopted a Core already listening on http://127.0.0.1:8788/state — not starting a second one
+2026-10-02 10:57:41 core: adopted a Core already listening on http://127.0.0.1:8788/state — not starting a second one
+2026-10-02 10:57:45 core: adopted a Core already listening on http://127.0.0.1:8788/state — not starting a second one
+2026-10-02 11:04:58 core: adopted the Core already listening on 127.0.0.1:8788 — not starting a second one
+
+$ netstat -ano | grep ':8788 .*LISTENING'      # must still be the SAME pid
+  TCP    127.0.0.1:8788         0.0.0.0:0              LISTENING       1884
+  listener pid: 1884      hand-started pid: 1884
+  ^ unchanged: the app did not start a second Core
+
+$ node processes running core/server.js        # must be exactly one
+1884 
+$ node docs/evidence/cdp.mjs eval "invoke('core_status')"
+{"origin":"adopted","pid":null,"url":"http://127.0.0.1:8788","port":8788,"node":"C:\\Users\\DELL\\.hermes\\tools\\node-26.7.0-win32-x64\\node.exe","serverJs":"\\\\?\\C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\server.js","restarts":0}
+
+################ 3. cleanup ################
+$ node -e "process.kill(6976)"                 # quit the app; it started no Core, so it should kill none
+  kai.exe: 
+  listener pid after the app quit: 1884   (the hand-started Core is not the app's to kill)
+$ node -e "process.kill(1884)"              # stop the hand-started Core
+  8788 is free again

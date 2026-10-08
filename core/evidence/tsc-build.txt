@@ -1,0 +1,30 @@
+$ npx tsc -p tsconfig.json --listEmittedFiles   # fresh build, dist/ removed first
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/config.js
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/config.js.map
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/config.d.ts
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/errors.js
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/errors.js.map
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/errors.d.ts
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/agents/hermes.js
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/agents/hermes.js.map
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/agents/hermes.d.ts
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/lib/sse.js
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/lib/sse.js.map
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/lib/sse.d.ts
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/agents/opencode.js
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/agents/opencode.js.map
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/agents/opencode.d.ts
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/server.js
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/server.js.map
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/server.d.ts
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/server.test.js
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/server.test.js.map
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/server.test.d.ts
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/agents/hermes.test.js
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/agents/hermes.test.js.map
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/agents/hermes.test.d.ts
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/agents/opencode.test.js
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/agents/opencode.test.js.map
+TSFILE: C:/Users/DELL/Desktop/kai/core/dist/agents/opencode.test.d.ts
+exit_code=0
+# (tsc prints nothing on stdout when there are no diagnostics — the lines above are --listEmittedFiles output)

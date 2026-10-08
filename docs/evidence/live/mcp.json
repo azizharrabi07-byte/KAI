@@ -1,0 +1,37 @@
+{
+  "service": "mcp",
+  "capability": {
+    "id": "mcp",
+    "availability": "UNAVAILABLE",
+    "detail": "no MCP server is registered; register one (POST /mcp/servers) to give KAI MCP tools"
+  },
+  "counts": {
+    "servers": 0,
+    "enabled": 0,
+    "connected": 0,
+    "tools": 0,
+    "resources": 0
+  },
+  "servers": [],
+  "managementTools": {
+    "registered": [
+      "mcp.register",
+      "mcp.update",
+      "mcp.enable",
+      "mcp.disable",
+      "mcp.remove",
+      "mcp.connect",
+      "mcp.disconnect",
+      "mcp.refresh"
+    ],
+    "refused": []
+  },
+  "persistence": {
+    "path": null,
+    "problem": null
+  },
+  "provenance": {
+    "recorded": 0
+  },
+  "note": "MCP servers are KAI-owned capabilities. Every MCP tool is registered into KAI's one tool registry (validate -> policy -> (approval) -> execute); every invocation is recorded in the MCP provenance ledger. A management call that parks answers 409 with an approvalId; retry the same request with it once a human decides."
+}

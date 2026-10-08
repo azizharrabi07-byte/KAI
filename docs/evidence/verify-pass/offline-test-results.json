@@ -1,0 +1,200 @@
+{
+  "identity": {
+    "service": "kai-core",
+    "coreVersion": "0.1.0",
+    "buildId": "2de85812ffd99f1f",
+    "gitCommit": "55197687d27208006fe06293ce64d6bfc9bcb155",
+    "protocolVersion": 1,
+    "pid": 68576,
+    "startedAt": "2026-10-03T15:06:40.382Z"
+  },
+  "killResult": "process.kill(68576) sent",
+  "before": {
+    "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+    "opacity": "0.65",
+    "label": "KAI is idle",
+    "islandH": "210px",
+    "canvas": {
+      "w": 139,
+      "h": 197
+    }
+  },
+  "series": [
+    {
+      "ms": 417,
+      "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+      "opacity": "0.65",
+      "label": "KAI is idle",
+      "islandH": "158.535px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 823,
+      "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+      "opacity": "0.65",
+      "label": "KAI is idle",
+      "islandH": "160.035px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 1229,
+      "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+      "opacity": "0.65",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 1633,
+      "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+      "opacity": "0.15",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 2037,
+      "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+      "opacity": "0.15",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 2439,
+      "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+      "opacity": "0.15",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 2844,
+      "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+      "opacity": "0.15",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 3248,
+      "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+      "opacity": "0.15",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 3650,
+      "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+      "opacity": "0.15",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 4066,
+      "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+      "opacity": "0.15",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 4468,
+      "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+      "opacity": "0.15",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 4876,
+      "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+      "opacity": "0.15",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 5278,
+      "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+      "opacity": "0.15",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 5692,
+      "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+      "opacity": "0.15",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 6108,
+      "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+      "opacity": "0.15",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    },
+    {
+      "ms": 6514,
+      "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+      "opacity": "0.15",
+      "label": "KAI is idle",
+      "islandH": "160px",
+      "canvas": {
+        "w": 119,
+        "h": 177
+      }
+    }
+  ]
+}

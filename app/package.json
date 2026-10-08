@@ -1,0 +1,26 @@
+{
+  "name": "kai-app",
+  "private": true,
+  "version": "0.1.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "icons": "node scripts/gen-icons.mjs",
+    "tauri": "tauri",
+    "predev": "cargo build --release -p kai-hook",
+    "prebuild": "cargo build --release -p kai-hook && cd ../core && npm run bundle",
+    "pack": "tauri build && node scripts/pack.mjs",
+    "//test": "Node's own glob: `node --test tests/` is rejected by Node 26 (it treats the directory as a module specifier) and cmd.exe does not expand globs, so the pattern is passed through quoted. Scoping to app/tests keeps the suite the app's own.",
+    "test": "node --import ./tests/register-ts.mjs --test \"tests/*.test.ts\""
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "typescript": "^5.6.0",
+    "vite": "^6"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2"
+  }
+}

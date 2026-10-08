@@ -1,0 +1,14 @@
+FAIL github-copilot/claude-sonnet-4.6 (4.7s): The requested model is not available for integrator "opencode". Available models: [gpt-4.1 claude-fable-5.1 cl
+FAIL github-copilot/claude-sonnet-4 (3.4s): The requested model is not supported.
+FAIL voidai/claude-sonnet-4-6 (2.5s): Your plan does not have access to model 'claude-sonnet-4-6'. Upgrade your plan or use a model available in you
+FAIL swiftrouter/claude-sonnet-4-6 (75.0s): 
+FAIL modal/zai-org/GLM-5.1-FP8 (75.0s): 
+FAIL openference/GLM-5.2 (1.7s): Payment Required: No active plan. Choose a plan to continue.
+FAIL zenllm/xiaomi/mimo-v2.5-pro-full (2.1s): unauthorized
+FAIL llmzone/claude-opus-4.6-2026 (2.3s): Plan expired. Please renew your plan to continue using the API.
+FAIL seraphyn/gpt-5.3-chat-latest (75.1s): 
+FAIL aqua/gpt-5.6-terra (2.5s): Premium models require invitation.  Check out at https://api.aquadevs.com/v1/models
+FAIL aihubmix/coding-glm-5-free (65.8s): Cannot connect to API: Unable to connect. Is the computer able to access the url?
+FAIL zai/glm-5v-turbo (8.9s): token expired or incorrect
+
+USABLE: []

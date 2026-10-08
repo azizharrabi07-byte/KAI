@@ -1,0 +1,36 @@
+PART A — OPENCODE RELIABILITY: VERDICT (live, 2026-10-02)
+=========================================================
+Core under test: buildId=8325353e1d63dc33 gitCommit=69fbb47e pid=27400, spawned by kai.exe,
+owns 127.0.0.1:8788. All probes below were made against the running product, not a dev server.
+
+A3 — NO FAKE COMPLETION AFTER A PROVIDER ABORT: PASS (live)
+  POST /agents/opencode/chat -> HTTP 200, reply="" and
+  error={"name":"MessageAbortedError","data":{"message":"Aborted"}}
+  The product reports the abort as a failure. Before the fix it reported `completed` with no
+  output for exactly this response, so a caller believed work had happened that never did.
+  This is the correctness requirement, demonstrated against a REAL provider abort.
+
+A1 — REAL SUCCESSFUL TASK: EXTERNALLY BLOCKED, with the cause proven, not assumed
+  Root cause is NOT in KAI. Every provider path was probed directly against the server:
+    opencode-go/mimo-v2.6-pro  -> APIError 401 "Missing API key."            (the paid provider
+                                                                             has no key here)
+    google/gemini-flash-latest -> APIError "This service has been disabled in this account for
+                                  violation of Terms of Service."
+    nvidia/zhipu/glm-5         -> HTTP 500
+    atessa (the server's DEFAULT agent model) -> not authenticated at all
+  So no configured provider on this machine can complete a turn today. Two of these are
+  account/credential facts the user must change; KAI cannot repair them.
+  ALSO: the long-running `opencode serve` on :4096 (started by another session ~10h earlier)
+  aborts EVERY turn instantly, while a fresh server on a spare port made a real upstream call
+  (HTTP 200 after 184s). The :4096 process is wedged and needs restarting — the user's call,
+  and I started and then stopped my own probe server rather than killing theirs.
+
+A2 — CANCELLATION: PASS. cancelTask reaches POST /session/{id}/abort (test asserts it
+  arrives), and cancellation does not fabricate a completion.
+
+A4 — NO DUPLICATE EXECUTION: PASS. The regression test asserts the turn is issued EXACTLY once,
+  including on the timeout path — a retried turn is how one action becomes two side effects.
+
+TIMEOUT SPLIT: VALIDATED BY REAL EVIDENCE, not just by test. Legitimate turns took 130s and
+  184s against real providers. The old single 10s scalar killed exactly those turns and
+  reported them as the server being unreachable. Control requests keep the 10s bound.

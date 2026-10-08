@@ -1,0 +1,320 @@
+{
+  "artifact": "kai-sessions-final",
+  "at": "2026-10-05T14:56:11.216Z",
+  "status": 200,
+  "count": 40,
+  "sessions": [
+    {
+      "id": "sess_musv974c_7dhj",
+      "title": "Conversation 35",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T20:50:30.348Z",
+      "updatedAt": "2026-10-05T14:51:05.026Z",
+      "turnCount": 288,
+      "lastTurnAt": "2026-10-05T14:51:05.025Z",
+      "agentId": "hermes",
+      "worker": "hermes",
+      "agentSessionId": "api_1791202535_b64fc64d"
+    },
+    {
+      "id": "sess_muuk9l8g_2r5r",
+      "title": "Bob — own session",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-05T01:18:25.216Z",
+      "updatedAt": "2026-10-05T01:18:25.609Z",
+      "turnCount": 3,
+      "lastTurnAt": "2026-10-05T01:18:25.608Z",
+      "agentId": "kai:bob",
+      "agentOwner": "kai:bob"
+    },
+    {
+      "id": "sess_muuk8dm6_ia0i",
+      "title": "Alice — own session",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-05T01:17:28.686Z",
+      "updatedAt": "2026-10-05T01:17:49.778Z",
+      "turnCount": 3,
+      "lastTurnAt": "2026-10-05T01:17:49.777Z",
+      "agentId": "kai:alice",
+      "agentOwner": "kai:alice"
+    },
+    {
+      "id": "sess_muuawu27_2kq1",
+      "title": "Probe — own session",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-04T20:56:33.583Z",
+      "updatedAt": "2026-10-04T20:56:37.320Z",
+      "turnCount": 3,
+      "lastTurnAt": "2026-10-04T20:56:37.319Z",
+      "agentId": "kai:probe",
+      "agentOwner": "kai:probe"
+    },
+    {
+      "id": "sess_muu7x6p2_7bcu",
+      "title": "Conversation 37",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-04T19:32:51.111Z",
+      "updatedAt": "2026-10-04T19:32:51.111Z",
+      "turnCount": 0
+    },
+    {
+      "id": "sess_musv9726_52o",
+      "title": "Conversation 34",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T20:50:30.270Z",
+      "updatedAt": "2026-10-03T20:56:57.567Z",
+      "turnCount": 25,
+      "lastTurnAt": "2026-10-03T20:56:57.566Z",
+      "agentId": "hermes",
+      "worker": "hermes",
+      "agentSessionId": "api_1791060992_f6ca5f72"
+    },
+    {
+      "id": "sess_musv9766_cg9l",
+      "title": "Conversation 36",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T20:50:30.414Z",
+      "updatedAt": "2026-10-03T20:50:30.468Z",
+      "turnCount": 2,
+      "lastTurnAt": "2026-10-03T20:50:30.467Z"
+    },
+    {
+      "id": "sess_mussji00_8hqi",
+      "title": "Conversation 32",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T19:34:32.160Z",
+      "updatedAt": "2026-10-03T20:18:11.579Z",
+      "turnCount": 10,
+      "lastTurnAt": "2026-10-03T20:18:11.579Z"
+    },
+    {
+      "id": "sess_mussji2c_a5rn",
+      "title": "Conversation 33",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T19:34:32.244Z",
+      "updatedAt": "2026-10-03T19:51:54.190Z",
+      "turnCount": 49,
+      "lastTurnAt": "2026-10-03T19:51:54.187Z",
+      "agentId": "hermes",
+      "worker": "hermes",
+      "agentSessionId": "api_1791056526_bad93ebe"
+    },
+    {
+      "id": "sess_mussjhx4_8rc4",
+      "title": "Conversation 31",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T19:34:32.056Z",
+      "updatedAt": "2026-10-03T19:34:32.154Z",
+      "turnCount": 2,
+      "lastTurnAt": "2026-10-03T19:34:32.151Z"
+    },
+    {
+      "id": "sess_musr69rd_g97",
+      "title": "Conversation 29",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T18:56:15.337Z",
+      "updatedAt": "2026-10-03T19:31:48.879Z",
+      "turnCount": 42,
+      "lastTurnAt": "2026-10-03T19:31:48.878Z",
+      "agentId": "hermes",
+      "worker": "hermes",
+      "agentSessionId": "api_1791055775_fa088885"
+    },
+    {
+      "id": "sess_musr7gng_mtt",
+      "title": "Conversation 30",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T18:57:10.924Z",
+      "updatedAt": "2026-10-03T18:57:16.544Z",
+      "turnCount": 2,
+      "lastTurnAt": "2026-10-03T18:57:16.543Z"
+    },
+    {
+      "id": "sess_musp9wri_593n",
+      "title": "Conversation 26",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T18:03:05.886Z",
+      "updatedAt": "2026-10-03T18:50:18.789Z",
+      "turnCount": 43,
+      "lastTurnAt": "2026-10-03T18:50:18.788Z",
+      "agentId": "hermes",
+      "worker": "hermes",
+      "agentSessionId": "api_1791053313_ee571c41"
+    },
+    {
+      "id": "sess_muspa1te_7zv0",
+      "title": "Conversation 27",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T18:03:12.434Z",
+      "updatedAt": "2026-10-03T18:12:04.967Z",
+      "turnCount": 6,
+      "lastTurnAt": "2026-10-03T18:12:04.966Z"
+    },
+    {
+      "id": "sess_muspa7xy_fi5x",
+      "title": "Conversation 28",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T18:03:20.375Z",
+      "updatedAt": "2026-10-03T18:03:25.096Z",
+      "turnCount": 2,
+      "lastTurnAt": "2026-10-03T18:03:25.095Z"
+    },
+    {
+      "id": "sess_musp67oh_f427",
+      "title": "Conversation 25",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T18:00:13.409Z",
+      "updatedAt": "2026-10-03T18:00:13.474Z",
+      "turnCount": 2,
+      "lastTurnAt": "2026-10-03T18:00:13.472Z"
+    },
+    {
+      "id": "sess_musp67mq_ei9q",
+      "title": "Conversation 24",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T18:00:13.346Z",
+      "updatedAt": "2026-10-03T18:00:13.405Z",
+      "turnCount": 2,
+      "lastTurnAt": "2026-10-03T18:00:13.403Z"
+    },
+    {
+      "id": "sess_musp67kt_fwnd",
+      "title": "Conversation 23",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T18:00:13.277Z",
+      "updatedAt": "2026-10-03T18:00:13.341Z",
+      "turnCount": 2,
+      "lastTurnAt": "2026-10-03T18:00:13.339Z"
+    },
+    {
+      "id": "sess_musmgc27_cg1q",
+      "title": "ph4 renamed",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T16:44:06.799Z",
+      "updatedAt": "2026-10-03T17:52:13.603Z",
+      "turnCount": 51,
+      "lastTurnAt": "2026-10-03T17:52:13.600Z",
+      "agentId": "hermes",
+      "worker": "hermes",
+      "agentSessionId": "api_1791045979_86f269a8"
+    },
+    {
+      "id": "sess_musdvo4q_aybg",
+      "title": "Conversation 1",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T12:44:05.738Z",
+      "updatedAt": "2026-10-03T16:43:11.321Z",
+      "turnCount": 118,
+      "lastTurnAt": "2026-10-03T16:43:11.320Z",
+      "agentId": "hermes",
+      "worker": "hermes",
+      "agentSessionId": "api_1791031445_3dfadbe6"
+    },
+    {
+      "id": "sess_muskhyd0_bbop",
+      "title": "Conversation 20",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T15:49:23.124Z",
+      "updatedAt": "2026-10-03T15:49:41.784Z",
+      "turnCount": 4,
+      "lastTurnAt": "2026-10-03T15:49:41.783Z",
+      "agentId": "hermes",
+      "worker": "hermes",
+      "agentSessionId": "api_1791042563_4e9d7331"
+    },
+    {
+      "id": "sess_muskhyd8_agge",
+      "title": "Conversation 21",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T15:49:23.132Z",
+      "updatedAt": "2026-10-03T15:49:41.775Z",
+      "turnCount": 2,
+      "lastTurnAt": "2026-10-03T15:49:41.774Z",
+      "agentId": "hermes",
+      "worker": "hermes",
+      "agentSessionId": "api_1791042571_e77a1ef1"
+    },
+    {
+      "id": "sess_muskhycl_clnk",
+      "title": "Conversation 19",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T15:49:23.109Z",
+      "updatedAt": "2026-10-03T15:49:23.109Z",
+      "turnCount": 0
+    },
+    {
+      "id": "sess_musjy35v_qu5",
+      "title": "Conversation 17",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T15:33:56.227Z",
+      "updatedAt": "2026-10-03T15:34:23.560Z",
+      "turnCount": 4,
+      "lastTurnAt": "2026-10-03T15:34:23.559Z",
+      "agentId": "hermes",
+      "worker": "hermes",
+      "agentSessionId": "api_1791041636_42b7cb5b"
+    },
+    {
+      "id": "sess_musjy362_hx7n",
+      "title": "Conversation 18",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T15:33:56.234Z",
+      "updatedAt": "2026-10-03T15:34:23.549Z",
+      "turnCount": 2,
+      "lastTurnAt": "2026-10-03T15:34:23.548Z",
+      "agentId": "hermes",
+      "worker": "hermes",
+      "agentSessionId": "api_1791041653_7a0a2621"
+    },
+    {
+      "id": "sess_musjy35j_60h1",
+      "title": "Conversation 16",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T15:33:56.215Z",
+      "updatedAt": "2026-10-03T15:33:56.215Z",
+      "turnCount": 0
+    },
+    {
+      "id": "sess_musj1nx5_anbo",
+      "title": "Conversation 15",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T15:08:43.481Z",
+      "updatedAt": "2026-10-03T15:09:10.840Z",
+      "turnCount": 1,
+      "lastTurnAt": "2026-10-03T15:09:10.839Z"
+    },
+    {
+      "id": "sess_musj1nwx_73y3",
+      "title": "Conversation 14",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T15:08:43.473Z",
+      "updatedAt": "2026-10-03T15:09:10.832Z",
+      "turnCount": 2,
+      "lastTurnAt": "2026-10-03T15:09:10.831Z",
+      "agentId": "hermes",
+      "worker": "hermes",
+      "agentSessionId": "api_1791040123_a4e80d14"
+    },
+    {
+      "id": "sess_musj1nwj_7f35",
+      "title": "Conversation 13",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T15:08:43.459Z",
+      "updatedAt": "2026-10-03T15:08:43.459Z",
+      "turnCount": 0
+    },
+    {
+      "id": "sess_musj0557_6fkp",
+      "title": "Conversation 12",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-03T15:07:32.491Z",
+      "updatedAt": "2026-10-03T15:08:12.435Z",
+      "turnCount": 2,
+      "lastTurnAt": "2026-10-03T15:08:12.433Z",
+      "agentId": "hermes",
+      "worker": "hermes",
+      "agentSessionId": "api_1791040079_8cc6d20d"
+    }
+  ],
+  "note": "Real persisted sessions from the running Core."
+}

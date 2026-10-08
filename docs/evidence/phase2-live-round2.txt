@@ -1,0 +1,51 @@
+KAI PHASE 2 — LIVE ACCEPTANCE, ROUND 2 (2026-10-02)
+==================================================
+Core: buildId=f5ed5787ddab15d8 gitCommit=51a811e3 protocol=1 pid=21616, spawned by the real
+kai.exe, owns 127.0.0.1:8788. Identity checked before every probe.
+
+PASS — R1 one-time schedule executes exactly once
+  POST /schedules {kind:"once", runAt:+20s, action:"mission.create"} -> 201
+  after the due time: lastRun=23:13:05.095Z, enabled=false (consumed), failureCount=0
+  AND the tick created mission_murkwpci_0 with status=COMPLETED.
+  This also demonstrates the Part L linkage LIVE, not only in a test: the mission itself
+  carries metadata {"scheduleId":"sched_bfdec027-fa1c-491d-a71f-91b41e8b79f7"}, so a fired
+  schedule is durably traceable from the mission side without depending on an action record.
+
+PASS — C1 checkpoint created and listed
+  POST /checkpoints {target:<temp dir>} -> 201, id=ckpt_murkx4o1_y5a2fj with a real sha;
+  GET /checkpoints lists it.
+
+PASS — C6 an UNKNOWN acceptance state is treated as unsafe
+  POST /recovery/classify {executionId:"does-not-exist-xyz"} ->
+  {"phase":"UNKNOWN","status":"UNKNOWN","sideEffecting":true,"sideEffectCount":0,
+   "replaySafe":false,"reason":"no durable record ..."}
+  Exactly the required verdict: unknown -> unsafe -> no automatic replay. A crash cannot
+  become unknown -> retry -> duplicate side effect.
+
+PASS — S2 progressive disclosure (the negative half)
+  GET /skills returns metadata only; asserted the response contains no SKILL.md body text.
+  (skills=0 at that moment, so this proves the list does not leak bodies, not that a body
+  loads correctly — see the gap below.)
+
+NOT DEMONSTRATED LIVE (built and unit-verified, but no live evidence):
+  S1/S2b/S3/S4  a learned skill could not be produced live, so discovery of an INSTALLED
+                skill, body loading, the approved exact-byte install and the tamper refusal
+                were not exercised through the product. The unit suites cover the hash
+                refusal; live coverage is missing.
+  L1            the learning pipeline ran and classified, but not into an artifact:
+                  repeated_workflow (2 payload shapes) -> decision=none
+                  user_correction "Always run tests before telling me a build is finished."
+                    -> decision=REJECTED
+                The directive's own example correction is REJECTED here. That may be correct
+                (it reads as an instruction, and the design deliberately refuses instructions
+                disguised as memory) or it may mean a legitimate correction cannot become
+                memory/skill. UNRESOLVED — flagged rather than spun.
+  R2/R3/R4, C2/C3, C4/C5, I1-I4   not run.
+
+OPENCODE (settled earlier): A3 honest-failure PASS live; A2 cancellation PASS; A4 no duplicate
+PASS; A1 EXTERNALLY BLOCKED with proven causes (opencode-go 401 "Missing API key", Google
+account disabled for ToS, nvidia 500, atessa unauthenticated; and a wedged 10h-old :4096).
+
+CORRECTION: four PARTIALs in the first round-2 pass were MY script guessing field names
+(`state`/`status`/`executions` on a schedule, and a payload shape for the learning propose),
+not product failures. Reading the real record resolved R1.

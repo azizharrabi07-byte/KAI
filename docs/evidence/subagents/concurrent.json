@@ -1,0 +1,80 @@
+{
+  "at": "2026-10-03T20:30:36.344Z",
+  "subagents": [
+    {
+      "id": "research-kai",
+      "name": "Research KAI",
+      "role": "deep researcher",
+      "soul": "Patient, sceptical, cites everything.",
+      "workerId": "hermes",
+      "capabilities": [
+        "run_task"
+      ],
+      "visual": {
+        "variant": "kai-research",
+        "colour": "#8B5CF6",
+        "outfit": "halo"
+      }
+    },
+    {
+      "id": "coding-kai",
+      "name": "Coding KAI",
+      "role": "implementation engineer",
+      "soul": "Blunt, ships small diffs, tests first.",
+      "workerId": "opencode",
+      "capabilities": [
+        "run_task"
+      ],
+      "visual": {
+        "variant": "kai-coder",
+        "colour": "#FBBF24",
+        "outfit": "cap"
+      }
+    }
+  ],
+  "employeeIds": [
+    "kai:research-kai",
+    "kai:coding-kai"
+  ],
+  "approvals": {
+    "A": "apr_musujl2h_0",
+    "B": "apr_musujl3a_1",
+    "pendingAtSameInstant": [
+      "apr_musujl3a_1",
+      "apr_musujl2h_0"
+    ]
+  },
+  "results": {
+    "A": {
+      "state": "completed",
+      "output": "hermes mock output: You are acting as KAI's subagent \"Research KAI\" (deep researcher).\nKAI remains the authority: you run under KAI's policy, approvals and permissions.\n\nPatient, sceptical, cites everything.\n\nSummarise the concurrent-execution spec."
+    },
+    "B": {
+      "state": "completed",
+      "output": "opencode mock output: You are acting as KAI's subagent \"Coding KAI\" (implementation engineer).\nKAI remains the authority: you run under KAI's policy, approvals and permissions.\n\nBlunt, ships small diffs, tests first.\n\nWrite a failing test for the two-run invariant."
+    }
+  },
+  "runWindowsMs": {
+    "opencode": {
+      "start": 1791059435507,
+      "end": 1791059436311
+    },
+    "hermes": {
+      "start": 1791059435506,
+      "end": 1791059436338
+    }
+  },
+  "overlapMs": 804,
+  "checks": {
+    "two distinct approvals held concurrently": true,
+    "run A completed": true,
+    "run B completed": true,
+    "results are INDEPENDENT (different worker outputs)": true,
+    "run A carries Research KAI's persona": true,
+    "run B carries Coding KAI's persona": true,
+    "run A ran on hermes": true,
+    "run B ran on opencode": true,
+    "worker windows OVERLAP in wall-clock": true
+  },
+  "allPass": true
+}

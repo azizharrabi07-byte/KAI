@@ -1,0 +1,40 @@
+### 1. overview card fits its box (real session rows, no clipping): PASS
+{
+  "viewIndex": 0,
+  "sessionRows": 3,
+  "meta": [
+    "status ok",
+    "api unknown",
+    "3 sessions"
+  ],
+  "island": [
+    640,
+    210
+  ],
+  "content": 151,
+  "box": 158,
+  "overflowPx": -6,
+  "fits": true
+}
+
+### 2. nothing visible escapes the island surface: PASS
+{
+  "islandBottom": 210,
+  "visibleOverflow": [],
+  "count": 0
+}
+
+### 3. Settings gear switches the island to its settings view: PASS
+{
+  "viewIndex": 8,
+  "isSettingsView": true
+}
+
+### 4. chat returns real model text via Hermes /v1/runs: PASS
+{
+  "ok": true,
+  "ms": 5509,
+  "text": "KAI-CHAT-OK"
+}
+
+===== 4/4 checks passed =====

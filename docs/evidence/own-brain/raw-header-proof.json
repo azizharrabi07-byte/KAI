@@ -1,0 +1,49 @@
+{
+  "endpoint": "https://opencode.ai/zen/go/v1",
+  "header_kai_sends": {
+    "x-opencode-session": "kai-d868c0d344dd955256253363dfabf035",
+    "user-agent": "opencode-ai/1.0"
+  },
+  "is_opencode_gateway": true,
+  "request": {
+    "method": "POST",
+    "path": "/chat/completions",
+    "model": "deepseek-v4.1-flash"
+  },
+  "without_header": {
+    "status": 400,
+    "ms": 691,
+    "error": {
+      "type": "MissingSessionID",
+      "message": "Request is missing x-opencode-session and cannot be routed efficiently. Please see https://opencode.ai/docs/go/#where-can-i-use-it"
+    },
+    "id": null,
+    "model": null,
+    "content": null,
+    "usage": null
+  },
+  "with_header": {
+    "status": 200,
+    "ms": 1504,
+    "error": null,
+    "id": "02179121938998311300f35b2a874e35aceb4d35afb57b8e0d3d6",
+    "model": "deepseek-v4.1-flash",
+    "content": "pong",
+    "usage": {
+      "prompt_tokens": 38,
+      "completion_tokens": 19,
+      "total_tokens": 57,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 16
+      }
+    }
+  },
+  "models_endpoint": {
+    "status": 200,
+    "catalogue_size": 36,
+    "deepseek_v4_1_flash_listed": true
+  }
+}

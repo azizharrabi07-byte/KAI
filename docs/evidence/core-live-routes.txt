@@ -1,0 +1,85 @@
+# KAI Core live route check — 2026-10-01T19:05:20+01:00
+# dist/server.js on 127.0.0.1:8788, API_SERVER_KEY from the Hermes install's .env
+
+## GET /health
+{
+  "status": "ok",
+  "service": "kai-core",
+  "version": "0.1.0",
+  "hermes": {
+    "reachable": true,
+    "authorized": true,
+    "version": "unknown",
+    "reason": null
+  },
+  "opencode": {
+    "reachable": true,
+    "version": "1.18.33",
+    "reason": null
+  },
+  "checked_at": "2026-10-01T18:05:20.878Z"
+}
+## POST /chat  (a real model turn through KAI Core -> Hermes -> provider)
+{
+  "agent": "hermes",
+  "session_id": "api_1790877920_f8906b8d",
+  "reply": "KAI-CORE-LIVE-OK",
+  "usage": {
+    "input_tokens": 17436,
+    "output_tokens": 70,
+    "total_tokens": 17506,
+    "runtime": {
+      "provider": "opencode-go",
+      "model": "deepseek-v4.1-flash",
+      "route_source": "global",
+      "requested": {
+        "provider": "",
+        "model": ""
+      }
+    }
+  }
+}
+## POST /chat  (second turn, same session_id — session continuity)
+session_id=api_1790877926_ee0074e1
+{
+  "agent": "hermes",
+  "session_id": "api_1790877926_ee0074e1",
+  "reply": "KAI-SESSION-ONE",
+  "usage": {
+    "input_tokens": 17526,
+    "output_tokens": 7,
+    "total_tokens": 17533,
+    "runtime": {
+      "provider": "opencode-go",
+      "model": "deepseek-v4.1-flash",
+      "route_source": "global",
+      "requested": {
+        "provider": "",
+        "model": ""
+      }
+    }
+  }
+}
+## GET /agents/opencode/permissions
+{
+  "agent": "opencode",
+  "data": []
+}
+## POST /agents/opencode/permissions/per_unknown/reply  (route is wired; server answers 404 for an unknown id)
+{
+  "error": "bad_gateway",
+  "target": "http://127.0.0.1:4096",
+  "reason": "upstream_http_404",
+  "message": "agent returned HTTP 404 (http://127.0.0.1:4096)"
+}
+## GET /chat  (wrong method)
+{
+  "error": "method_not_allowed",
+  "reason": "method_not_allowed",
+  "method": "GET"
+}
+## POST /chat  (invalid body)
+{
+  "error": "invalid_request",
+  "reason": "invalid_text"
+}

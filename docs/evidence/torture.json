@@ -1,0 +1,90 @@
+{
+  "at": "2026-10-07T23:54:19.272Z",
+  "scenarios": {
+    "T1: 100 sequential missions complete": {
+      "pass": true,
+      "detail": "100/100 in 7803ms"
+    },
+    "T2: 25 concurrent missions, no collision": {
+      "pass": true,
+      "detail": "25/25 in 1918ms"
+    },
+    "T3: 10 concurrent multi-child missions created": {
+      "pass": true,
+      "detail": "ok=10/10"
+    },
+    "T4: 3-level delegation completes level by level": {
+      "pass": true,
+      "detail": ""
+    },
+    "T5: breaker recommends then replacement completes": {
+      "pass": true,
+      "detail": "breaker=true final=COMPLETED"
+    },
+    "T6: review loop (CHANGES then PASS) completes": {
+      "pass": true,
+      "detail": "state=COMPLETED"
+    },
+    "T7: approval parks then resumes to COMPLETED": {
+      "pass": true,
+      "detail": "parked=WAITING after=COMPLETED"
+    },
+    "T8: large transcript (320 turns) intact": {
+      "pass": true,
+      "detail": "turns=320"
+    },
+    "T9: activity log bounded": {
+      "pass": true,
+      "detail": "events=100"
+    },
+    "T10a: every operator command runs live": {
+      "pass": true,
+      "detail": "16/16"
+    },
+    "T10b: rapid @ mention routes to the worker": {
+      "pass": true,
+      "detail": "status=200"
+    },
+    "M: false-completion rate is zero": {
+      "pass": true,
+      "detail": "0/131 completed lacked passed verification"
+    },
+    "M: needs-continue rate is zero for autonomous missions": {
+      "pass": true,
+      "detail": "paused-at-end=0"
+    },
+    "M: no true orphan tasks": {
+      "pass": true,
+      "detail": "in-flight=0"
+    },
+    "M: every attempted mission completed": {
+      "pass": true,
+      "detail": "rate=1 (131/131)"
+    },
+    "M: bench recorded real worker history": {
+      "pass": true,
+      "detail": "workers=2"
+    },
+    "M: memory growth bounded": {
+      "pass": true,
+      "detail": "+17MB"
+    }
+  },
+  "metrics": {
+    "t1Ms": 7803,
+    "t2Ms": 1918,
+    "activityEvents": 100,
+    "created": 171,
+    "attempted": 131,
+    "completed": 131,
+    "completionRate": 1,
+    "falseCompletionRate": 0,
+    "orphanTasks": 0,
+    "retried": 0,
+    "benchmarkedWorkers": 2,
+    "activeRuns": 0,
+    "memDeltaMB": 17,
+    "needsContinue": 0
+  },
+  "verdict": "PASS"
+}

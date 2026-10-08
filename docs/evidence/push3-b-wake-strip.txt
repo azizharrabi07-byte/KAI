@@ -1,0 +1,118 @@
+################ setup ################
+$ powershell -File docs/evidence/launch-cdp.ps1
+kai.exe started with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222
+kai.exe: 6872 
+$ node docs/evidence/cdp.mjs eval   # a DOM probe on #wake-strip, so its own counts are evidence
+probe installed on #wake-strip
+
+################ PART 1 — hidden, then approached with the real mouse ################
+$ (park the real cursor, then wait for the product's own hide: 15 s + 60 s)
+  hidden after ~60s (style.width = 184px, window = wake strip)
+
+$ win-input.ps1 -Action rect -ProcessName kai        # while hidden
+{"pid":6872,"handle":984638,"left":787,"top":0,"width":345,"height":9,"dpi":106,"scale":1.1042}
+
+$ win-styles.ps1 -TitleMatch KAI -TitleExact          # while hidden
+{
+    "value":  [
+                  {
+                      "hwnd":  984638,
+                      "class":  "Tauri Window",
+                      "title":  "KAI",
+                      "visible":  true,
+                      "enabled":  true,
+                      "style":  "0x14C80000",
+                      "exstyle":  "0x00040118",
+                      "exflags":  "WS_EX_TOPMOST",
+                      "layered":  "none",
+                      "rect":  "787,0 345x9",
+                      "ws_visible":  true
+                  }
+              ],
+    "Count":  1
+}
+
+$ win-input.ps1 -Action move -X 400 -Y 700            # real cursor away from the strip
+{"requested":"400,700","actual":"400,700"}
+$ win-input.ps1 -Action move -X 959 -Y 4              # real cursor INTO the hidden strip
+{"requested":"959,4","actual":"959,4"}
+
+-- the island --
+{"island":"288pxx32px","content":"0","mini":"1","viewport":"721x320","stripEnter":1,"stripMove":3,"docMove":3}
+-- the window --
+{"pid":6872,"handle":984638,"left":443,"top":0,"width":1034,"height":459,"dpi":106,"scale":1.1042}
+-- kai.log --
+2026-10-02 11:05:47 ui  [core] connection ONLINE
+2026-10-02 11:08:00 ui  [island] wake strip entered at 959,4 (window 787,0 PhysicalSize { width: 345, height: 9 }) — waking
+2026-10-02 11:22:02 ui  [core] connection CONNECTING
+2026-10-02 11:22:05 ui  [core] connection ONLINE
+
+################ PART 2 — the worst case, forced: the hidden window is click-through ################
+  hidden after ~65s (style.width = 184px, window = wake strip)
+
+$ win-input.ps1 -Action rect
+{"pid":6872,"handle":984638,"left":787,"top":0,"width":345,"height":9,"dpi":106,"scale":1.1042}
+$ win-transparent.ps1 -TitleMatch KAI -TitleExact -On    # put LAYERED|TRANSPARENT back
+[KAI] exstyle 0x00040118 -> 0x000C0138
+$ win-styles.ps1 -TitleMatch KAI -TitleExact
+{
+    "value":  [
+                  {
+                      "hwnd":  984638,
+                      "class":  "Tauri Window",
+                      "title":  "KAI",
+                      "visible":  true,
+                      "enabled":  true,
+                      "style":  "0x14C80000",
+                      "exstyle":  "0x000C0138",
+                      "exflags":  "WS_EX_TRANSPARENT|WS_EX_LAYERED|WS_EX_TOPMOST",
+                      "layered":  "ok key=0x000000 alpha=255 flags=2",
+                      "rect":  "787,0 345x9",
+                      "ws_visible":  true
+                  }
+              ],
+    "Count":  1
+}
+
+-- reset the probe, park the cursor, then approach again with the real mouse --
+{"requested":"400,700","actual":"400,700"}
+$ win-input.ps1 -Action move -X 959 -Y 4
+{"requested":"959,4","actual":"959,4"}
+
+-- the island --
+{"island":"288pxx32px","content":"0","mini":"1","viewport":"721x320","stripEnter":0,"stripMove":0,"docMove":1}
+-- the window --
+{"pid":6872,"handle":984638,"left":443,"top":0,"width":1034,"height":459,"dpi":106,"scale":1.1042}
+-- kai.log: the Rust wake monitor's own line --
+2026-10-02 10:43:47 ui  [island] wake strip entered at 959,4 (window 787,0 PhysicalSize { width: 345, height: 9 }) — waking
+2026-10-02 11:08:00 ui  [island] wake strip entered at 959,4 (window 787,0 PhysicalSize { width: 345, height: 9 }) — waking
+2026-10-02 11:24:22 ui  [island] wake strip entered at 959,4 (window 787,0 PhysicalSize { width: 345, height: 9 }) — waking
+
+
+################ PART 3 — a real click on the revealed island expands it ################
+$ sleep 5   # the window has to shed the flag this test forced on it (the poll re-asserts once a second)
+$ win-styles.ps1 -TitleMatch KAI -TitleExact          # the forced flag is gone again
+{
+    "value":  [
+                  {
+                      "hwnd":  984638,
+                      "class":  "Tauri Window",
+                      "title":  "KAI",
+                      "visible":  true,
+                      "enabled":  true,
+                      "style":  "0x14C80000",
+                      "exstyle":  "0x000C0118",
+                      "exflags":  "WS_EX_LAYERED|WS_EX_TOPMOST",
+                      "layered":  "ok key=0x000000 alpha=255 flags=2",
+                      "rect":  "443,0 1034x459",
+                      "ws_visible":  true
+                  }
+              ],
+    "Count":  1
+}
+$ win-input.ps1 -Action click -X 959 -Y 30
+{"clicked":"959,30","actual":"959,30"}
+-- the island --
+{"island":"640pxx210px","content":"1","mini":"0","viewport":"721x320","stripEnter":0,"stripMove":0,"docMove":3}
+-- the window --
+{"pid":6872,"handle":984638,"left":443,"top":0,"width":1034,"height":459,"dpi":106,"scale":1.1042}

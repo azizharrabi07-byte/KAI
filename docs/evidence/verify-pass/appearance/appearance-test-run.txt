@@ -1,0 +1,20 @@
+
+=== phase: reset ===
+reset clicked: KAI
+island appearance after reset: {"id":"kai","label":"KAI","skin":"blue","theme":"aqua","accessory":"none","primaryColor":"#2E84F6","secondaryColor":"#A4E4FF"}
+
+=== phase: change ===
+baseline island appearance: {"id":"kai","label":"KAI","skin":"blue","theme":"aqua","accessory":"none","primaryColor":"#2E84F6","secondaryColor":"#A4E4FF"} -> appearance-01-before-orb.png
+settings controls present: {"preset":true,"skin":true,"theme":true,"outfit":true,"heading":true}
+clicked preset: KAI-Coder
+set skin -> yellow  outfit -> cap
+settings localStorage kai.appearance.v1: {"id":"kai-coder","label":"KAI-Coder","skin":"yellow","theme":"sun","accessory":"cap","primaryColor":"#FFC21A","secondaryColor":"#FFEFA0"}
+island appearance after UI change (no restart): {"id":"kai-coder","label":"KAI-Coder","skin":"yellow","theme":"sun","accessory":"cap","primaryColor":"#FFC21A","secondaryColor":"#FFEFA0"} -> appearance-02-after-orb.png
+
+CHANGE summary: settingsControlsFound=true changedWithoutRestart=true appliedSelection=true orbPngsDiffer=true
+
+=== phase: verify ===
+after restart, island appearance: {"id":"kai-coder","label":"KAI-Coder","skin":"yellow","theme":"progress","accessory":"cap","primaryColor":"#FFC21A","secondaryColor":"#FFEFA0"} -> appearance-03-after-restart-orb.png
+after restart, localStorage kai.appearance.v1: {"id":"kai-coder","label":"KAI-Coder","skin":"yellow","theme":"progress","accessory":"cap","primaryColor":"#FFC21A","secondaryColor":"#FFEFA0"}
+
+VERIFY summary: persistedAcrossRestart=true

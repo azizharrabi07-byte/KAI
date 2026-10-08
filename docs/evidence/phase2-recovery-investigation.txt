@@ -1,0 +1,47 @@
+RECOVERY LEDGER INVESTIGATION — RESOLVED (live, 2026-10-03)
+===========================================================
+Product: buildId b2a75cd601c269d1 gitCommit f8757df1, pid 3968 owns 8788, spawned by kai.exe.
+
+THE BUG WAS REAL AND IS FIXED
+  A mission tool step took `sideEffecting` from the TEMPLATE. Nothing derived it from the
+  tool's declared risk, so a WRITE/EXTERNAL/DESTRUCTIVE step could report sideEffecting:false
+  — and the acceptance boundary records only side-effecting work. Same principle the risk
+  gate already enforced (a template cannot lower a tool's declared risk); it could still
+  lower sideEffectiveness, and that half was missing.
+  FIX (core/src/runtime.ts, at mission creation — the authoritative point):
+      impliedByRisk = tool.risk !== "READ"
+      step.sideEffecting = impliedByRisk || step.sideEffecting   // may raise, never lower
+  VERIFIED LIVE: the same probe step now reports sideEffecting = TRUE (it reported false
+  before the fix), and the mission completed.
+
+THE LEDGER DOES RECORD — the STATUS ENDPOINT WAS THE PROBLEM
+  Raw row read from recovery-ledger.db after the probe:
+    executionId exec_mission_murobtie_0_step_mission_murobtie_0_0
+    kind mission_step  refId mission_murobtie_0  stepId step_mission_murobtie_0_0
+    sideEffecting 1  phase AFTER_ACCEPT  status COMPLETED  sideEffectCount 1
+    startedAt 00:48:49.216Z  acceptedAt 00:48:49.218Z  finishedAt 00:48:49.225Z
+  So the boundary writes, the acceptance point is recorded (acceptedAt), and the side-effect
+  counter exists. But GET /recovery/status reports {"open":[], "total":0} for the same ledger.
+  That is a REPORTING defect: `total` does not include settled records, so a healthy ledger
+  looks empty. Recorded as an open defect, not papered over.
+
+C5 — PASS (the after-accept requirement, demonstrated live)
+  POST /recovery/classify {executionId: exec_mission_murobtie_0_...} ->
+    {"phase":"AFTER_ACCEPT","status":"COMPLETED","sideEffecting":true,"sideEffectCount":1,
+     "replaySafe":false,"reason":"already completed; nothing to replay"}
+  An accepted side effect is NOT replayable and the count stays 1. This is the required
+  verdict, produced from durable ledger state.
+
+C4 — NOT YET. It needs a step that fails BEFORE acceptance so the record shows BEFORE_ACCEPT
+  and classifies replaySafe:true. The machinery for it is now proven to exist.
+
+FINDING #2 RESOLVED — NO POLICY DIVERGENCE
+  The earlier probe parked at WAITING_APPROVAL, which looked like the mission path being
+  stricter than the route path for memory.write. It was not: MissionStepInput names its tool
+  in `target`, and my probe had used a `toolId` field that does not exist, so no tool was
+  resolvable and the executor's conservative default (EXTERNAL -> approval) applied. With the
+  tool named correctly the same step was allowed and completed. The two paths agree; my
+  payload was malformed.
+
+TEST DISCIPLINE: every result above came from a full raw response plus an independent query
+(the ledger DB read directly), after three rounds where partial JSON paths misled me.

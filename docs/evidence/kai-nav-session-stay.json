@@ -1,0 +1,37 @@
+{
+  "finding": "P0 — 'sending a prompt throws the user back to Home'",
+  "root_cause": {
+    "not": "a route change (no hashchange router, no location mutation, no reset-on-error — confirmed again on the live path)",
+    "is": "app/src/shell/presence/presence.ts overloaded the `.talking` CSS class for two meanings: (a) a turn is in flight, and (b) a conversation exists to show. `runTurn`'s completion path ran `app.classList.remove('talking')` 600ms after EVERY turn, and presence.css ties the surface to that class: `.talking .thread{display:block}` / `.talking .hero{display:none}`. So the moment a reply arrived the thread was hidden and the greeting hero (the landing/Home screen) came back, even though the conversation was still loaded.",
+    "css": ["presence.css:132 .talking .thread{display:block}", "presence.css:199 .talking .hero,.talking .abil,.talking .chips{display:none}"]
+  },
+  "fix": {
+    "new_module": "app/src/shell/presence/conversation.ts — conversationVisible({turns,busy}) = busy || turns > 0 (the one tested decision)",
+    "presence": "refreshChatSurface() RECOMPUTES the class from conversationVisible; the completion path recomputes instead of removing. Failed turns stay in the session and name the subsystem (NETWORK / MODEL PROVIDER / KAI), preserve the input, and offer Retry without recording a duplicate user turn."
+  },
+  "live_reproduction": {
+    "harness": "Chrome --headless=new over CDP (port 9223) against the real app: vite dev 127.0.0.1:1420/shell.html + the running KAI Core on 127.0.0.1:8788 (GET /state ok)",
+    "flow": "Sessions rail -> Open the active session -> type 'reply with exactly: PONG' -> Send",
+    "before": {
+      "at_turn_resolution": { "on": ["chat"], "talking": false, "heroVisible": true, "threadTurns": 203, "note": "reply appended at T+3.5s, then the conversation collapsed to the greeting at T+4.2s" }
+    },
+    "after": {
+      "at_turn_resolution": { "on": ["chat"], "talking": true, "heroVisible": false, "threadTurns": 203, "hash": "" },
+      "note": "thread stays in front from just-sent through T+7.0s; the reply (203rd node) is visible"
+    },
+    "reload_restores_session": { "on": ["chat"], "talking": true, "heroVisible": false, "turns": 200, "session": "Say hi as yourself · 328 turns", "note": "refreshActive() loads the active session's turns; the surface is computed from them" }
+  },
+  "tests": {
+    "file": "app/tests/presence-conversation.test.ts",
+    "asserts": [
+      "a just-finished turn keeps the conversation on screen (turns>0, busy=false -> visible)",
+      "a live turn is shown before the first reply",
+      "the greeting shows only with no conversation and no live turn",
+      "a tool call / approval turn stays in the session through to its result",
+      "a reloaded session with history starts on the conversation",
+      "presence.ts computes the surface from conversationVisible",
+      "presence.ts no longer removes `.talking` on turn completion"
+    ]
+  },
+  "verification": { "app_tsc": 0, "app_suite": "269/269 pass, 0 fail", "baseline": "262/262" }
+}

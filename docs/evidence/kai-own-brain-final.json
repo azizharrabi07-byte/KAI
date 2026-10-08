@@ -1,0 +1,363 @@
+{
+  "what": "KAI's OWN-BRAIN path, live: the two defects that stopped a real generative turn from coming back from KAI's own model provider (opencode-go), the fix for each, and the raw evidence. DEFECT 1: the provider never sent the routing header the gateway requires, so POST /chat/completions answered 400 MissingSessionID while GET /models answered 200 — reachable=true, every generative turn dead. DEFECT 2: KAI_HOME was resolved twice (the Core's data under %LOCALAPPDATA%\\KAI, the model credential under homedir()/.kai), so a fresh install looked for its credential in the wrong root.",
+  "when": "2026-10-05T17:59:35+01:00",
+  "host": "Windows 11, KAI Core on 127.0.0.1:8788 (live, started by the desktop app kai.exe)",
+  "build": {
+    "git_head_at_write": "6d353348729a4df2917cdb6a62c751b70048cee8",
+    "dist_build_info": {
+      "service": "kai-core",
+      "coreVersion": "0.1.0",
+      "buildId": "fd0bbdbd19212a6d",
+      "gitCommit": "6d353348729a4df2917cdb6a62c751b70048cee8",
+      "protocolVersion": 1,
+      "sourceBuildId": "fd0bbdbd19212a6d"
+    },
+    "shipped_core_artifacts_rebuilt": [
+      "core/bundle/server.js (npm run bundle)",
+      "core/dist/server.js (npm run build)",
+      "app/target/release/core/server.js (bundle installed where the app resolves it)"
+    ],
+    "working_tree_sha256_12_of_provider": "bda8c3d37d4b"
+  },
+  "defect_1_provider_header": {
+    "symptom": "POST /chat -> intent=unknown, from_state=false, brain=null, reply=\"My own model provider isn't answering that right now — http.\"",
+    "captured_before_the_fix_on_the_live_core": "RAW CAPTURE — taken on the LIVE Core (http://127.0.0.1:8788, the Core the desktop app runs)\nBEFORE this fix, with the supervisor's seeded credential already in place.\nCommand: curl -s -X POST http://127.0.0.1:8788/chat -H \"content-type: application/json\"\n         -d '{\"text\":\"Write a two-line haiku about terminals, then name the model you used\"}'\nResponse body, verbatim:\n\n{\n  \"agent\": \"core\",\n  \"from_state\": false,\n  \"intent\": \"unknown\",\n  \"conversation_id\": \"sess_musv974c_7dhj\",\n  \"reply\": \"My own model provider isn't answering that right now — http. I'm still KAI and my memory and state are available; ask me for status, what I remember, or what I can do, or tell me to retry.\",\n  \"data\": {\n    \"provider\": \"opencode-go\",\n    \"model\": \"deepseek-v4.1-flash\",\n    \"error\": \"http\"\n  },\n  \"brain\": null,\n  \"dependency\": {\n    \"normal_chat_calls_to_hermes\": 0\n  }\n}\n\nGET /independence on the same Core, before the fix, already reported\ninference.configured=true, inference.reachable=true, capabilities\nchat/stream/structured/embeddings=true — which is exactly why the defect was\ninvisible from that surface: /models answers 200 without the routing header, so\n\"reachable\" was true while every generative turn answered HTTP 400.\n\nThe provider-level raw status codes from that same pre-fix state (the probe in\ndocs/evidence/kai-own-brain-final.json re-runs it with the fix in place):\n\n  POST https://opencode.ai/zen/go/v1/chat/completions   (no extra header)          -> HTTP 400\n    {\"type\":\"error\",\"error\":{\"type\":\"MissingSessionID\",\"message\":\"Request is missing x-opencode-session and cannot be routed efficiently. Please see https://opencode.ai/docs/go/#where-can-i-use-it\"}}\n\n  POST https://opencode.ai/zen/go/v1/chat/completions   + x-opencode-session + UA  -> HTTP 200\n    {\"id\":\"0217912181181005b7c5d80188542749d9bf0e4ecbfb37f8c15b1\", \"model\":\"deepseek-v4.1-flash\",\n     \"content\":\"pong\", \"usage\":{\"prompt_tokens\":38,\"completion_tokens\":14,\"total_tokens\":52}}\n",
+    "raw_provider_level_repro": {
+      "endpoint": "https://opencode.ai/zen/go/v1",
+      "header_kai_sends": {
+        "x-opencode-session": "kai-d868c0d344dd955256253363dfabf035",
+        "user-agent": "opencode-ai/1.0"
+      },
+      "is_opencode_gateway": true,
+      "request": {
+        "method": "POST",
+        "path": "/chat/completions",
+        "model": "deepseek-v4.1-flash"
+      },
+      "without_header": {
+        "status": 400,
+        "ms": 691,
+        "error": {
+          "type": "MissingSessionID",
+          "message": "Request is missing x-opencode-session and cannot be routed efficiently. Please see https://opencode.ai/docs/go/#where-can-i-use-it"
+        },
+        "id": null,
+        "model": null,
+        "content": null,
+        "usage": null
+      },
+      "with_header": {
+        "status": 200,
+        "ms": 1504,
+        "error": null,
+        "id": "02179121938998311300f35b2a874e35aceb4d35afb57b8e0d3d6",
+        "model": "deepseek-v4.1-flash",
+        "content": "pong",
+        "usage": {
+          "prompt_tokens": 38,
+          "completion_tokens": 19,
+          "total_tokens": 57,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 16
+          }
+        }
+      },
+      "models_endpoint": {
+        "status": 200,
+        "catalogue_size": 36,
+        "deepseek_v4_1_flash_listed": true
+      }
+    },
+    "header_sent": {
+      "name": "x-opencode-session",
+      "value": "KIASessionId() — kai-<sha256(machine|user|platform|arch) first 32 hex>, derived ONCE per install, identical on every request and across restarts",
+      "live_value": "kai-d868c0d344dd955256253363dfabf035",
+      "also_sent": {
+        "user-agent": "opencode-ai/1.0"
+      }
+    },
+    "scoping": "Sent ONLY when the configured base URL host is opencode.ai (or a subdomain) — isOpencodeGateway(baseUrl). Another OpenAI-compatible endpoint receives exactly the headers it received before (test: 'a non-opencode OpenAI-compatible endpoint gets NO routing headers'). A caller can still add arbitrary headers via options.headers, and pin the id via options.sessionId.",
+    "secrecy": "The session id is not a secret (no key material) and is never logged; the API key still appears only in the authorization header.",
+    "fix_files": [
+      "core/src/model/openai-compatible.ts",
+      "core/src/model/index.ts"
+    ]
+  },
+  "defect_2_kai_home": {
+    "symptom": "the Core's database lived at C:/Users/DELL/AppData/Local/KAI/core/kai-core.db (runtime KAI_HOME = %LOCALAPPDATA%\\KAI) while resolveModelSettings() defaulted to homedir()/.kai, so model/credentials.json was looked for in the WRONG root and the provider stayed unconfigured until KAI_HOME was set by hand AND the file was copied to ~/.kai.",
+    "fix": "ONE rule (agent/kai-home.ts::defaultKaiHome) that model/config.ts re-exports, plus the runtime resolving kaiHome once and passing it explicitly down the runtime -> provider path (createCoreRuntime -> createKaiModelProvider({kaiHome}) -> resolveModelSettings). Nothing re-derives a default.",
+    "fix_files": [
+      "core/src/agent/kai-home.ts",
+      "core/src/model/config.ts",
+      "core/src/runtime.ts"
+    ],
+    "live_fresh_install_proof": {
+      "setup": "A second Core started from the shipped artifact app/target/release/core/server.js (PID stopped afterwards) with KAI_CORE_PORT=8799 and KAI_HOME deliberately UNSET in its environment; the ~/.kai duplicate the supervisor had to create was renamed to credentials.json.duplicate-not-needed, so the ONLY credential on disk was <runtime KAI_HOME>/model/credentials.json = C:/Users/DELL/AppData/Local/KAI/model/credentials.json.",
+      "kAI_home_env_var": null,
+      "reported_database_path": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\kai-core.db",
+      "independence": {
+        "architecture": "KAI UI -> KAI Core -> KAI ModelProvider -> model -> KAI",
+        "inference": {
+          "owner": "kai",
+          "provider": "opencode-go",
+          "model": "deepseek-v4.1-flash",
+          "configured": true,
+          "reachable": true,
+          "baseUrl": "https://opencode.ai/zen/go/v1",
+          "reason": null,
+          "capabilities": {
+            "chat": true,
+            "stream": true,
+            "structured": true,
+            "embeddings": true,
+            "tools": false,
+            "models": [],
+            "defaultModel": "deepseek-v4.1-flash"
+          }
+        },
+        "workers": {
+          "hermes": {
+            "optional": true,
+            "role": "worker",
+            "reachable": true,
+            "authorized": true
+          }
+        },
+        "dependency": {
+          "normal_chat_turns": 0,
+          "delegated_turns": 0,
+          "normal_chat_calls_to_hermes": 0,
+          "delegated_calls_to_hermes": 0
+        }
+      },
+      "generative_turn": {
+        "agent": "core",
+        "from_state": false,
+        "intent": "unknown",
+        "conversation_id": "sess_musv974c_7dhj",
+        "reply": "KAI-OWN-BRAIN-OK",
+        "data": {
+          "provider": "opencode-go",
+          "model": "deepseek-v4.1-flash"
+        },
+        "brain": {
+          "provider": "opencode-go",
+          "model": "deepseek-v4.1-flash"
+        },
+        "dependency": {
+          "normal_chat_calls_to_hermes": 0
+        }
+      },
+      "result": "configured=true, reachable=true and a real completion, with no env var and no duplicate file."
+    }
+  },
+  "live_proof_hermes_up": {
+    "endpoint": "http://127.0.0.1:8788",
+    "independence": {
+      "architecture": "KAI UI -> KAI Core -> KAI ModelProvider -> model -> KAI",
+      "inference": {
+        "owner": "kai",
+        "provider": "opencode-go",
+        "model": "deepseek-v4.1-flash",
+        "configured": true,
+        "reachable": true,
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "reason": null,
+        "capabilities": {
+          "chat": true,
+          "stream": true,
+          "structured": true,
+          "embeddings": true,
+          "tools": false,
+          "models": [],
+          "defaultModel": "deepseek-v4.1-flash"
+        }
+      },
+      "workers": {
+        "hermes": {
+          "optional": true,
+          "role": "worker",
+          "reachable": true,
+          "authorized": true
+        }
+      },
+      "dependency": {
+        "normal_chat_turns": 1,
+        "delegated_turns": 0,
+        "normal_chat_calls_to_hermes": 0,
+        "delegated_calls_to_hermes": 0
+      }
+    },
+    "generative_turn": {
+      "agent": "core",
+      "from_state": false,
+      "intent": "unknown",
+      "conversation_id": "sess_musv974c_7dhj",
+      "reply": "Cursor blinks alone —\nthe dark screen waits for my words.\n\nOn the model: I can't honestly name one. I'm KAI, your agent running locally, and I don't have verified access from here to which underlying model is serving this turn — guessing a name would be inventing a fact. If you want it confirmed, point me at the config (or say the word and I'll look for where the runtime records it) and I'll read it rather than guess.\n\nSmall note: a haiku is normally three lines (5-7-5); I followed your two-line request, so the form is off by convention, not by accident.",
+      "data": {
+        "provider": "opencode-go",
+        "model": "deepseek-v4.1-flash"
+      },
+      "brain": {
+        "provider": "opencode-go",
+        "model": "deepseek-v4.1-flash"
+      },
+      "dependency": {
+        "normal_chat_calls_to_hermes": 0
+      }
+    },
+    "dependency_check": "normal_chat_calls_to_hermes == 0 on the turn AND in the /independence counters; the reply is a genuine completion with brain.provider=opencode-go, brain.model=deepseek-v4.1-flash."
+  },
+  "hermes_down_test": {
+    "how": "The Hermes gateway process (PID 23464, `hermes -p default gateway run`, owner of 127.0.0.1:8642) was stopped; 8642 stopped listening and http://127.0.0.1:8642/health did not answer. KAI Core was NOT restarted or reconfigured.",
+    "independence_while_down": {
+      "architecture": "KAI UI -> KAI Core -> KAI ModelProvider -> model -> KAI",
+      "inference": {
+        "owner": "kai",
+        "provider": "opencode-go",
+        "model": "deepseek-v4.1-flash",
+        "configured": true,
+        "reachable": true,
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "reason": null,
+        "capabilities": {
+          "chat": true,
+          "stream": true,
+          "structured": true,
+          "embeddings": true,
+          "tools": false,
+          "models": [],
+          "defaultModel": "deepseek-v4.1-flash"
+        }
+      },
+      "workers": {
+        "hermes": {
+          "optional": true,
+          "role": "worker",
+          "reachable": false,
+          "authorized": false
+        }
+      },
+      "dependency": {
+        "normal_chat_turns": 5,
+        "delegated_turns": 0,
+        "normal_chat_calls_to_hermes": 0,
+        "delegated_calls_to_hermes": 0
+      }
+    },
+    "generative_turn_while_down": {
+      "agent": "core",
+      "from_state": false,
+      "intent": "unknown",
+      "conversation_id": "sess_musv974c_7dhj",
+      "reply": "Jupiter.",
+      "data": {
+        "provider": "opencode-go",
+        "model": "deepseek-v4.1-flash"
+      },
+      "brain": {
+        "provider": "opencode-go",
+        "model": "deepseek-v4.1-flash"
+      },
+      "dependency": {
+        "normal_chat_calls_to_hermes": 0
+      }
+    },
+    "independence_question_while_down": {
+      "agent": "core",
+      "from_state": true,
+      "intent": "independence",
+      "conversation_id": "sess_musv974c_7dhj",
+      "reply": "No — I don't need a worker to exist, to boot, to know who I am or to speak. My identity and my runtime are my own; a worker is an ability I can use, never what I am. Workers are Hermes, OpenCode, Codex. A worker provides information; a worker does not become the speaker. Internal provenance may still say worker = Hermes; that is correct and stays. Right now Hermes is offline; either way I remain KAI and will say if it is unavailable.",
+      "data": {
+        "worker": "hermes"
+      },
+      "brain": null,
+      "dependency": {
+        "normal_chat_calls_to_hermes": 0
+      }
+    },
+    "identity_question_while_down": {
+      "agent": "core",
+      "from_state": true,
+      "intent": "identity",
+      "conversation_id": "sess_musv974c_7dhj",
+      "reply": "I am KAI. Hermes and OpenCode are workers I can use; I'm still KAI when they are unavailable.",
+      "data": {
+        "version": "ab81578e"
+      },
+      "brain": null,
+      "dependency": {
+        "normal_chat_calls_to_hermes": 0
+      }
+    },
+    "result": "workers.hermes.reachable=false while inference configured=true/reachable=true; a real generative turn succeeded ('Jupiter.'); the independence and identity questions were answered from KAI's own state (from_state=true); normal_chat_calls_to_hermes stayed 0.",
+    "restart": "The gateway was restarted with the same command; 8642 was LISTENING again after 16 s (new PID 7236), `hermes gateway status` reports the default profile running, and /independence reports workers.hermes.reachable=true, authorized=true (evidence/independence-hermes-restored.json).",
+    "after_restore": {
+      "architecture": "KAI UI -> KAI Core -> KAI ModelProvider -> model -> KAI",
+      "inference": {
+        "owner": "kai",
+        "provider": "opencode-go",
+        "model": "deepseek-v4.1-flash",
+        "configured": true,
+        "reachable": true,
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "reason": null,
+        "capabilities": {
+          "chat": true,
+          "stream": true,
+          "structured": true,
+          "embeddings": true,
+          "tools": false,
+          "models": [],
+          "defaultModel": "deepseek-v4.1-flash"
+        }
+      },
+      "workers": {
+        "hermes": {
+          "optional": true,
+          "role": "worker",
+          "reachable": true,
+          "authorized": true
+        }
+      },
+      "dependency": {
+        "normal_chat_turns": 8,
+        "delegated_turns": 0,
+        "normal_chat_calls_to_hermes": 0,
+        "delegated_calls_to_hermes": 0
+      }
+    }
+  },
+  "tests": {
+    "new": "core/tests/model-provider.test.ts (8 tests)",
+    "defect_1_regression": {
+      "test": "opencode-go: the outgoing chat request carries x-opencode-session and the opencode user-agent",
+      "asserts": "on the OUTGOING request headers captured by a stub fetch — x-opencode-session is a kai-<32 hex> string, user-agent is opencode-ai/1.0, authorization is unchanged; plus the streamed path, the stability of the id across requests and across provider instances, and that a non-opencode host gets neither header.",
+      "proved_to_fail_without_the_fix": "With the routing headers temporarily disabled (isOpencodeGateway forced false), 3 of the 8 tests fail (both header tests and the fresh-install Core test). Restored: 8/8 pass."
+    },
+    "defect_2_regression": {
+      "tests": [
+        "KAI_HOME is resolved by ONE rule: the model resolver and the identity layer agree (reference equality of the exported function + the KAI_HOME -> %LOCALAPPDATA%\\KAI -> ~/.kai order)",
+        "a fresh install: a real Core configured ONLY by <runtime KAI_HOME>/model/credentials.json, with no env var (boots createCoreRuntime with KAI_HOME and every KAI_MODEL_* deleted from the environment, then asserts capabilities().chat == true and drives a real turn to the credential file's endpoint/key)"
+      ],
+      "proved_to_fail_without_the_fix": "With the pre-fix wiring temporarily restored (the runtime not passing kaiHome down AND config.ts re-deriving homedir()/.kai), 2 of the 8 tests fail. Restored: 8/8 pass."
+    },
+    "made_hermetic_because_they_boot_a_Core": {
+      "files": [
+        "core/tests/routing-relay.test.ts",
+        "core/tests/session-switch.test.ts"
+      ],
+      "why": "These tests exercise the NO-brain worker-relay path by booting a real Core. They were already failing before this change (verified at HEAD: 5 failures) because the seeded, working credential made a live brain available to them. They now pin their own subsystemPaths.identityRoot (which IS a KAI_HOME) to their temp directory, so <temp>/model/credentials.json does not exist and the relay path is what is under test. 3 session-switch + 2 routing-relay failures -> 0."
+    }
+  },
+  "suites": {
+    "core": "cd core && npm test -> tests 879, pass 866, fail 0, skipped 13 (HEAD baseline with a real credential on the machine: tests 872, pass 853, fail 6, skipped 13 — the 6 included the whole new test file failing to import at HEAD because the exports did not exist yet)",
+    "core_typecheck": "cd core && npx tsc -p tsconfig.json --noEmit -> exit 0",
+    "app": "cd app && npm test -> tests 262, pass 262, fail 0, skipped 0",
+    "app_typecheck": "cd app && npx tsc --noEmit -> exit 0"
+  }
+}

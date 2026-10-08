@@ -1,0 +1,300 @@
+
+> @kai/core@0.1.0 test
+> node scripts/test.mjs
+
+kai-core tests: 16 from TypeScript, 0 from dist
+api key: loaded from C:\Users\DELL\.hermes\.env
+  tests\adapters.test.ts
+  tests\api.test.ts
+  tests\chat.test.ts
+  tests\events.test.ts
+  tests\memory.test.ts
+  tests\missions.test.ts
+  tests\notifications.test.ts
+  tests\policy.test.ts
+  tests\registry.test.ts
+  tests\runtime.test.ts
+  tests\scheduler.test.ts
+  tests\storage.test.ts
+  tests\tools.test.ts
+  src\agents\hermes.test.ts
+  src\agents\opencode.test.ts
+  src\server.test.ts
+
+✔ hermes: GET /health answers ok with no auth (132.5345ms)
+✔ hermes: authenticated GET /v1/models lists the hermes-agent model (11.4716ms)
+✔ hermes: authenticated GET /v1/capabilities is an object (15.5071ms)
+✔ hermes: listSessions() returns sessions carrying an id (98.434ms)
+✔ hermes: sessionMessages() on a real session returns an array (94.2783ms)
+✔ hermes: a wrong key produces the typed unauthorized error, never a crash (11.1388ms)
+✔ hermes: a closed port produces the typed unreachable error (1.6665ms)
+✔ hermes: POST /api/sessions rejects an invalid id with a 400 (route verified, nothing created) (11.3126ms)
+✔ hermes: POST /api/sessions/{id}/chat on an unknown session answers 404 (route verified, no turn run) (9.347ms)
+      -> opencode version reported live: 1.18.33
+✔ opencode: GET /global/health reports healthy with the server's real version (109.4321ms)
+✔ opencode: health().version matches a raw GET /global/health (no fabricated version) (67.2067ms)
+✖ opencode: listSessions() returns an array whose entries carry an id (23.0105ms)
+✔ opencode: listPermissions() returns an array (16.952ms)
+✔ opencode: listQuestions() returns an array (21.7039ms)
+✔ opencode: messages() on an unknown session surfaces a typed 404 (34.174ms)
+✔ opencode: prompt() routes to POST /session/{id}/message, which answers a real JSON 404 (39.836ms)
+✔ opencode: POST /session/{id}/prompt is NOT a route — it is the web UI SPA fallback (documented deviation) (44.4361ms)
+      -> first live SSE event type: server.connected
+✔ opencode: events() yields parsed SSE from the live GET /event stream (29.0325ms)
+✔ opencode: a closed port produces the typed unreachable error (1.3394ms)
+      -> /health: hermes={"reachable":true,"authorized":true,"version":"unknown","reason":null} opencode={"reachable":true,"version":"1.18.33","reason":null}
+✔ kai core: binds and GET /health aggregates both agents (133.4228ms)
+✔ kai core: GET /integrations mirrors the aggregate (53.0659ms)
+✔ kai core: GET /agents/hermes/sessions returns sessions with ids (41.3737ms)
+✖ kai core: GET /agents/opencode/sessions proxies the live session list (31.4389ms)
+✔ kai core: GET /agents/opencode/permissions passes the array through (12.8515ms)
+✔ kai core: POST /agents/opencode/permissions/:id/reply validates the reply enum (11.5264ms)
+✔ kai core: CORS allows the Tauri dev origin and rejects every other origin (50.7013ms)
+✔ kai core: an unknown route answers 404 JSON, never HTML (5.5768ms)
+✔ kai core: an unreachable upstream answers 502 JSON with a reason and no stack trace (8.593ms)
+✔ kai core: GET /events opens an SSE stream and emits kai.ready (14.5645ms)
+✔ kai core: POST /chat rejects a body with no text (26.0739ms)
+      -> /chat: session=api_1790933583_cfc4ed2b reply="KAI-CORE-RELAY-OK"
+      -> /chat (2nd turn, same session): "KAI-CORE-RELAY-OK"
+✔ kai core: POST /chat runs a real turn through Hermes and returns the reply (6415.1642ms)
+✔ capabilities: real adapters and their simulators declare the same set (4.1703ms)
+✔ capabilities: an adapter that cannot cancel omits cancel_task and leaves cancelTask undefined (0.5784ms)
+✔ mock: a connect failure yields AGENT_NOT_LISTENING (2.7424ms)
+✔ mock: a health failure reports ok:false (0.3827ms)
+✔ mock: a run failure yields AGENT_RUN_FAILED (0.7906ms)
+✔ mock: connected -> working -> completed, observed deterministically (1.4061ms)
+✔ mock: a hanging run yields timed_out rather than hanging the test (0.7128ms)
+✔ mock: disconnect reports offline (0.3408ms)
+✔ hermes: distinguishes 'not listening' from a real timeout (3.4187ms)
+✔ hermes: 401 is AGENT_AUTH_FAILED and the api key never leaves the header (105.227ms)
+✔ hermes: runTask submits, polls from running to completed, and never stops it (3.6673ms)
+✔ hermes: a failed poll abandons the run and asks it to stop (2.7063ms)
+✔ hermes: a run that never reaches a terminal state times out and is stopped (7.8511ms)
+✔ GET /state reports core, agents, counts and scheduler state (5.551ms)
+✔ GET /agents lists agents with status (1.7433ms)
+✔ GET /agents/:id returns one agent or 404 (1.0305ms)
+✔ unknown path returns 404 JSON, never HTML (0.4709ms)
+✔ known path with the wrong method returns 404 (0.3609ms)
+✔ POST /missions with a valid body creates and starts the mission (0.8917ms)
+✔ POST /missions with a missing title returns 400 naming the field (0.4894ms)
+✔ POST /missions with a blank title returns 400 (0.4216ms)
+✔ POST /missions with a bad step kind returns 400 naming the field (0.5022ms)
+✔ POST /missions with a non-object body returns 400, not a crash (0.5613ms)
+✔ GET /missions with a bad status returns 400 naming the field (0.6453ms)
+✔ GET /missions with a bad limit returns 400 naming the field (0.4508ms)
+✔ GET /missions passes a valid status and limit through (0.4688ms)
+✔ GET /missions/:id unknown returns 404 (0.3351ms)
+✔ GET /missions/:id known returns the mission with its steps (0.2023ms)
+✔ POST /missions/:id/cancel unknown returns 404 and does not call the executor (0.2792ms)
+✔ POST /missions/:id/cancel known calls through and returns the mission (0.2846ms)
+✔ POST /approvals/:id/decide with a non-boolean returns 400 naming the field (0.4217ms)
+✔ POST /approvals/:id/decide with a missing approved returns 400 (0.2356ms)
+✔ POST /approvals/:id/decide with a valid body decides (0.3195ms)
+✔ POST /approvals/:id/decide unknown returns 404 (0.1876ms)
+✔ POST /approvals/:id/decide on an already-decided approval returns 409 with a reason (0.2425ms)
+✔ POST /memory with a valid body creates the record and publishes memory.created (20.4167ms)
+✔ POST /memory with an invalid type returns 400 naming the field (0.4321ms)
+✔ POST /memory with an out-of-range importance returns 400 naming the field (0.2551ms)
+✔ POST /memory with a blank content returns 400 naming the field (0.2275ms)
+✔ GET /memory with a bad type returns 400 naming the field (0.4087ms)
+✔ GET /notifications with a bad unreadOnly returns 400 naming the field (0.3967ms)
+✔ POST /notifications/:id/read unknown returns 404, known marks read (0.4209ms)
+✔ POST /agents/:id/action unknown agent returns 404 (0.6245ms)
+✔ POST /agents/:id/action without run_task returns 409 and never calls runTask (0.3214ms)
+✔ POST /agents/:id/action with run_task calls the adapter and returns the result (0.3395ms)
+✔ POST /agents/:id/action with a missing action returns 400 naming the field (0.3805ms)
+✔ a throwing dependency becomes a 500 JSON body with a reason and no internals (0.5062ms)
+✔ attachEventStream writes a frame per event and stops after unsubscribe (0.7793ms)
+✔ routes() lists every served path (0.3435ms)
+✔ classify is deterministic, case-insensitive and punctuation-tolerant (9.7154ms)
+✔ intents() documents every intent, including unknown (1.3112ms)
+✔ status.summary reports the stub's numbers and invents none (1.2238ms)
+✔ agent.status names the asked agent and its real state (1.7161ms)
+✔ agent.status says plainly when the asked agent is offline (0.4557ms)
+✔ agent.status is honest when the asked agent is not registered (0.3319ms)
+✔ agent.list reports the registered agents from state (0.5968ms)
+✔ mission.list counts and names the missions from the store (3.3974ms)
+✔ mission.list reports an empty list honestly (3.448ms)
+✔ approval.list reports the pending approvals from state (1.7633ms)
+✔ approval.list falls back to health counts when no list service is injected (0.6083ms)
+✔ notification.list reports unread notifications from state (1.9594ms)
+✔ memory.remember stores a note and confirms with the stored content (1.0861ms)
+✔ memory.remember with an empty fact is a clear message, not a silent no-op (1.1896ms)
+✔ memory.list answers from the digest and says so when empty (0.7137ms)
+✔ artifact.run_tests runs nothing and says so (1.5078ms)
+✔ unknown with hermes connected delegates to hermes (0.4751ms)
+✔ unknown with only opencode connected delegates to opencode (0.2631ms)
+✔ unknown with no agent connected claims nothing and delegates to nobody (0.3226ms)
+✔ unknown delegates to nobody when the registry is empty (0.1969ms)
+✔ a health probe that throws does not become an invented answer (0.5484ms)
+✔ publish delivers the built event to a subscriber and returns it (5.2483ms)
+✔ source defaults to "core" (0.3605ms)
+✔ subscribe's returned unsubscribe function stops delivery (and is idempotent) (0.6479ms)
+✔ unsubscribe(handler) works directly and twice without removing others (0.4621ms)
+✔ multiple independent subscribers all receive a matching event (0.334ms)
+✔ type filtering delivers only the requested types (0.3701ms)
+✔ an empty types array matches nothing; no types receives everything (0.3078ms)
+✔ missionId filtering receives only events carrying that mission (0.3504ms)
+✔ types and missionId filters combine (both must match) (0.3503ms)
+✔ a throwing subscriber does not stop the others or break publish (1.1831ms)
+✔ recent() returns in-memory events newest first, honouring limit (0.5983ms)
+✔ recent() is a copy — mutating it cannot corrupt the bus (0.7257ms)
+✔ persistence is skipped for a non-persisted type and performed for a persisted one (0.6408ms)
+✔ without a store the bus behaves identically, minus persistence (0.4186ms)
+✔ injected now and idFactory make events deterministic (0.2937ms)
+✔ default ids stay unique within the same millisecond (0.5422ms)
+✔ remember stores a row, applies defaults, and publishes memory.created (4.4776ms)
+✔ remember honors explicit source, importance clamp and metadata (1.2811ms)
+✔ remember rejects blank content with a KaiError-shaped throw (1.0882ms)
+✔ dedupe: true (and the default) keeps one row for the same (type, content) (0.4949ms)
+✔ dedupe: false forces a second row (0.442ms)
+✔ dedupe is scoped by type — same content under a different type is a new row (0.3538ms)
+✔ search filters by type and by case-insensitive content substring (0.6108ms)
+✔ digest orders by importance desc, then createdAt desc (0.6567ms)
+✔ digest can be restricted to specific types (0.4273ms)
+✔ forget returns true and publishes memory.deleted for a known id (0.5866ms)
+✔ forget returns false for an unknown id, never throws, and publishes nothing (0.2295ms)
+✔ an omitted publish seam is tolerated by every mutation (0.2044ms)
+✔ createMission builds a DRAFT mission; addStep appends in index order (5.5154ms)
+✔ nextRunnableStep skips completed/failed/approval-parked steps (0.4735ms)
+✔ start runs steps in index order and completes with ordered events (2.4264ms)
+✔ a failing step fails the mission; later steps are not run (1.2006ms)
+✔ risk is derived: side-effecting >= WRITE, unknown tool target = EXTERNAL (0.4677ms)
+✔ policy deny fails the step with POLICY_DENIED and stops the mission (0.8938ms)
+✔ policy needs_approval parks the mission and does NOT call the runner (1.19ms)
+✔ cancel mid-mission stops further steps and is idempotent (1.0365ms)
+✔ recover resumes a mission whose remaining steps are not side-effecting (1.2128ms)
+✔ recover blocks a mission whose next step is side-effecting and never calls the runner (0.9031ms)
+✔ recover settles an all-steps-complete mission without re-running anything (0.6776ms)
+✔ notify stores the notification and publishes notification.created on the bus (6.4877ms)
+✔ notify carries missionId onto the event and keeps payload/metadata (1.5421ms)
+✔ dedupe returns the same notification inside the window and a new one after it (0.7387ms)
+✔ dedupe falls back to type + title when no dedupeKey is given (0.4458ms)
+✔ an explicit dedupeKey groups otherwise-different notifications (0.3794ms)
+✔ an invalid priority falls back to NORMAL; valid ones are preserved (0.4298ms)
+✔ markRead updates the store and publishes notification.read (0.5705ms)
+✔ markRead is quiet when the notification is already read or unknown (0.3357ms)
+✔ list delegates to the store, honouring unreadOnly and limit (0.5921ms)
+✔ deterministic ids and timestamps come from injection (0.5191ms)
+✔ default ids stay unique within the same millisecond (0.4002ms)
+✔ safe by default: READ allows, everything that touches the world asks first (2.6284ms)
+✔ DESTRUCTIVE is never silently allowed and its reason says so (0.6173ms)
+✔ a rule can override any risk level, and an absent tools list is a blanket rule (0.5684ms)
+✔ a scoped rule applies only to the tools it names (0.5044ms)
+✔ an unscoped deny rule blocks a whole risk level, and the first matching rule wins (0.4396ms)
+✔ malformed rules are ignored, never trusted to loosen anything (1.6836ms)
+✔ an unrecognized risk at runtime is treated as needs_approval, not trusted (0.3039ms)
+✔ rules() returns a defensive copy (0.3044ms)
+✔ request creates a PENDING approval with an expiry and publishes approval.requested (2.3077ms)
+✔ an explicit ttlMs overrides the default (0.4941ms)
+✔ decide publishes the verdict and a second decide cannot flip it (1.239ms)
+✔ a rejected approval records REJECTED and publishes approval.rejected (0.3714ms)
+✔ decide on an unknown id fails without touching anything (0.259ms)
+✔ expireStale retires only past-due PENDING approvals and returns their ids (0.6201ms)
+✔ expireStale leaves already-decided approvals alone and an explicit `at` wins over the clock (0.368ms)
+✔ get and list delegate to the store, honouring the status filter (0.4022ms)
+✔ default ids stay unique within the same millisecond (0.3182ms)
+✔ registry: register / get / list / ids / unregister (3.6923ms)
+✔ registry: connectAll returns a per-agent result and never throws on a failing adapter (2.5208ms)
+✔ registry: healthAll reports ok:false (never a crash) for failing probes (1.0482ms)
+✔ registry: statusAll reports offline for an unreachable adapter (and a crash) (0.6625ms)
+✔ registry: statusAll reflects connected -> idle for a healthy adapter (0.501ms)
+✔ registry: onEvent fires on register and on connect transitions (0.6347ms)
+✔ registry: disconnectAll never throws even when an adapter does (0.5158ms)
+✔ the Core boots, connects its agents and reports health derived from live calls (41.8817ms)
+✔ a mission runs a read tool step and an agent step through to COMPLETED (63.4988ms)
+✔ a step whose tool needs approval parks the mission and does NOT execute it (43.9632ms)
+✔ a deny policy fails the step before the tool runs, with the reason recorded (42.0725ms)
+✔ a scheduled task fires, creates a mission and runs it — through the timer path (44.0798ms)
+✔ state survives a restart, and recovery resumes only what is safe (73.0726ms)
+✔ computeNextRun: once returns the instant when still ahead, null when past (2.8684ms)
+✔ computeNextRun: interval is from + intervalMs (0.6117ms)
+✔ computeNextRun: daily uses the next LOCAL occurrence (0.7977ms)
+✔ computeNextRun: malformed input returns null, never throws (0.4642ms)
+✔ validateSchedule explains each malformed case (2.27ms)
+✔ tick fires a due interval task once and persists lastRun + advanced nextRun (1.801ms)
+✔ tick disables a once task after it fires (0.7572ms)
+✔ anti-catch-up (spec §36): a task 5 intervals overdue fires exactly ONCE (0.7424ms)
+✔ a failing onFire does not throw out of tick, does not block other tasks, increments failureCount (1.0074ms)
+✔ a permanently failing task is quarantined at the bounded limit (0.9735ms)
+✔ reload reports an invalid task and leaves it disabled in the store (2.1631ms)
+✔ stop clears the timer and makes tick a no-op; start is idempotent (2.7637ms)
+✔ memory: create, read, update and delete (47.8925ms)
+✔ notification: create, read, markRead and unread filter (32.74ms)
+✔ scheduled task: create, read, update and delete (24.5014ms)
+✔ mission: round-trips with three steps returned in index order (13.3797ms)
+✔ mission: upsert replaces the step set instead of duplicating it (16.5146ms)
+✔ mission: list filters by status and delete removes the mission with its steps (22.1399ms)
+✔ events: insert and filtered queries, newest first (23.8948ms)
+✔ listUnfinishedMissions returns only QUEUED/RUNNING/WAITING/WAITING_APPROVAL (30.5903ms)
+✔ booleans and JSON survive a round-trip byte-equal (20.4603ms)
+✔ approval: create, list by status and decide (15.4446ms)
+✔ mutations on a missing id are no-ops, not throws (7.622ms)
+✔ restart: a temp-file database keeps its data and does not re-run migrations (24.9266ms)
+✔ open: twice on :memory: and once on a temp file does not throw (12.6944ms)
+✔ close is safe to call twice (8.4836ms)
+✔ defaultDatabasePath honours KAI_CORE_DB and never points into the repository (1.8602ms)
+✔ invoke runs validate -> policy -> execute, in that order (4.161ms)
+✔ a bad input is rejected before policy or execute ever see it (1.9999ms)
+✔ a denied request never reaches execute (0.4516ms)
+✔ a validator that throws is a validation failure, not an exception (0.6135ms)
+✔ a validator returning a malformed result is refused (1.2137ms)
+✔ an unknown tool id returns NOT_FOUND (1.1861ms)
+✔ execute throwing becomes an INTERNAL KaiError and is not propagated (1.5429ms)
+✔ a registry with no policy gate refuses to run anything (0.9289ms)
+✔ register refuses malformed and duplicate definitions (2.297ms)
+✔ approval path end to end: needs_approval -> request -> approve -> invoke succeeds (3.5006ms)
+✔ a missing approvalId fails and requests one; the request is only made once per invoke (0.4756ms)
+✔ a stale/unknown approvalId fails without executing (0.4504ms)
+✔ a PENDING approvalId is not enough, and a rejected one is denied (0.5727ms)
+✔ an expired approval cannot be spent (0.7404ms)
+✔ an approval granted for one tool cannot authorise another (0.4692ms)
+✔ missionId and stepId reach both the approval and the tool context (0.7383ms)
+✔ a READ tool runs without approval but validates first (0.3449ms)
+✔ the builtin set is exactly the four safe READ tools (0.9033ms)
+✔ builtin tools invoke through the registry with default policy (READ allows) (3.5166ms)
+✔ builtin validators reject malformed input and accept good input (2.3185ms)
+✔ a user-registered tool shadows nothing: builtin ids are stable and get() finds them (0.7228ms)
+ℹ tests 229
+ℹ suites 0
+ℹ pass 227
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7429.5124
+
+✖ failing tests:
+
+test at src\agents\opencode.test.ts:36:3
+✖ opencode: listSessions() returns an array whose entries carry an id (23.0105ms)
+  AssertionError [ERR_ASSERTION]: the server must have at least one session to assert on
+      at TestContext.<anonymous> (file:///C:/Users/DELL/Desktop/kai/core/src/agents/opencode.test.ts:63:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at src\server.test.ts:95:1
+✖ kai core: GET /agents/opencode/sessions proxies the live session list (31.4389ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(body.data.length > 0)
+  
+      at TestContext.<anonymous> (file:///C:/Users/DELL/Desktop/kai/core/src/server.test.ts:104:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

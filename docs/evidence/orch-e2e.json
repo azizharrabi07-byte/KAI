@@ -1,0 +1,90 @@
+{
+  "at": "2026-10-07T16:55:50.361Z",
+  "scenarios": {
+    "setup: autonomy level 3 + auto review applies": {
+      "pass": true,
+      "detail": "status=200"
+    },
+    "setup: worker persona created": {
+      "pass": true,
+      "detail": "status=201"
+    },
+    "setup: poor worker persona created": {
+      "pass": true,
+      "detail": "status=201"
+    },
+    "S1: objective decomposes to parent + 3 children": {
+      "pass": true,
+      "detail": "status=201 children=3"
+    },
+    "S1: run completes verified via review": {
+      "pass": true,
+      "detail": "state=COMPLETED note=Completed and verified."
+    },
+    "S1: inspector shows handoff + verification + review": {
+      "pass": true,
+      "detail": "verification=true review=PASS"
+    },
+    "S1: children tracked under parent": {
+      "pass": true,
+      "detail": "children=3"
+    },
+    "S1: bench recorded the outcome": {
+      "pass": true,
+      "detail": "samples=1"
+    },
+    "S1: trace recorded real activity": {
+      "pass": true,
+      "detail": "Done | Verified | Reviewer checking | e2e-good-muycmtlj working | Planned: RC-ORCH-muycmtlj: analyze the workspace, name the three biggest risks, propose a patc"
+    },
+    "S2: breaker recommends after repeated failure": {
+      "pass": true,
+      "detail": "no available employee can handle \"subagent:e2e-bad-muycmtlj\" (role: subagent:e2e-bad-muycmtlj) — recommended: reassign (3 consecutive failur"
+    },
+    "S2: switched worker completes": {
+      "pass": true,
+      "detail": "state=COMPLETED"
+    },
+    "S3: bench distinguishes failed cheap from verified dear": {
+      "pass": true,
+      "detail": "bad=0.10297520158735501 good=0.4543720387721386"
+    },
+    "S3: difficult routes differently than simple": {
+      "pass": true,
+      "detail": "hard=DELEGATE_AND_REVIEW easy=DELEGATE_ONE"
+    },
+    "S4: retry prompt carried the failure context": {
+      "pass": true,
+      "detail": "I'm e2e-good-muycmtlj, KAI's worker. hermes mock output: You are acting as KAI's subagent \"e2e-good-muycmtlj\" (worker). I help. ## MISSION direct objective ## YOUR ROLE Role: e2e-good-muycmtlj Selecte"
+    },
+    "S5: 10 parallel runs, no collisions": {
+      "pass": true,
+      "detail": "states=COMPLETED"
+    },
+    "S5: review loop (CHANGES then PASS) completes": {
+      "pass": true,
+      "detail": "state=COMPLETED"
+    },
+    "S5: activity log bounded": {
+      "pass": true,
+      "detail": "events=80"
+    },
+    "S6: 25 concurrent runs, no collisions": {
+      "pass": true,
+      "detail": "states=COMPLETED"
+    },
+    "S6: nested execution completes level by level": {
+      "pass": true,
+      "detail": ""
+    },
+    "S6: 50 sequential tasks complete": {
+      "pass": true,
+      "detail": "50/50"
+    },
+    "S6: bench accumulated stress samples": {
+      "pass": true,
+      "detail": "samples=92"
+    }
+  },
+  "verdict": "PASS"
+}

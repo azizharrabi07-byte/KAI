@@ -1,0 +1,69 @@
+KAI appearance system — live product verification (owner gate 7)
+================================================================
+Date: 2026-10-03  Machine: Windows 11  Product: app/target/release/kai.exe (mtime 2026-10-03 20:24:13)
+Method: WebView2 CDP (docs/evidence/cdp.mjs) driving the REAL Settings controls on
+http://tauri.localhost/settings.html and reading the REAL island on http://tauri.localhost/.
+
+WHAT THE PRODUCT EXPOSES  (Settings -> "KAI's appearance")
+----------------------------------------------------------
+  * Body colour (skin)      select[data-role=appearance-skin]       3 values:  blue, black, yellow      -> APPLIED to the renderer today
+  * Outfit (accessory)      select[data-role=appearance-accessory]  8 values:  none, hair, cap, bat, phones, cat, crown, halo -> APPLIED today
+  * Colour treatment (theme) select[data-role=appearance-theme]     11 values: aqua, wake, sky, mint, sun, rose, plan, help, progress, error, ultra
+                                                                              -> RECORDED in the variant only; NOT rendered (KaiOrb has no setTheme hook)
+  * 4 subagent presets (KAI / KAI-Coder / KAI-Research / KAI-Browser) + a live KaiEngine preview + two palette swatches.
+  NOT exposed: per-part geometry, eye shape, decorations beyond the 8 outfits, or any custom-colour picker.
+
+Set by the engine's public API only: KaiEngine.setSkin / setAccessory (variant.ts applyVariant).
+applyVariant honestly reports themeApplied=false today; the settings hint says so in the UI.
+
+PERSISTENCE
+-----------
+  Mechanism: the WebView2 durable store, localStorage key "kai.appearance.v1".
+  Both windows share one WebView2 environment and one origin (http://tauri.localhost), so
+  one store serves island + settings. The on-disk store is
+      %LOCALAPPDATA%\com.aziz.kai\EBWebView\Default\Local Storage\leveldb\*.log
+  Chosen because variant.ts was committed with this design and it needs no edit to
+  core/src/storage/* (owned elsewhere this round) — it is an EXISTING mechanism (the
+  webview's own store), not a new one. loadVariant() runs at island boot (app/src/main.ts).
+
+LIVE CHANGE  (no restart)
+-------------------------
+  Settings control change -> saveVariant + Bridge.saveSettings -> island event path -> island
+  __kaiAppearance() updated within ~2 s.
+    before: {skin:blue, accessory:cap,  theme:sky}
+    after : {skin:black, accessory:halo, theme:ultra}  (set via the real selects)
+
+RESTART PERSISTENCE
+-------------------
+  Killed kai.exe PID 23320 (node process.kill). Relaunched via docs/evidence/launch-cdp.ps1.
+  Fresh kai.exe PID 10524 (start 20:44:26). Island boot applied WITHOUT any interaction:
+    __kaiAppearance() = {"id":"kai-browser","label":"KAI-Browser","skin":"black","theme":"ultra",
+                          "accessory":"halo","primaryColor":"#0a0a0c","secondaryColor":"#34343c"}
+    localStorage["kai.appearance.v1"] = same JSON.
+  Settings window after restart also shows skin=black, outfit=halo, theme=ultra.
+
+SCREENSHOTS + VISION (vision_analyze, own reading)
+--------------------------------------------------
+  config-A-blue-none-island.png     blue glowing orb, white slit eyes, NO accessory.
+  config-A-blue-none-settings.png   preview = glossy blue sphere; dropdowns blue / sky / none;
+                                    summary "KAI-Browser - blue skin - sky theme - none outfit".
+  config-B-black-halo-island.png    dark shaded sphere (NOT a flat black disc), bright white
+                                    highlight, glowing yellow halo ring floating above.
+  config-B-black-halo-settings.png  preview = black sphere with a yellow halo; dropdowns
+                                    black / ultra / halo; summary "KAI-Browser - black skin -
+                                    ultra theme - halo outfit".
+  config-B-after-restart-island.png dark blue-black sphere with white specular highlight and
+                                    the yellow halo ring -> the persisted config, unchanged by restart.
+  The two configurations differ in BOTH skin (blue vs black) and outfit (none vs halo).
+
+BUILD/REPO STATE
+----------------
+  npx tsc --noEmit : clean (exit 0).  npm test : 107 pass / 0 fail (incl. 14 variant tests).
+  NOTE: HEAD d4bdc62's package.json test script ("node --test \"tests/*.test.ts\"") FAILS on this
+  Node v26.7.0; the required `--import ./tests/register-ts.mjs` change was still uncommitted.
+
+UNVERIFIED / LIMITS
+-------------------
+  * Colour treatment (theme) is exposed as a control but does NOT repaint KAI — only skin and
+    outfit are rendered today. Claimed as recorded-only, not as applied.
+  * Restart was a kill+relaunch of the same exe (a real process restart), not an OS reboot.

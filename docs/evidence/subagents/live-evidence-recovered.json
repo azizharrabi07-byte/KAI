@@ -1,0 +1,267 @@
+{
+  "base": "http://127.0.0.1:8971",
+  "subagents": {
+    "deep-research": {
+      "status": 201,
+      "name": "Deep Research",
+      "workerId": "hermes",
+      "employeeId": "kai:deep-research",
+      "activity": "idle"
+    },
+    "data-miner": {
+      "status": 201,
+      "name": "Data Miner",
+      "workerId": "hermes",
+      "employeeId": "kai:data-miner",
+      "activity": "idle"
+    },
+    "code-forge": {
+      "status": 201,
+      "name": "Code Forge",
+      "workerId": "opencode",
+      "employeeId": "kai:code-forge",
+      "activity": "idle"
+    }
+  },
+  "park": {
+    "deep-research": {
+      "status": 409,
+      "approvalId": "apr_mut161c1_0",
+      "sessionId": "sess_mut161bq_9m4c"
+    }
+  },
+  "executions": {
+    "deep-research-sole": {
+      "executionId": "apr_mut161c1_0",
+      "subagentId": "deep-research",
+      "sessionId": "sess_mut161bq_9m4c",
+      "worker": "hermes",
+      "startTime": "2026-10-03T23:36:00.602Z",
+      "endTime": "2026-10-03T23:36:13.989Z",
+      "startMonotonicMs": 873.01,
+      "endMonotonicMs": 14260.01,
+      "durationMs": 13387,
+      "status": "completed",
+      "workerTaskId": "task-mut161d1"
+    }
+  },
+  "overlap": {
+    "hermes-hermes": {
+      "label": "hermes-hermes",
+      "A": {
+        "subagentId": "deep-research",
+        "executionId": "apr_mut16bp0_1",
+        "sessionId": "sess_mut161bq_9m4c",
+        "worker": "hermes",
+        "startTime": "2026-10-03T23:36:14.044Z",
+        "endTime": "2026-10-03T23:36:36.603Z",
+        "startMonotonicMs": 14314.658,
+        "endMonotonicMs": 36873.929,
+        "status": "completed",
+        "reply": "I'm Deep Research, KAI's deep researcher. ALPHA"
+      },
+      "B": {
+        "subagentId": "data-miner",
+        "executionId": "apr_mut16bpm_2",
+        "sessionId": "sess_mut16bpe_j6a1",
+        "worker": "hermes",
+        "startTime": "2026-10-03T23:36:14.055Z",
+        "endTime": "2026-10-03T23:36:35.585Z",
+        "startMonotonicMs": 14325.796,
+        "endMonotonicMs": 35855.677,
+        "status": "completed",
+        "reply": "I'm Data Miner, KAI's data analyst. BETA"
+      },
+      "distinctExecutionIds": true,
+      "distinctSessions": true,
+      "overlap": true,
+      "overlapMs": 21530
+    },
+    "hermes-opencode": {
+      "label": "hermes-opencode",
+      "A": {
+        "subagentId": "data-miner",
+        "executionId": "apr_mut16t5g_3",
+        "sessionId": "sess_mut16bpe_j6a1",
+        "worker": "hermes",
+        "startTime": "2026-10-03T23:36:36.697Z",
+        "endTime": "2026-10-03T23:36:40.506Z",
+        "startMonotonicMs": 36967.797,
+        "endMonotonicMs": 40776.791,
+        "status": "completed",
+        "reply": "I'm Data Miner, KAI's data analyst. GAMMA"
+      },
+      "B": {
+        "subagentId": "code-forge",
+        "executionId": "apr_mut16t6m_4",
+        "sessionId": "sess_mut16t69_gbt",
+        "worker": "opencode",
+        "startTime": "2026-10-03T23:36:36.709Z",
+        "endTime": "2026-10-03T23:38:01.797Z",
+        "startMonotonicMs": 36980.117,
+        "endMonotonicMs": 122067.581,
+        "status": "failed",
+        "reply": "I'm Code Forge, KAI's implementation engineer."
+      },
+      "distinctExecutionIds": true,
+      "distinctSessions": true,
+      "overlap": true,
+      "overlapMs": 3797
+    }
+  },
+  "sessionIsolation": {
+    "kaiSessionId": "sess_mut18mvg_9a4s",
+    "kaiTurnsBefore": 0,
+    "kaiTurnsAfter": 0,
+    "kaiHistoryUnchanged": true,
+    "activeSessionAgentId": null,
+    "personaSessionId": "sess_mut161bq_9m4c",
+    "personaSessionAgentId": "kai:deep-research",
+    "personaTurns": 6,
+    "secondSessionStatus": 201,
+    "personaSessionCount": 2
+  },
+  "management": {
+    "edit": {
+      "status": 201,
+      "name": "Data Miner Prime",
+      "role": "principal data analyst",
+      "capabilities": [
+        "filesystem",
+        "shell"
+      ],
+      "visual": {
+        "declared": {
+          "colour": "#F472B6",
+          "skin": "tan",
+          "outfit": "labcoat",
+          "notes": "upgraded",
+          "accessories": [
+            "glasses",
+            "tablet"
+          ]
+        }
+      }
+    },
+    "archive": {
+      "status": 200,
+      "enabledAfter": false,
+      "statusAfter": "DISABLED"
+    },
+    "unarchive": {
+      "status": 200,
+      "enabledAfter": true
+    },
+    "duplicate": {
+      "status": 201,
+      "id": "data-miner-copy",
+      "duplicatedFrom": "data-miner"
+    },
+    "delete": {
+      "status": 404,
+      "supported": false,
+      "note": "no delete route — archive only"
+    }
+  },
+  "adversarial": {
+    "approvalBypass": {
+      "runStatus": 409,
+      "parked": true,
+      "approvalId": "apr_mut18mxv_5"
+    },
+    "rejectedApproval": {
+      "decideStatus": 200,
+      "reissued": false,
+      "executedAnything": false,
+      "sessionsBefore": 1,
+      "sessionsAfter": 1
+    },
+    "workerIdentityLeak": false,
+    "personaLeak": "persona-authored (expected)"
+  },
+  "workerWindows": [
+    {
+      "worker": "hermes",
+      "startMonotonicMs": 884.201,
+      "endMonotonicMs": 14245.458,
+      "startedAt": "2026-10-03T23:36:00.613Z",
+      "endedAt": "2026-10-03T23:36:13.975Z",
+      "inputPrefix": "hing.\n\nReply with the single word READY."
+    },
+    {
+      "worker": "hermes",
+      "startMonotonicMs": 14332.534,
+      "endMonotonicMs": 35848.742,
+      "startedAt": "2026-10-03T23:36:14.062Z",
+      "endedAt": "2026-10-03T23:36:35.578Z",
+      "inputPrefix": "MARKER: reply with the single word BETA."
+    },
+    {
+      "worker": "hermes",
+      "startMonotonicMs": 14322.82,
+      "endMonotonicMs": 36866.15,
+      "startedAt": "2026-10-03T23:36:14.052Z",
+      "endedAt": "2026-10-03T23:36:36.595Z",
+      "inputPrefix": "ARKER: reply with the single word ALPHA."
+    },
+    {
+      "worker": "hermes",
+      "startMonotonicMs": 36975.792,
+      "endMonotonicMs": 40769.66,
+      "startedAt": "2026-10-03T23:36:36.705Z",
+      "endedAt": "2026-10-03T23:36:40.499Z",
+      "inputPrefix": "ARKER: reply with the single word GAMMA."
+    },
+    {
+      "worker": "opencode",
+      "startMonotonicMs": 36987.891,
+      "endMonotonicMs": 122051.208,
+      "startedAt": "2026-10-03T23:36:36.717Z",
+      "endedAt": "2026-10-03T23:38:01.780Z",
+      "inputPrefix": "ARKER: reply with the single word DELTA."
+    }
+  ],
+  "restart": {
+    "status": 200,
+    "subagents": [
+      {
+        "id": "deep-research",
+        "name": "Deep Research",
+        "workerId": "hermes",
+        "enabled": true,
+        "capabilities": [
+          "filesystem"
+        ]
+      },
+      {
+        "id": "data-miner",
+        "name": "Data Miner Prime",
+        "workerId": "hermes",
+        "enabled": true,
+        "capabilities": [
+          "filesystem",
+          "shell"
+        ]
+      },
+      {
+        "id": "code-forge",
+        "name": "Code Forge",
+        "workerId": "opencode",
+        "enabled": true,
+        "capabilities": [
+          "filesystem"
+        ]
+      },
+      {
+        "id": "data-miner-copy",
+        "name": "Data Miner Copy",
+        "workerId": "hermes",
+        "enabled": true,
+        "capabilities": [
+          "filesystem",
+          "shell"
+        ]
+      }
+    ]
+  }
+}

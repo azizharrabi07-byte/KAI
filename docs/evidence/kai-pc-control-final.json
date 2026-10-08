@@ -1,0 +1,390 @@
+{
+  "artifact": "kai-pc-control-final",
+  "at": "2026-10-05T14:56:11.469Z",
+  "source": "GET /capabilities + POST /capabilities/:id/test on the running Core (exercised THROUGH policy)",
+  "capabilityTests": [
+    {
+      "id": "system",
+      "availability": "AVAILABLE",
+      "test": {
+        "status": 200,
+        "body": {
+          "capabilityId": "system",
+          "action": null,
+          "result": {
+            "capabilityId": "system",
+            "action": "system.get_status",
+            "executor": "kai",
+            "result": {
+              "status": "ok",
+              "pid": 11140,
+              "node": "v26.7.0",
+              "platform": "win32",
+              "release": "10.0.26200",
+              "arch": "x64",
+              "cpus": 12,
+              "uptimeMs": 58794,
+              "checkedAt": "2026-10-05T14:56:11.223Z",
+              "memory": {
+                "rssBytes": 85504000,
+                "heapUsedBytes": 17975680,
+                "heapTotalBytes": 21745664,
+                "systemTotalBytes": 16897576960,
+                "systemFreeBytes": 4195737600
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "browser",
+      "availability": "UNAVAILABLE",
+      "test": {
+        "status": 409,
+        "body": {
+          "error": true,
+          "reason": "tool \"capability.browser\" acts outside this machine (EXTERNAL); outbound actions always require user approval; approval \"apr_muvdh8tj_0\" is pending",
+          "approvalRequired": true,
+          "approvalId": "apr_muvdh8tj_0"
+        }
+      }
+    },
+    {
+      "id": "computer",
+      "availability": "UNAVAILABLE",
+      "test": {
+        "status": 409,
+        "body": {
+          "error": true,
+          "reason": "tool \"capability.computer\" is DESTRUCTIVE; destructive actions always require user approval and are never allowed silently; approval \"apr_muvdh8u0_1\" is pending",
+          "approvalRequired": true,
+          "approvalId": "apr_muvdh8u0_1"
+        }
+      }
+    },
+    {
+      "id": "filesystem",
+      "availability": "UNAVAILABLE",
+      "test": {
+        "status": 409,
+        "body": {
+          "error": true,
+          "reason": "tool \"capability.filesystem\" performs a WRITE; writes are allowed only when a policy rule explicitly permits them, so this requires user approval; approval \"apr_muvdh8uk_2\" is pending",
+          "approvalRequired": true,
+          "approvalId": "apr_muvdh8uk_2"
+        }
+      }
+    },
+    {
+      "id": "git",
+      "availability": "UNAVAILABLE",
+      "test": {
+        "status": 200,
+        "body": {
+          "capabilityId": "git",
+          "action": null,
+          "result": {
+            "capabilityId": "git",
+            "action": "status",
+            "executor": "kai",
+            "result": {
+              "cwd": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core",
+              "branch": "master",
+              "clean": false,
+              "entries": [
+                " M app/src-tauri/src/main_window.rs",
+                " M app/src/settings/main.ts",
+                " M app/src/shell/presence/presence.css",
+                " M app/src/shell/presence/presence.ts",
+                " M core/tests/subagent.test.ts",
+                " M docs/evidence/kai-mcp-final.json",
+                " M docs/evidence/kai-sessions-final.json",
+                " M docs/evidence/kai-tools-final.json",
+                "?? docs/KAI_RUNTIME_ARCHITECTURE.md",
+                "?? docs/KAI_SOUL.md",
+                "?? docs/evidence/accept-island.png",
+                "?? docs/evidence/accept-main-after-set1280.png",
+                "?? docs/evidence/accept-main.png",
+                "?? docs/evidence/accept-settings.png",
+                "?? docs/evidence/char-baseline.png",
+                "?? docs/evidence/char-idle-expanded.png",
+                "?? docs/evidence/kai-branding-final.json",
+                "?? docs/evidence/kai-build-nobundle.log",
+                "?? docs/evidence/kai-build-window-fix.log",
+                "?? docs/evidence/kai-direct-hermes-down.json",
+                "?? docs/evidence/kai-harness-final.json",
+                "?? docs/evidence/kai-identity-final.json",
+                "?? docs/evidence/kai-independence-baseline.json",
+                "?? docs/evidence/kai-independence-final.json",
+                "?? docs/evidence/kai-live-journey.mjs",
+                "?? docs/evidence/kai-security-final.json",
+                "?? docs/evidence/kai-subagent-e2e.json",
+                "?? docs/evidence/kai-subagents-final.json",
+                "?? docs/evidence/kai-twelve-hermes-down.json",
+                "?? docs/evidence/kai-ui-truth.json",
+                "?? docs/evidence/kai-ui-truth.mjs",
+                "?? docs/evidence/kai-window-acceptance.json",
+                "?? docs/evidence/kai-window-acceptance.mjs",
+                "?? docs/evidence/kai-window-size-probe.json",
+                "?? docs/evidence/kai-window-size-probe.mjs",
+                "?? docs/evidence/measure-cdp.mjs",
+                "?? docs/evidence/measure-display.ps1",
+                "?? docs/evidence/measure-windows.ps1",
+                "?? docs/evidence/nav-clickthrough.json",
+                "?? docs/evidence/phase6-head-core-live.txt",
+                "?? docs/evidence/subagents/concurrent.json",
+                "?? docs/evidence/subagents/live-evidence-recovered.json",
+                "?? docs/evidence/ui-chat-page.png",
+                "?? docs/evidence/ui-island-window.png",
+                "?? docs/evidence/ui-main-final-agents.png",
+                "?? docs/evidence/ui-main-final-chat.png",
+                "?? docs/evidence/ui-main-final-home.png",
+                "?? docs/evidence/ui-main-fresh-agents.png",
+                "?? docs/evidence/ui-main-fresh-chat.png",
+                "?? docs/evidence/ui-main-fresh-home.png",
+                "?? docs/evidence/ui-main-fresh-tools.png",
+                "?? docs/evidence/ui-main-window-fresh.png",
+                "?? docs/evidence/ui-main-window.png",
+                "?? docs/evidence/ui-presence-main.png",
+                "?? docs/evidence/ui-shell-chat.png",
+                "?? docs/evidence/ui-shell-home.png",
+                "?? docs/evidence/ui-view-orb-live.png",
+                "?? docs/evidence/uitruth-island-panel.png",
+                "?? docs/evidence/uitruth-main-home.png",
+                "?? docs/openghost-integration-audit.md",
+                "?? scripts/kill-kai.cjs"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "shell",
+      "availability": "UNAVAILABLE",
+      "test": {
+        "status": 409,
+        "body": {
+          "error": true,
+          "reason": "tool \"capability.shell\" is DESTRUCTIVE; destructive actions always require user approval and are never allowed silently; approval \"apr_muvdh8zk_3\" is pending",
+          "approvalRequired": true,
+          "approvalId": "apr_muvdh8zk_3"
+        }
+      }
+    }
+  ],
+  "employees": {
+    "employees": [
+      {
+        "id": "hermes",
+        "name": "Hermes",
+        "kind": "hermes",
+        "origin": "builtin:hermes",
+        "state": "READY",
+        "enabled": true,
+        "placeholder": false,
+        "capabilities": [
+          "filesystem",
+          "shell",
+          "browser",
+          "mcp"
+        ],
+        "grants": [],
+        "config": {},
+        "instanceId": "hermes#1",
+        "snapshot": {
+          "state": "READY",
+          "at": "2026-10-05T14:55:12.878Z",
+          "reachable": true,
+          "authenticated": true
+        },
+        "problems": [],
+        "history": [
+          "DISCOVERED",
+          "INSTALLED",
+          "READY"
+        ]
+      },
+      {
+        "id": "opencode",
+        "name": "OpenCode",
+        "kind": "opencode",
+        "origin": "builtin:opencode",
+        "state": "READY",
+        "enabled": true,
+        "placeholder": false,
+        "capabilities": [
+          "filesystem",
+          "shell",
+          "git",
+          "browser",
+          "mcp"
+        ],
+        "grants": [],
+        "config": {},
+        "instanceId": "opencode#1",
+        "snapshot": {
+          "state": "READY",
+          "at": "2026-10-05T14:55:12.909Z",
+          "reachable": true,
+          "authenticated": true
+        },
+        "problems": [],
+        "history": [
+          "DISCOVERED",
+          "INSTALLED",
+          "READY"
+        ]
+      },
+      {
+        "id": "codex",
+        "name": "Codex",
+        "kind": "codex",
+        "origin": "builtin:codex",
+        "state": "UNAVAILABLE",
+        "enabled": true,
+        "placeholder": false,
+        "capabilities": [
+          "filesystem",
+          "shell",
+          "git"
+        ],
+        "grants": [],
+        "config": {},
+        "instanceId": "codex#1",
+        "snapshot": {
+          "state": "UNAVAILABLE",
+          "at": "2026-10-05T14:55:12.937Z",
+          "reachable": false,
+          "authenticated": false,
+          "problems": [
+            "the codex CLI is not installed on this machine"
+          ]
+        },
+        "problems": [],
+        "history": [
+          "DISCOVERED",
+          "UNAVAILABLE"
+        ]
+      },
+      {
+        "id": "kai:alice",
+        "name": "Alice",
+        "kind": "subagent",
+        "description": "KAI subagent — researcher",
+        "origin": "subagent",
+        "state": "READY",
+        "enabled": true,
+        "placeholder": false,
+        "role": "subagent:alice",
+        "capabilities": [
+          "filesystem"
+        ],
+        "grants": [],
+        "config": {},
+        "instanceId": "kai:alice#1",
+        "snapshot": {
+          "state": "READY",
+          "at": "2026-10-05T14:55:12.950Z",
+          "reachable": true,
+          "authenticated": true
+        },
+        "problems": [],
+        "history": [
+          "DISCOVERED",
+          "INSTALLED",
+          "READY"
+        ]
+      },
+      {
+        "id": "kai:bob",
+        "name": "Bob",
+        "kind": "subagent",
+        "description": "KAI subagent — engineer",
+        "origin": "subagent",
+        "state": "READY",
+        "enabled": true,
+        "placeholder": false,
+        "role": "subagent:bob",
+        "capabilities": [
+          "filesystem",
+          "shell"
+        ],
+        "grants": [],
+        "config": {},
+        "instanceId": "kai:bob#1",
+        "snapshot": {
+          "state": "READY",
+          "at": "2026-10-05T14:55:12.959Z",
+          "reachable": true,
+          "authenticated": true
+        },
+        "problems": [],
+        "history": [
+          "DISCOVERED",
+          "INSTALLED",
+          "READY"
+        ]
+      },
+      {
+        "id": "kai:probe",
+        "name": "Probe",
+        "kind": "subagent",
+        "description": "KAI subagent — identity probe",
+        "origin": "subagent",
+        "state": "READY",
+        "enabled": true,
+        "placeholder": false,
+        "role": "subagent:probe",
+        "capabilities": [
+          "filesystem"
+        ],
+        "grants": [],
+        "config": {},
+        "instanceId": "kai:probe#1",
+        "snapshot": {
+          "state": "READY",
+          "at": "2026-10-05T14:55:12.969Z",
+          "reachable": true,
+          "authenticated": true
+        },
+        "problems": [],
+        "history": [
+          "DISCOVERED",
+          "INSTALLED",
+          "READY"
+        ]
+      },
+      {
+        "id": "kai:deleteme",
+        "name": "Delete Me",
+        "kind": "subagent",
+        "description": "KAI subagent — tester",
+        "origin": "subagent",
+        "state": "READY",
+        "enabled": true,
+        "placeholder": false,
+        "role": "subagent:deleteme",
+        "capabilities": [
+          "filesystem"
+        ],
+        "grants": [],
+        "config": {},
+        "instanceId": "kai:deleteme#1",
+        "snapshot": {
+          "state": "READY",
+          "at": "2026-10-05T14:55:12.978Z",
+          "reachable": true,
+          "authenticated": true
+        },
+        "problems": [],
+        "history": [
+          "DISCOVERED",
+          "INSTALLED",
+          "READY"
+        ]
+      }
+    ]
+  }
+}

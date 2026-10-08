@@ -1,0 +1,29 @@
+TOKEN           FILES   HITS
+coucou              0      0
+Coucou              0      0
+COUCOU              0      0
+mochi               0      0
+Mochi               0      0
+MOCHI               0      0
+NotchBuddy          0      0
+Notch Buddy         0      0
+notchbuddy          0      0
+notch-buddy         0      0
+notch_buddy         0      0
+louisraille         0      0
+Louis Raille        0      0
+Raill               0      0
+
+--- built artifacts ---
+app/dist            0
+.wav files          0
+
+--- evidence files (allowed to contain upstream branding) ---
+docs/evidence/branding-inventory.txt
+docs/evidence/launch-upstream-cdp.cmd
+docs/evidence/README.md
+docs/evidence/rebrand-audit.txt
+docs/evidence/runtime-findings.md
+docs/evidence/upstream-build.log
+
+AUDIT CLEAN

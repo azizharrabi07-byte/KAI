@@ -1,0 +1,55 @@
+/* KAI Visual Engine — the host's own styling.
+ *
+ * KAI's palette only, referenced through the app's existing CSS variables
+ * (--card, --ink, --dim, --hairline, --indigo, --font). Nothing here is copied
+ * from OpenGhost's stylesheet: no class name, no colour value, no layout recipe.
+ * See NOTICE.md for the attribution of the adapted mechanism.
+ */
+
+#kai-visual.kai-visual {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  box-sizing: border-box;
+  padding: 16px;
+  background: var(--card, #141518);
+  color: var(--ink, #f5f6f8);
+  overflow: auto;
+  font-family: var(--font);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#kai-visual.kai-visual[hidden] {
+  display: none;
+}
+
+.kai-visual .kai-visual-svg {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.kai-visual .kai-visual-shape {
+  stroke-width: 1;
+}
+
+.kai-visual .kai-visual-label {
+  font: 500 12.5px var(--font);
+}
+
+.kai-visual .kai-visual-edge-path {
+  stroke-width: 1.6;
+}
+
+.kai-visual .kai-visual-edge-label-text {
+  font: 500 11px var(--font);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kai-visual * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

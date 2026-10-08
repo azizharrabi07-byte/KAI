@@ -1,0 +1,36 @@
+pre-install copy : C:\Users\DELL\.claude\settings.json.pre-kai-20261001-182737
+  sha256         : 5b86bcd6f1979f71e3f49569065cf43ca51dd4dc05618e01a8612454d93061d8
+settings.json    : C:\Users\DELL\.claude\settings.json
+  sha256         : be13f62ad72fcdf35e59e935d351b3ff96824bf43c82bfdefa8cec4e47c8165e
+app's own backup : C:\Users\DELL\.claude\settings.json.bak-20261001-182808
+  sha256         : 5b86bcd6f1979f71e3f49569065cf43ca51dd4dc05618e01a8612454d93061d8
+  identical to my pre-install copy: True
+
+top-level keys before: ['enabledPlugins', 'env', 'extraKnownMarketplaces', 'hooks', 'permissions', 'statusLine']
+top-level keys after : ['enabledPlugins', 'env', 'extraKnownMarketplaces', 'hooks', 'permissions', 'statusLine']
+keys added / removed : [] / []
+values changed       : ['hooks']
+
+event                      before  after  kai
+Notification                    0      1    1
+PermissionRequest               1      2    1
+PostToolUse                     1      2    1
+PostToolUseFailure              1      2    1
+PreCompact                      1      1    0
+PreToolUse                      1      2    1
+SessionEnd                      0      1    1
+SessionStart                    1      2    1
+Stop                            1      2    1
+StopFailure                     1      2    1
+SubagentStart                   1      2    1
+SubagentStop                    1      2    1
+TeammateIdle                    1      1    0
+UserPromptSubmit                2      3    1
+
+pre-existing hook entries lost: 0
+KAI events missing a hook     : none
+
+removing KAI's entries reproduces the original object : True
+... and byte-for-byte the original file               : True
+
+RESULT: PASS

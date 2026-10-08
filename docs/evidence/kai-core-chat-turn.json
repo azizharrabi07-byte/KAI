@@ -1,0 +1,20 @@
+{
+  "health": {
+    "status": 200,
+    "body": "{\"healthy\":true,\"version\":\"1.18.33\"}",
+    "seconds": 0.06
+  },
+  "create_session": {
+    "status": 200,
+    "body": "{\"id\":\"ses_f07971a5bffesRx4FcVblPnQu4\",\"slug\":\"misty-orchid\",\"projectID\":\"global\",\"directory\":\"C:\\\\Users\\\\DELL\\\\.opencode\",\"path\":\".opencode\",\"cost\":0,\"tokens\":{\"input\":0,\"output\":0,\"reasoning\":0,\"cache\":{\"read\":0,\"write\":0}},\"title\":\"KAI selftest - chat turn (2026-10-01)\",\"model\":{\"id\":\"deepseek-v4-flash\",\"providerID\":\"crof\"},\"version\":\"1.18.33\",\"time\":{\"created\":1790874019236,\"updated\":1790874019236}}",
+    "seconds": 0.03
+  },
+  "prompt": {
+    "session_id": "ses_f07971a5bffesRx4FcVblPnQu4",
+    "prompt_sent": "Reply with exactly this token and nothing else: KAI-CONTROL-LAYER-OK",
+    "status": 200,
+    "seconds": 2.04,
+    "body": "{\"info\":{\"parentID\":\"msg_0f868e5cf001frAQiVpLR3eSLb\",\"role\":\"assistant\",\"mode\":\"build\",\"agent\":\"build\",\"path\":{\"cwd\":\"C:\\\\Users\\\\DELL\\\\.opencode\",\"root\":\"C:\\\\Users\\\\DELL\"},\"cost\":0,\"tokens\":{\"input\":0,\"output\":0,\"reasoning\":0,\"cache\":{\"read\":0,\"write\":0}},\"modelID\":\"deepseek-v4-flash\",\"providerID\":\"crof\",\"time\":{\"created\":1790874019300,\"completed\":1790874021274},\"error\":{\"name\":\"APIError\",\"data\":{\"message\":\"Method Not Allowed: This is a static site, at a static route. There is no need for anything other than a GET request.\",\"statusCode\":405,\"isRetryable\":false,\"responseHeaders\":{\"alt-svc\":\"h3=\\\":443\\\"; ma=86400\",\"cf-cache-status\":\"DYNAMIC\",\"cf-ray\":\"a43d05df5e97e220-MRS\",\"connection\":\"keep-alive\",\"content-length\":\"136\",\"content-type\":\"application/json\",\"date\":\"Thu, 01 Oct 2026 17:00:20 GMT\",\"nel\":\"{\\\"report_to\\\":\\\"cf-nel\\\",\\\"success_fraction\\\":0.0,\\\"max_age\\\":604800}\",\"report-to\":\"{\\\"group\\\":\\\"cf-nel\\\",\\\"max_age\\\":604800,\\\"endpoints\\\":[{\\\"url\\\":\\\"https://a.nel.cloudflare.com/report/v4?s=MEFm7MBaH%2BuuybowejU47R3l9nXXRevlBQj4wKBITpWCEFAbEdqLn%2FNbxAwA4Dkm%2BmWl4Sq5rfEgEZP55kKZPCX%2BOQYP7LZiP5dyyyh%2FiZ6xWMNTO2p7p751\\\"}]}\",\"server\":\"cloudflare\"},\"responseBody\":\"{\\\"code\\\":405,\\\"error\\\":true,\\\"message\\\":\\\"This is a static site, at a static route. There is no need for anything other than a GET request.\\\"}\\n\",\"metadata\":{\"url\":\"https://crof.ai/v1/chat/completions\"}}},\"id\":\"msg_0f868e5e40017mDSEODDPK4q14\",\"sessionID\":\"ses_f07971a5bffesRx4FcVblPnQu4\"},\"parts\":[]}"
+  },
+  "assistant_text": ""
+}

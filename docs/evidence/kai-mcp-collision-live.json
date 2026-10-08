@@ -1,0 +1,43 @@
+{
+  "at": "2026-10-05T00:10:45.693Z",
+  "claim": "Two servers exposing the same tool name stay namespaced; invoking one never reaches the other.",
+  "method": "KAI's real McpManager; two real MCP fixture child processes over stdio; real registry/policy/approvals.",
+  "servers": {
+    "alpha": {
+      "registeredToolIds": [
+        "mcp.alpha.echo",
+        "mcp.alpha.write_note"
+      ],
+      "connected": true
+    },
+    "beta": {
+      "registeredToolIds": [
+        "mcp.beta.echo",
+        "mcp.beta.write_note"
+      ],
+      "connected": true
+    }
+  },
+  "steps": {
+    "connect": {
+      "alpha": "OK:2",
+      "beta": "OK:2"
+    },
+    "invoke": {
+      "alphaEcho": {
+        "ok": true,
+        "text": "A",
+        "raw": "{\"toolId\":\"mcp.alpha.echo\",\"executionId\":\"mcp_muuhul06_0\",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"A\"}]}}"
+      },
+      "betaEcho": {
+        "ok": true,
+        "text": "B",
+        "raw": "{\"toolId\":\"mcp.beta.echo\",\"executionId\":\"mcp_muuhul08_1\",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"B\"}]}}"
+      }
+    },
+    "collisionHeld": true,
+    "distinctIds": true,
+    "provenanceCount": 2
+  },
+  "verdict": "END-TO-END PROVEN (live)"
+}

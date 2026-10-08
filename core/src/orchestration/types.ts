@@ -1,0 +1,244 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 KAI contributors. MIT licensed (see repository LICENSE).
+
+/**
+ * KAI orchestration contracts — the ONE vocabulary for the autonomous
+ * operator loop. Every orchestrator module (board, bench, dispatch, review,
+ * trace, learn, autonomy) speaks these types; nothing invents a parallel
+ * task/agent/work state shape.
+ *
+ * Design rules:
+ * - Workers are identifiable profiles, never "Agent #N".
+ * - A handoff is structured evidence, never "done" prose.
+ * - Benchmarks are measured components, never one opaque number.
+ * - Verification is structural (deliverable + evidence + criteria), matching
+ *   the existing task synthesis guard — this layer extends it to delegation.
+ */
+
+export type WorkItemState =
+  | "READY"
+  | "CLAIMED"
+  | "RUNNING"
+  | "WAITING"
+  | "REVIEW"
+  | "CHANGES_REQUESTED"
+  | "COMPLETED"
+  | "BLOCKED"
+  | "FAILED"
+  | "CANCELLED";
+
+/** A unit of delegated work on the KAI work board. Survives restarts. */
+export interface WorkItem {
+  id: string;
+  parentId?: string;
+  missionId?: string;
+  taskId?: string;
+  objective: string;
+  deliverable?: string;
+  workerId?: string;
+  workerVersion?: string;
+  skills: string[];
+  tools: string[];
+  state: WorkItemState;
+  attempts: number;
+  heartbeats: { at: string; step?: string; note?: string }[];
+  outputs?: unknown;
+  handoff?: WorkerHandoff;
+  verification?: VerificationRecord;
+  review?: ReviewRecord;
+  cost?: WorkCost;
+  tokensIn?: number;
+  tokensOut?: number;
+  latencyMs?: number;
+  failures: string[];
+  retries: number;
+  valueScore?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** What every worker returns. A process exit is not a handoff. */
+export interface WorkerHandoff {
+  status: "ok" | "blocked" | "failed";
+  result: string;
+  changedArtifacts: string[];
+  evidence: string[];
+  tests?: string;
+  blockers: string[];
+  risks: string[];
+  followUps: string[];
+  recommendedNext?: string;
+  tokenCost?: number;
+  timeMs?: number;
+  toolsUsed: string[];
+}
+
+export interface VerificationRecord {
+  passed: boolean;
+  criteria: { name: string; met: boolean; detail?: string }[];
+  at: string;
+}
+
+export type ReviewVerdict = "PASS" | "CHANGES_REQUESTED" | "BLOCKED";
+
+export interface ReviewRecord {
+  reviewerId: string;
+  criteria: string[];
+  verdict: ReviewVerdict;
+  findings: string[];
+  at: string;
+}
+
+export interface WorkCost {
+  tokensIn?: number;
+  tokensOut?: number;
+  toolCalls?: number;
+  costUsd?: number;
+  latencyMs?: number;
+}
+
+/** Per-domain measured stats. All rates are 0..1 from real outcomes only. */
+export interface DomainStats {
+  quality: number;
+  verification: number;
+  completion: number;
+  rework: number;
+  tokenEfficiency: number;
+  latency: number;
+  safety: number;
+  samples: number;
+  confidence: "low" | "medium" | "high";
+  trend: "up" | "flat" | "down";
+}
+
+export interface WorkerProfile {
+  workerId: string;
+  role: string;
+  /** Fingerprint of model+provider+instructions+skills+tools+objective config. */
+  configVersion: string;
+  domains: Record<string, DomainStats>;
+  overallValue: number;
+  overallConfidence: "low" | "medium" | "high";
+  totalSamples: number;
+  updatedAt: string;
+}
+
+export type TaskDomain =
+  | "coding"
+  | "debugging"
+  | "research"
+  | "writing"
+  | "architecture"
+  | "review"
+  | "testing"
+  | "document"
+  | "mcp"
+  | "system"
+  | "planning"
+  | "general";
+
+export type RoutingDecisionKind =
+  | "DO_IT_SELF"
+  | "DELEGATE_ONE"
+  | "PARALLELIZE"
+  | "DELEGATE_AND_REVIEW"
+  | "ASK_USER"
+  | "CHANGE_WORKER";
+
+export interface RoutingDecision {
+  decision: RoutingDecisionKind;
+  workerIds: string[];
+  /** Compact user-facing rationale from structured data, never chain-of-thought. */
+  rationale: string;
+  taskType: TaskDomain;
+  difficulty: number;
+  alternatives: { workerId: string; value: number; reason: string }[];
+}
+
+export interface WorkBudget {
+  maxToolCalls?: number;
+  maxRuntimeMs?: number;
+  maxRetries?: number;
+  maxCostUsd?: number;
+  maxChildren?: number;
+  maxDepth?: number;
+}
+
+export type AutonomyLevel = 0 | 1 | 2 | 3 | 4;
+
+export interface AutonomyPolicy {
+  level: AutonomyLevel;
+  workerAuto: "AUTO" | "ASK" | "OFF";
+  review: "AUTO" | "ASK" | "OFF";
+  skillLearning: "OFF" | "PROPOSE" | "AUTO_SAFE";
+  budgets: WorkBudget;
+  maxDepth: number;
+  maxParallel: number;
+  taskRetentionDays: number;
+}
+
+export type TraceLevel = "OFF" | "COMPACT" | "VERBOSE";
+
+export type ActivityKind =
+  | "plan"
+  | "tool"
+  | "worker"
+  | "review"
+  | "approval"
+  | "verify"
+  | "memory"
+  | "skill"
+  | "error"
+  | "done";
+
+/** One compact status unit. Every instance comes from a real runtime event. */
+export interface ActivityEvent {
+  seq: number;
+  taskId?: string;
+  workItemId?: string;
+  workerId?: string;
+  kind: ActivityKind;
+  /** Tiny words: "Searching files", "Coder-2 working", "18/18 passed". */
+  label: string;
+  detail?: string;
+  at: string;
+}
+
+export type ReasoningMode = "HIDDEN" | "SUMMARY" | "PROVIDER_EXPOSED";
+
+/** A reusable prompt strategy with measured outcomes. */
+export interface PromptPattern {
+  id: string;
+  taskType: string;
+  template: string;
+  requiredFields: string[];
+  failureModes: string[];
+  verification: string[];
+  version: number;
+  uses: number;
+  successes: number;
+  updatedAt: string;
+}
+
+export type SkillProposalState = "CANDIDATE" | "IN_REVIEW" | "APPROVED" | "INSTALLED" | "REJECTED";
+
+export interface SkillMetrics {
+  skillId: string;
+  triggers: number;
+  successes: number;
+  verifications: number;
+  failures: number;
+  corrections: number;
+  tokensUsed: number;
+  updatedAt: string;
+}
+
+/** Difficulty signals for value normalization (all optional, all observed). */
+export interface DifficultySignals {
+  fileCount?: number;
+  toolCount?: number;
+  dependencyCount?: number;
+  subtaskCount?: number;
+  risk?: "READ" | "WRITE" | "EXTERNAL" | "DESTRUCTIVE";
+  reviewRounds?: number;
+}

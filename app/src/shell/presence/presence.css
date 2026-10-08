@@ -1,0 +1,377 @@
+/* KAI presence v2 — the owner's reference design (docs/design/kai-presence-v2.html)
+   ported as the REAL main interface.
+
+   The look and the interaction model are kept exactly as authored: the rail, the
+   orb and its mood CSS, the composer, the command palette, the details drawer,
+   the plan/thinking/tool/approval/summary card shapes, the status bar, the agent
+   grid and the tool rows. What changed is only WHAT DRIVES IT — every hardcoded
+   array and the scripted `run()` are gone; the elements below are fed from real
+   KAI Core (see presence.ts).
+
+   Scoped under #kai-presence-root so it cannot collide with the pre-existing
+   dark island stylesheet. */
+
+@property --ar{syntax:'<number>';inherits:true;initial-value:120}
+@property --ag{syntax:'<number>';inherits:true;initial-value:180}
+@property --ab{syntax:'<number>';inherits:true;initial-value:240}
+
+#kai-presence-root{
+  --ink:#0b1838;--soft:#52638b;--blue:#4a8fd6;--line:rgba(11,24,56,.1);--glass:rgba(255,255,255,.66);--ok:#1f9d74;--warn:#c98512;--err:#d9435f;
+  --ar:120;--ag:180;--ab:240;
+  position:fixed;inset:0;z-index:1;
+  font:15px/1.55 "Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);
+  background:radial-gradient(55% 50% at 78% -5%,rgba(var(--ar),var(--ag),var(--ab),.42),transparent 70%),
+             radial-gradient(45% 45% at 0% 75%,rgba(var(--ar),var(--ag),var(--ab),.2),transparent 70%),#eaf3fc;
+  transition:--ar 1.1s,--ag 1.1s,--ab 1.1s;
+}
+#kai-presence-root[data-mood=listen]{--ar:110;--ag:170;--ab:245}
+#kai-presence-root[data-mood=curious]{--ar:150;--ag:190;--ab:250}
+#kai-presence-root[data-mood=think]{--ar:100;--ag:160;--ab:240}
+#kai-presence-root[data-mood=focus]{--ar:70;--ag:200;--ab:230}
+#kai-presence-root[data-mood=worry]{--ar:255;--ag:196;--ab:110}
+#kai-presence-root[data-mood=happy]{--ar:90;--ag:215;--ab:170}
+#kai-presence-root[data-mood=excited]{--ar:255;--ag:150;--ab:200}
+#kai-presence-root[data-mood=sad]{--ar:150;--ag:160;--ab:190}
+#kai-presence-root[data-mood=sleepy]{--ar:170;--ag:180;--ab:220}
+
+#kai-presence-root *{box-sizing:border-box;margin:0}
+#kai-presence-root button{font:inherit;color:inherit;cursor:pointer}
+#kai-presence-root :focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:8px}
+#kai-presence-root code,#kai-presence-root .mono{font-family:"DM Mono",ui-monospace,monospace;font-size:.88em}
+#kai-presence-root svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ================= ORB ================= */
+#kai-presence-root .orb{--s:40px;--glow:60,130,220;--ew:.078;--eh:.15;--rot:0deg;--eyo:0px;--hue:0deg;position:relative;display:inline-block;width:var(--s);height:var(--s);border-radius:50%;flex:none;transition:rotate .5s cubic-bezier(.3,1.4,.5,1),filter .6s}
+#kai-presence-root .orb .g{position:absolute;inset:0;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 50% 40%,#8fbfe9,#5b9bdc 55%,#6fb2dc);filter:hue-rotate(var(--hue));
+  border:max(1px,calc(var(--s)*.008)) solid #cfe9f9;box-shadow:0 calc(var(--s)*.08) calc(var(--s)*.22) rgba(var(--glow),.42),inset 0 calc(var(--s)*-.06) calc(var(--s)*.12) rgba(140,210,240,.5);transition:box-shadow .6s}
+#kai-presence-root .orb .g i{position:absolute;border-radius:50%;filter:blur(calc(var(--s)*.05));animation:drift 14s ease-in-out infinite alternate}
+#kai-presence-root .orb .b1{width:45%;height:28%;left:12%;top:14%;background:#d6e6fb;opacity:.7}
+#kai-presence-root .orb .b2{width:50%;height:35%;left:26%;top:55%;background:#3f7fcb;opacity:.85;animation-duration:18s}
+#kai-presence-root .orb .b3{width:35%;height:30%;right:6%;top:30%;background:#b3cef4;opacity:.6;animation-duration:11s}
+@keyframes drift{to{transform:translate(9%,6%) scale(1.15)}}
+#kai-presence-root .orb .dt{position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.45) 1px,transparent 1.6px);background-size:calc(var(--s)*.024) calc(var(--s)*.024);-webkit-mask:radial-gradient(circle at 50% 45%,#000 20%,transparent 75%);mask:radial-gradient(circle at 50% 45%,#000 20%,transparent 75%)}
+#kai-presence-root .orb .sp{position:absolute;left:14%;top:29%;width:3.4%;aspect-ratio:1;border-radius:50%;background:rgba(235,242,255,.9)}
+#kai-presence-root .orb .ck{position:absolute;top:58%;width:15%;height:9%;border-radius:50%;background:#ff8fb8;filter:blur(calc(var(--s)*.022));opacity:0;transition:opacity .5s}
+#kai-presence-root .orb .ck.l{left:19%}#kai-presence-root .orb .ck.r{right:19%}
+#kai-presence-root .orb .ey{position:absolute;left:50%;top:47%;display:flex;gap:calc(var(--s)*.1);align-items:center;transform:translate(calc(-50% + var(--ex,0px)),calc(-50% + var(--ey,0px) + var(--eyo)));transition:transform .45s cubic-bezier(.3,1.3,.5,1),gap .4s}
+#kai-presence-root .orb .ey b{position:relative;display:block;width:calc(var(--s)*var(--ew));height:calc(var(--s)*var(--eh));border-radius:999px;background:linear-gradient(#fff 10%,#c4f1ff 70%,#8ee6ff);
+  box-shadow:0 0 calc(var(--s)*.05) rgba(170,240,255,.9);animation:blink 5.5s infinite;transition:width .35s,height .35s,rotate .35s,background .3s,border-radius .3s}
+#kai-presence-root .orb .ey b:first-child{rotate:var(--rot)}
+#kai-presence-root .orb .ey b:last-child{rotate:calc(var(--rot)*-1)}
+#kai-presence-root .orb .ey b::before{content:"";position:absolute;left:18%;top:8%;width:30%;height:22%;border-radius:50%;background:#fff;transform:rotate(-10deg)}
+#kai-presence-root .orb .ey b::after{content:"";position:absolute;left:50%;bottom:7%;width:16%;aspect-ratio:1;border-radius:50%;background:#bfeeff;transform:translateX(-30%)}
+@keyframes blink{0%,94%,100%{transform:scaleY(1)}96.5%{transform:scaleY(.08)}}
+#kai-presence-root .orb[data-s=listen]{--ew:.088;--eh:.172}
+#kai-presence-root .orb[data-s=curious]{--ew:.09;--eh:.178;rotate:-5deg}
+#kai-presence-root .orb[data-s=think] .ey{animation:scan 1.7s ease-in-out infinite}
+@keyframes scan{0%,100%{transform:translate(calc(-50% - var(--s)*.06),-50%)}50%{transform:translate(calc(-50% + var(--s)*.06),-50%)}}
+#kai-presence-root .orb[data-s=think]{animation:pulse 1.7s ease-in-out infinite}
+@keyframes pulse{50%{filter:brightness(1.1) saturate(1.08)}}
+#kai-presence-root .orb[data-s=focus]{--ew:.102;--eh:.09;--glow:50,200,235}
+#kai-presence-root .orb[data-s=focus] .ey{gap:calc(var(--s)*.085)}
+#kai-presence-root .orb[data-s=worry]{--ew:.074;--eh:.172;--rot:11deg;--eyo:calc(var(--s)*-.015);--glow:255,185,80}
+#kai-presence-root .orb[data-s=sad]{--ew:.07;--eh:.11;--rot:-13deg;--eyo:calc(var(--s)*.04);--glow:120,140,190;filter:saturate(.6) brightness(.93)}
+#kai-presence-root .orb[data-s=sad] .ey b{animation:none;box-shadow:0 0 calc(var(--s)*.03) rgba(170,220,255,.6)}
+#kai-presence-root .orb[data-s=sleepy]{animation:breathe 4s ease-in-out infinite}
+@keyframes breathe{50%{transform:scale(1.025)}}
+#kai-presence-root .orb[data-s=sleepy]{--ew:.1;--eh:.02;--eyo:calc(var(--s)*.03)}
+#kai-presence-root .orb[data-s=sleepy] .ey b{animation:none;box-shadow:none}
+#kai-presence-root .orb[data-s=sleepy] .ey b::before,#kai-presence-root .orb[data-s=sleepy] .ey b::after,#kai-presence-root .orb[data-s=happy] .ey b::before,#kai-presence-root .orb[data-s=happy] .ey b::after,#kai-presence-root .orb[data-s=excited] .ey b::before,#kai-presence-root .orb[data-s=excited] .ey b::after{display:none}
+#kai-presence-root .orb[data-s=happy],#kai-presence-root .orb[data-s=excited]{--ew:.1;--eh:.05;--glow:70,210,165}
+#kai-presence-root .orb[data-s=happy] .ey b,#kai-presence-root .orb[data-s=excited] .ey b{animation:none;background:none;box-shadow:none;border-top:calc(var(--s)*.026) solid #effffa;border-radius:50% 50% 0 0/100% 100% 0 0;filter:drop-shadow(0 0 calc(var(--s)*.035) rgba(160,255,225,.95))}
+#kai-presence-root .orb[data-s=happy] .ck,#kai-presence-root .orb[data-s=excited] .ck{opacity:.55}
+#kai-presence-root .orb[data-s=excited]{--glow:255,140,200;animation:bounce .55s ease-in-out 4}
+@keyframes bounce{40%{transform:translateY(-8%) scale(1.03,.98)}70%{transform:translateY(0) scale(.98,1.03)}}
+#kai-presence-root .orb.boop{animation:boop .5s cubic-bezier(.3,1.6,.5,1)}
+@keyframes boop{30%{transform:scale(1.08,.9)}60%{transform:scale(.95,1.06)}}
+#kai-presence-root .orb[data-fx=on]::after{position:absolute;pointer-events:none;font-weight:700;color:var(--ink)}
+#kai-presence-root .orb[data-fx=on][data-s=sleepy]::after{content:"z z";right:-8%;top:-6%;font-size:calc(var(--s)*.13);letter-spacing:.2em;opacity:.55;animation:zz 3s ease-in-out infinite}
+@keyframes zz{0%{transform:translate(0,8px);opacity:0}30%{opacity:.6}100%{transform:translate(10px,-14px);opacity:0}}
+#kai-presence-root .orb[data-fx=on][data-s=worry]::after{content:"";right:8%;top:6%;width:calc(var(--s)*.07);height:calc(var(--s)*.105);background:linear-gradient(#e7f6ff,#9ad4ff);border-radius:50% 50% 50% 50%/65% 65% 35% 35%;box-shadow:0 0 6px rgba(255,255,255,.8)}
+#kai-presence-root .orb[data-fx=on][data-s=sad]::after{content:"";left:31%;top:57%;width:calc(var(--s)*.05);height:calc(var(--s)*.075);background:linear-gradient(#e7f6ff,#8fcaff);border-radius:50% 50% 50% 50%/65% 65% 35% 35%;animation:tear 2.4s ease-in infinite}
+@keyframes tear{0%{transform:translateY(0);opacity:0}20%{opacity:.95}100%{transform:translateY(calc(var(--s)*.18));opacity:0}}
+#kai-presence-root .orb[data-fx=on][data-s=excited]::after{content:"✦  ✧";left:-6%;top:-4%;width:112%;text-align:justify;font-size:calc(var(--s)*.12);color:#ff7fb8;animation:tw .9s ease-in-out infinite alternate;text-shadow:0 0 8px rgba(255,170,215,.8)}
+@keyframes tw{to{opacity:.35;transform:scale(1.15)}}
+#kai-presence-root .float{animation:float 7s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-2.5%)}}
+
+/* ================= SHELL ================= */
+#kai-presence-root .app{height:100vh;display:grid;grid-template-columns:72px minmax(0,1fr) 0;grid-template-rows:minmax(0,1fr) 34px;transition:grid-template-columns .4s cubic-bezier(.3,.9,.4,1)}
+#kai-presence-root .app.drawer{grid-template-columns:72px minmax(0,1fr) 450px}
+#kai-presence-root .rail{grid-row:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 0;border-right:1px solid var(--line);background:rgba(255,255,255,.4);backdrop-filter:blur(16px);overflow-x:hidden;overflow-y:auto;scrollbar-width:none}
+#kai-presence-root .rail .orb{--s:36px;margin-bottom:10px;cursor:pointer;flex:none}
+#kai-presence-root .rb{position:relative;width:40px;height:40px;border-radius:12px;border:0;background:none;color:var(--soft);display:grid;place-items:center;transition:background .2s,color .2s;flex:none}
+#kai-presence-root .rb:hover{background:rgba(255,255,255,.75);color:var(--ink)}
+#kai-presence-root .rb.on{background:#fff;color:var(--ink);box-shadow:0 4px 14px rgba(40,100,190,.15)}
+#kai-presence-root .rb .n{position:absolute;top:3px;right:3px;min-width:17px;height:17px;border-radius:99px;background:var(--ink);color:#fff;font-size:10.5px;font-weight:600;display:grid;place-items:center;padding:0 4px}
+#kai-presence-root .rb .n.warn{background:var(--warn)}
+#kai-presence-root .rail .sp{flex:1;min-height:8px}
+
+#kai-presence-root .main{grid-row:1;grid-column:2;position:relative;min-width:0;min-height:0;display:flex;flex-direction:column}
+#kai-presence-root .view{display:none;flex:1;min-height:0;flex-direction:column}
+#kai-presence-root .view.on{display:flex}
+#kai-presence-root .top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 24px;min-height:70px}
+#kai-presence-root .top h2{font-size:1.5rem;letter-spacing:-.03em;font-weight:700;line-height:1.1}
+#kai-presence-root .top p{color:var(--soft);font-size:14px}
+#kai-presence-root .topr{display:flex;gap:8px;align-items:center}
+#kai-presence-root .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 15px;border-radius:999px;border:1px solid var(--line);background:var(--glass);font-weight:500;font-size:14px;white-space:nowrap;transition:background .2s,transform .15s}
+#kai-presence-root .pill:hover{background:#fff}
+#kai-presence-root .pill.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+#kai-presence-root .pill.pri:hover{background:#17306a}
+#kai-presence-root .pill kbd{font:12px "DM Mono",monospace;color:var(--soft)}
+#kai-presence-root .badge{background:var(--ink);color:#fff;border-radius:999px;font-size:11px;padding:0 7px;line-height:18px}
+#kai-presence-root .proj{display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:var(--glass);border:1px solid #fff;font-weight:500}
+#kai-presence-root .proj small{color:var(--soft);font-weight:400}
+#kai-presence-root .who{display:none;align-items:center;gap:12px}
+#kai-presence-root .talking .who{display:flex}
+#kai-presence-root .who .orb{--s:46px}
+#kai-presence-root .who b{display:block;font-weight:600;line-height:1.2}
+#kai-presence-root .who span{font-size:13px;color:var(--soft)}
+
+#kai-presence-root .thread{display:none;flex:1;overflow:auto;padding:6px 24px 10px}
+#kai-presence-root .talking .thread{display:block}
+#kai-presence-root .col{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:16px;padding-bottom:12px}
+#kai-presence-root .u{align-self:flex-end;max-width:82%;background:var(--ink);color:#fff;padding:10px 16px;border-radius:18px 18px 4px 18px}
+#kai-presence-root .k{display:flex;flex-direction:column;gap:9px}
+#kai-presence-root .k>p{padding:0 2px}
+#kai-presence-root .fade{animation:in .4s ease both}
+@keyframes in{from{opacity:0;transform:translateY(7px)}}
+#kai-presence-root .blk{border-radius:14px;background:var(--glass);border:1px solid #fff;box-shadow:0 6px 22px rgba(40,100,190,.08)}
+#kai-presence-root details.think{padding:2px 14px;color:var(--soft)}
+#kai-presence-root details.think summary{padding:9px 0;cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-weight:500;color:var(--ink)}
+#kai-presence-root details.think summary::-webkit-details-marker{display:none}
+#kai-presence-root details.think summary i{width:7px;height:7px;border-radius:50%;background:var(--blue);animation:dot 1s infinite alternate}
+#kai-presence-root details.think.done summary i{animation:none;background:var(--ok)}
+@keyframes dot{to{opacity:.25;transform:scale(.7)}}
+#kai-presence-root details.think div{padding:0 0 12px 17px;font-size:14px;display:flex;flex-direction:column;gap:4px}
+#kai-presence-root .plan{padding:12px 16px}
+#kai-presence-root .plan h4{font-size:13.5px;margin-bottom:8px;color:var(--soft);font-weight:600}
+#kai-presence-root .plan li{list-style:none;display:flex;gap:10px;align-items:center;padding:3px 0;color:var(--soft);transition:color .3s}
+#kai-presence-root .plan li i{width:18px;height:18px;border-radius:50%;border:2px solid rgba(11,24,56,.2);display:grid;place-items:center;flex:none;transition:all .3s}
+#kai-presence-root .plan li.on{color:var(--ink)}
+#kai-presence-root .plan li.on i{border-color:var(--blue);box-shadow:0 0 0 4px rgba(74,143,214,.15)}
+#kai-presence-root .plan li.ok{color:var(--ink)}
+#kai-presence-root .plan li.ok i{background:var(--ok);border-color:var(--ok)}
+#kai-presence-root .plan li.ok i::after{content:"";width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+#kai-presence-root .go-row{display:flex;gap:8px;padding:0 16px 14px}
+#kai-presence-root details.tc{overflow:hidden}
+#kai-presence-root details.tc summary{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;list-style:none;font-size:14px}
+#kai-presence-root details.tc summary::-webkit-details-marker{display:none}
+#kai-presence-root .ti{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:#fff;color:var(--blue);flex:none}
+#kai-presence-root .ti.mcp{background:#efe9ff;color:#6d4fd6}
+#kai-presence-root details.tc b{font-weight:600}
+#kai-presence-root details.tc summary code{color:var(--soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+#kai-presence-root .tag{font-size:11px;font-weight:600;border-radius:99px;padding:1px 8px;background:#e8defd;color:#5a3cc0}
+#kai-presence-root .ms{margin-left:auto;font:12px "DM Mono",monospace;color:var(--soft);display:flex;align-items:center;gap:8px;white-space:nowrap}
+#kai-presence-root .spin{width:12px;height:12px;border-radius:50%;border:2px solid rgba(74,143,214,.25);border-top-color:var(--blue);animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#kai-presence-root .okd{width:12px;height:12px;border-radius:50%;background:var(--ok)}
+#kai-presence-root .bad{color:var(--err)}
+#kai-presence-root details.tc pre{margin:0 14px 12px;padding:10px 12px;border-radius:10px;background:#fff;border:1px solid var(--line);font:12.5px/1.65 "DM Mono",monospace;color:var(--soft);white-space:pre-wrap}
+#kai-presence-root .ag{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:12px 14px}
+#kai-presence-root .ag .orb{--s:42px}
+#kai-presence-root .ag b{font-weight:600}
+#kai-presence-root .ag small{display:block;color:var(--soft);font-size:13.5px}
+#kai-presence-root .ag .bar{grid-column:2/-1;height:4px;border-radius:9px;background:rgba(11,24,56,.08);overflow:hidden}
+#kai-presence-root .ag .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4a8fd6,#8fd6ff);transition:width 1.4s ease}
+#kai-presence-root .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font-size:12.5px;font-weight:600;background:#e1eefb;color:#2c66a8}
+#kai-presence-root .chip.ok{background:#dff5ec;color:var(--ok)} #kai-presence-root .chip.warn{background:#fdf0d6;color:var(--warn)} #kai-presence-root .chip.err{background:#fde3e8;color:var(--err)} #kai-presence-root .chip.mut{background:rgba(11,24,56,.06);color:var(--soft)}
+#kai-presence-root .ask{padding:14px 16px;border-color:rgba(201,133,18,.5);background:linear-gradient(rgba(255,196,110,.22),rgba(255,255,255,.7))}
+#kai-presence-root .ask h4{display:flex;align-items:center;gap:8px;font-size:14px;color:#8a5a06}
+#kai-presence-root .ask .cmd{margin:10px 0 12px;padding:9px 12px;border-radius:10px;background:#fff;border:1px solid var(--line);font-family:"DM Mono",monospace;font-size:13px;white-space:pre-wrap;word-break:break-word}
+#kai-presence-root .btns{display:flex;gap:8px;flex-wrap:wrap}
+#kai-presence-root .btn{padding:8px 15px;border-radius:11px;border:1px solid var(--line);background:#fff;font-weight:600;font-size:14px;transition:transform .15s}
+#kai-presence-root .btn:hover{transform:translateY(-1px)}
+#kai-presence-root .btn.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+#kai-presence-root .btn.warn{background:#f7b955;border-color:#f7b955;color:#3a2500}
+#kai-presence-root .sum{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;background:linear-gradient(120deg,rgba(255,255,255,.9),rgba(222,247,238,.8));border:1px solid #fff;box-shadow:0 12px 34px rgba(31,157,116,.16)}
+#kai-presence-root .sum .tick{width:32px;height:32px;border-radius:50%;background:var(--ok);display:grid;place-items:center;flex:none}
+#kai-presence-root .sum .tick svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+#kai-presence-root .sum div{flex:1}#kai-presence-root .sum b{display:block;font-weight:600}#kai-presence-root .sum span{font-size:13.5px;color:var(--soft)}
+
+/* stage / composer */
+#kai-presence-root .stage{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:0 24px 22px;min-height:0}
+#kai-presence-root .talking .stage{flex:none;justify-content:flex-end;padding-bottom:16px}
+#kai-presence-root .hero{text-align:center;margin-bottom:24px}
+#kai-presence-root .hero .orb{--s:min(26vh,200px);cursor:pointer}
+#kai-presence-root .hero h1{margin-top:20px;font-size:clamp(1.9rem,4vw,2.9rem);line-height:1.05;letter-spacing:-.04em;font-weight:700}
+#kai-presence-root .hero p{color:var(--soft);margin-top:6px;min-height:1.5em}
+#kai-presence-root .talking .hero,#kai-presence-root .talking .abil,#kai-presence-root .talking .chips{display:none}
+#kai-presence-root .cw{position:relative;width:100%;max-width:720px}
+#kai-presence-root .comp{border-radius:26px;background:rgba(255,255,255,.88);border:1px solid #fff;box-shadow:0 16px 54px rgba(40,100,190,.2);padding:10px 10px 10px 20px;transition:box-shadow .3s}
+#kai-presence-root .comp:focus-within{box-shadow:0 16px 54px rgba(40,100,190,.3),0 0 0 2px rgba(74,143,214,.45)}
+#kai-presence-root .comp textarea{width:100%;border:0;outline:0;background:none;resize:none;font:inherit;color:var(--ink);padding:9px 0 4px;min-height:42px;max-height:160px}
+#kai-presence-root .crow{display:flex;align-items:center;gap:8px;padding:4px 0 0}
+#kai-presence-root .crow .sp{flex:1}
+#kai-presence-root .seg{display:flex;border:1px solid var(--line);border-radius:999px;padding:2px;background:rgba(255,255,255,.7)}
+#kai-presence-root .seg button{border:0;background:none;padding:4px 12px;border-radius:99px;font-size:13px;font-weight:500;color:var(--soft)}
+#kai-presence-root .seg button[aria-pressed=true]{background:var(--ink);color:#fff}
+#kai-presence-root .tb{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:99px;border:1px solid var(--line);background:rgba(255,255,255,.7);font-size:13px;font-weight:500;color:var(--soft)}
+#kai-presence-root .tb:hover{color:var(--ink);background:#fff}
+#kai-presence-root .tb .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+#kai-presence-root .tb .dot.w{background:#e5a31c}
+#kai-presence-root .go{width:40px;height:40px;border-radius:50%;border:0;background:var(--ink);color:#fff;display:grid;place-items:center;flex:none;transition:transform .15s,background .2s}
+#kai-presence-root .go:hover{background:#17306a;transform:scale(1.05)}
+#kai-presence-root .go:disabled{opacity:.5;cursor:default}
+#kai-presence-root .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:16px;max-width:720px}
+#kai-presence-root .chips button{padding:8px 15px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.5);font-size:14px;color:var(--soft)}
+#kai-presence-root .chips button:hover{background:#fff;color:var(--ink)}
+#kai-presence-root .abil{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:720px;margin-top:18px}
+#kai-presence-root .ab{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:var(--glass);border:1px solid #fff;text-align:left;transition:transform .2s,box-shadow .2s}
+#kai-presence-root .ab:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(40,100,190,.15)}
+#kai-presence-root .ab .ti{width:34px;height:34px;border-radius:11px}
+#kai-presence-root .ab b{display:block;font-weight:600;line-height:1.25}#kai-presence-root .ab span{font-size:13px;color:var(--soft)}
+
+/* popovers */
+#kai-presence-root .pop{position:absolute;bottom:calc(100% + 10px);left:0;width:min(420px,100%);border-radius:20px;background:rgba(255,255,255,.97);box-shadow:0 24px 70px rgba(11,24,56,.25);border:1px solid #fff;padding:8px;display:none;z-index:20;max-height:46vh;overflow:auto}
+#kai-presence-root .pop.on{display:block}
+#kai-presence-root .pop h5{font-size:12px;font-weight:600;color:var(--soft);padding:8px 10px 4px}
+#kai-presence-root .pr{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px}
+#kai-presence-root .pr:hover{background:#eef5fd}
+#kai-presence-root .pr .ti{width:30px;height:30px}
+#kai-presence-root .pr .orb{--s:30px}
+#kai-presence-root .pr div{flex:1;min-width:0}#kai-presence-root .pr small{display:block;color:var(--soft);font-size:12.5px}
+#kai-presence-root .sw{position:relative;width:38px;height:22px;border-radius:99px;background:rgba(11,24,56,.18);border:0;transition:background .25s;flex:none}
+#kai-presence-root .sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25);transition:transform .25s cubic-bezier(.3,1.5,.5,1)}
+#kai-presence-root .sw[aria-checked=true]{background:var(--ok)}
+#kai-presence-root .sw[aria-checked=true]::after{transform:translateX(16px)}
+#kai-presence-root .mention{left:0;width:300px}
+
+/* feelings lab */
+#kai-presence-root .lab{position:absolute;top:64px;right:24px;width:330px;border-radius:22px;background:rgba(255,255,255,.96);box-shadow:0 24px 70px rgba(11,24,56,.25);padding:16px;display:none;z-index:30}
+#kai-presence-root .lab.on{display:block}
+#kai-presence-root .lab h4{font-size:15px}#kai-presence-root .lab p{font-size:13px;color:var(--soft);margin:2px 0 12px}
+#kai-presence-root .fg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#kai-presence-root .fg button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px 8px;border-radius:14px;border:1px solid var(--line);background:#f4f9fe;font-size:12.5px;font-weight:600;color:var(--soft)}
+#kai-presence-root .fg button:hover{background:#fff;color:var(--ink)}
+#kai-presence-root .fg .orb{--s:44px}
+
+/* drawer */
+#kai-presence-root .dr{grid-row:1;grid-column:3;overflow:hidden;background:rgba(255,255,255,.72);backdrop-filter:blur(18px);border-left:1px solid var(--line);min-width:0}
+#kai-presence-root .dr-in{width:450px;height:100%;display:flex;flex-direction:column}
+#kai-presence-root .tabs{display:flex;gap:4px;padding:14px 16px 0;border-bottom:1px solid var(--line)}
+#kai-presence-root .tabs button{border:0;background:none;padding:9px 12px;font-weight:600;color:var(--soft);border-bottom:2px solid transparent}
+#kai-presence-root .tabs button[aria-selected=true]{color:var(--ink);border-color:var(--ink)}
+#kai-presence-root .dp{flex:1;overflow:auto;padding:14px;display:none;min-height:0}
+#kai-presence-root .dp.on{display:block}
+#kai-presence-root .dif{margin-top:10px;border-radius:14px;background:#fff;border:1px solid var(--line);font:12.5px/1.8 "DM Mono",monospace;padding:8px 0;overflow-x:auto}
+#kai-presence-root .dif div{padding:0 14px;white-space:pre;color:var(--soft);min-width:max-content}
+#kai-presence-root .dfoot{display:flex;gap:8px;padding:14px;border-top:1px solid var(--line)}
+#kai-presence-root .dfoot .btn{flex:1;padding:10px}
+#kai-presence-root .tl{position:relative;padding-left:20px}
+#kai-presence-root .tl::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:var(--line)}
+#kai-presence-root .ev{position:relative;padding:0 0 14px}
+#kai-presence-root .ev::before{content:"";position:absolute;left:-19px;top:6px;width:10px;height:10px;border-radius:50%;background:var(--blue);border:2px solid #fff}
+#kai-presence-root .ev.mcp::before{background:#7c5ce0}#kai-presence-root .ev.agt::before{background:var(--ok)}#kai-presence-root .ev.bad::before{background:var(--err)}
+#kai-presence-root .ev b{font-weight:600}#kai-presence-root .ev small{display:block;color:var(--soft);font-size:12.5px}
+#kai-presence-root .empty{padding:34px 14px;text-align:center;color:var(--soft);font-size:14px}
+#kai-presence-root .arow{display:flex;align-items:center;gap:12px;padding:10px;border-radius:14px;background:var(--glass);border:1px solid #fff;margin-bottom:8px}
+#kai-presence-root .arow .orb{--s:38px}#kai-presence-root .arow div{flex:1}#kai-presence-root .arow small{display:block;color:var(--soft);font-size:13px}
+
+/* tools & agents views */
+#kai-presence-root .scroll{flex:1;overflow:auto;padding:0 24px 24px}
+#kai-presence-root .wrapw{max-width:980px;margin:0 auto}
+#kai-presence-root .sumrow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+#kai-presence-root .sumrow .chip{padding:6px 14px;font-size:13.5px}
+#kai-presence-root .sec{font-size:13px;font-weight:600;color:var(--soft);margin:22px 4px 8px}
+#kai-presence-root .trow{display:grid;grid-template-columns:42px minmax(0,1fr) auto auto auto;gap:14px;align-items:center;padding:12px 14px;border-radius:18px;background:var(--glass);border:1px solid #fff;margin-bottom:8px;transition:box-shadow .2s,opacity .2s}
+#kai-presence-root .trow:hover{box-shadow:0 10px 30px rgba(40,100,190,.12)}
+#kai-presence-root .trow.off{opacity:.55}
+#kai-presence-root .trow .ti{width:42px;height:42px;border-radius:13px}
+#kai-presence-root .trow b{font-weight:600}#kai-presence-root .trow small{display:block;color:var(--soft);font-size:13px}
+#kai-presence-root .trow .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:3px}
+#kai-presence-root .tcell{display:flex;align-items:center;gap:10px}
+#kai-presence-root .mini{padding:6px 12px;border-radius:99px;border:1px solid var(--line);background:#fff;font-size:13px;font-weight:600}
+#kai-presence-root .mini:hover{background:#f0f6fd}
+@media(max-width:1100px){#kai-presence-root .trow{grid-template-columns:42px minmax(0,1fr) auto}#kai-presence-root .trow .seg,#kai-presence-root .trow .tcell:nth-of-type(3){display:none}}
+#kai-presence-root .agrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+#kai-presence-root .acard{padding:20px 18px 16px;border-radius:22px;background:var(--glass);border:1px solid #fff;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;transition:transform .25s,box-shadow .25s}
+#kai-presence-root .acard:hover{transform:translateY(-3px);box-shadow:0 18px 44px rgba(40,100,190,.18)}
+#kai-presence-root .acard .orb{--s:88px;margin-bottom:6px;cursor:pointer}
+#kai-presence-root .acard h3{font-size:1.15rem;letter-spacing:-.02em}
+#kai-presence-root .acard p{color:var(--soft);font-size:14px;min-height:42px}
+#kai-presence-root .acard .tools{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin:4px 0}
+#kai-presence-root .acard .foot{display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:8px;padding-top:12px;border-top:1px solid var(--line)}
+#kai-presence-root .acard.add{border:2px dashed rgba(11,24,56,.2);background:transparent;justify-content:center;color:var(--soft);min-height:300px}
+#kai-presence-root .acard.add:hover{color:var(--ink);border-color:var(--ink)}
+#kai-presence-root .acard.dis{opacity:.55}
+
+/* status bar */
+#kai-presence-root .sb{grid-column:1/-1;grid-row:2;display:flex;align-items:center;gap:16px;padding:0 16px;border-top:1px solid var(--line);background:rgba(255,255,255,.55);backdrop-filter:blur(14px);font-size:12.5px;color:var(--soft);white-space:nowrap;overflow:hidden}
+#kai-presence-root .sb button{border:0;background:none;display:flex;align-items:center;gap:6px;color:inherit;font-size:inherit;padding:3px 6px;border-radius:7px}
+#kai-presence-root .sb button:hover{background:#fff;color:var(--ink)}
+#kai-presence-root .sb .d{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+#kai-presence-root .sb .d.w{background:#e5a31c}#kai-presence-root .sb .d.e{background:var(--err)}#kai-presence-root .sb .d.n{background:#aab4c8}
+#kai-presence-root .sb .sp{flex:1}
+#kai-presence-root .sb .live{display:flex;align-items:center;gap:7px}
+#kai-presence-root .sb .live i{width:7px;height:7px;border-radius:50%;background:var(--blue);animation:dot 1s infinite alternate}
+
+/* overlay / modal / palette */
+#kai-presence-root .ov{position:fixed;inset:0;background:rgba(11,24,56,.28);backdrop-filter:blur(5px);display:none;align-items:flex-start;justify-content:center;padding-top:12vh;z-index:60}
+#kai-presence-root .ov.on{display:flex}
+#kai-presence-root .pal,#kai-presence-root .modal{width:min(580px,92vw);border-radius:24px;background:rgba(255,255,255,.97);box-shadow:0 30px 90px rgba(11,24,56,.35);overflow:hidden}
+#kai-presence-root .pal input{width:100%;border:0;outline:0;padding:18px 22px;font:inherit;font-size:17px;border-bottom:1px solid var(--line);background:none;color:var(--ink)}
+#kai-presence-root .pal ul{list-style:none;padding:8px;max-height:46vh;overflow:auto;margin:0}
+#kai-presence-root .pal li button{display:flex;width:100%;gap:12px;align-items:center;padding:11px 14px;border:0;background:none;border-radius:12px;text-align:left}
+#kai-presence-root .pal li button:hover,#kai-presence-root .pal li button.sel{background:#e7f1fc}
+#kai-presence-root .pal li small{margin-left:auto;color:var(--soft);font:12px "DM Mono",monospace}
+#kai-presence-root .modal{padding:24px;max-height:80vh;overflow:auto}
+#kai-presence-root .modal h3{font-size:1.3rem;letter-spacing:-.02em}
+#kai-presence-root .modal .sub{color:var(--soft);font-size:14px;margin:2px 0 16px}
+#kai-presence-root .mhead{display:flex;gap:16px;align-items:center;margin-bottom:12px}
+#kai-presence-root .mhead .orb{--s:84px}
+#kai-presence-root .fld{display:block;margin-bottom:14px}
+#kai-presence-root .fld span{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:var(--soft)}
+#kai-presence-root .fld input,#kai-presence-root .fld textarea{width:100%;padding:10px 13px;border-radius:12px;border:1px solid var(--line);background:#fff;font:inherit;outline:0;resize:none;color:var(--ink)}
+#kai-presence-root .fld input:focus,#kai-presence-root .fld textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(74,143,214,.18)}
+#kai-presence-root .hues{display:flex;gap:8px}
+#kai-presence-root .hues button{width:30px;height:30px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px var(--line)}
+#kai-presence-root .hues button[aria-pressed=true]{box-shadow:0 0 0 2px var(--ink)}
+#kai-presence-root .chk{display:flex;flex-wrap:wrap;gap:6px}
+#kai-presence-root .chk button{padding:5px 12px;border-radius:99px;border:1px solid var(--line);background:#fff;font-size:13px;font-weight:500;color:var(--soft)}
+#kai-presence-root .chk button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+#kai-presence-root .mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+#kai-presence-root .toasts{position:fixed;right:18px;bottom:48px;display:flex;flex-direction:column;gap:8px;z-index:80}
+#kai-presence-root .toast{display:flex;gap:10px;align-items:center;padding:11px 16px;border-radius:14px;background:var(--ink);color:#fff;font-size:14px;box-shadow:0 16px 40px rgba(11,24,56,.35);animation:in .35s ease both}
+#kai-presence-root .toast.out{opacity:0;transform:translateY(6px);transition:.4s}
+
+@media(max-width:1000px){#kai-presence-root .abil{grid-template-columns:1fr}#kai-presence-root .app{grid-template-columns:52px minmax(0,1fr) 0}#kai-presence-root .app.drawer{grid-template-columns:52px 0 100%}#kai-presence-root .rail{padding:12px 0}#kai-presence-root .main{grid-column:2}}
+@media (prefers-reduced-motion:reduce){#kai-presence-root *{animation:none!important;transition:none!important}}
+
+/* -- Operator workspace chrome (docs/design/KAI_OPERATOR_UI_REFERENCE.html) --
+   KAI as the main operator: identity header, live execution strip, console
+   chips + hints. Uses the app's existing tokens (--ink, --line, --dim, --acc). */
+#kai-presence-root .top.op{display:flex;align-items:center;gap:18px;height:auto;padding:12px 20px;flex-wrap:wrap}
+#kai-presence-root .who-id{display:flex;flex-direction:column;line-height:1.15}
+#kai-presence-root .who-name{display:flex;align-items:baseline;gap:8px}
+#kai-presence-root .who-name b{font-size:15px;letter-spacing:.02em}
+#kai-presence-root .who-role{font-size:10px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
+#kai-presence-root .who-state{font-size:11.5px;color:var(--dim)}
+#kai-presence-root .opstate{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:6px}
+#kai-presence-root .opill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--line);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+#kai-presence-root .opill i{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.7;flex:0 0 auto}
+#kai-presence-root .opill.ok{color:#34d399}
+#kai-presence-root .opill.bad{color:#f4505e}
+#kai-presence-root .opill.warn{color:#f5a524}
+#kai-presence-root .actstrip{display:flex;flex-direction:column;gap:2px;max-height:132px;overflow-y:auto;padding:8px 22px 4px;border-bottom:1px solid var(--line)}
+#kai-presence-root .actstrip:empty{display:none}
+#kai-presence-root .actrow{display:flex;align-items:center;gap:9px;font-size:11.5px;color:var(--dim);font-variant-numeric:tabular-nums}
+#kai-presence-root .actrow i{width:6px;height:6px;border-radius:50%;background:var(--dim);flex:0 0 auto}
+#kai-presence-root .actrow.w i{background:#7bd0ff}
+#kai-presence-root .actrow.r i{background:#f5a524}
+#kai-presence-root .actrow.b i{background:#a78bfa}
+#kai-presence-root .actrow.done span{color:#34d399}
+#kai-presence-root .opchips{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0 0 8px}
+#kai-presence-root .opchip{padding:3px 9px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:11px;font-family:var(--font-mono,monospace);cursor:pointer}
+#kai-presence-root .opchip:hover{color:var(--acc);border-color:var(--acc)}
+#kai-presence-root .ophint{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 2px 0;font-size:10.5px;color:var(--dim)}
+#kai-presence-root .ophint kbd{padding:1px 5px;border-radius:5px;background:var(--line);color:var(--ink);font-size:10px}
+/* -- Live command card (real child-process stdout/stderr, streamed) -- */
+#kai-presence-root .cmd.blk{margin:6px 0;border:1px solid var(--line);border-radius:10px;background:var(--bg2,rgba(0,0,0,.18));overflow:hidden;max-height:340px}
+#kai-presence-root .cmd summary{display:flex;align-items:center;gap:8px;padding:7px 11px;cursor:pointer;font-size:12px;list-style:none}
+#kai-presence-root .cmd summary .cline{color:var(--ink);font-family:var(--font-mono,monospace);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#kai-presence-root .cmd .st{margin-left:auto;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+#kai-presence-root .cmd .st.bad{color:#f4505e}
+#kai-presence-root .cmd .cmdout{margin:0;padding:8px 11px;max-height:280px;overflow:auto;font-family:var(--font-mono,monospace);font-size:11.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+#kai-presence-root .cmd .cmd-err{color:#f5a524;display:block}
+#kai-presence-root .cmd .cmd-out{color:var(--ink);display:block}

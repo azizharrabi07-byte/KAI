@@ -1,0 +1,14 @@
+{
+  "agents": [
+    {
+      "id": "hermes",
+      "state": "idle",
+      "lastActivity": "2026-10-05T15:08:03.814Z"
+    },
+    {
+      "id": "opencode",
+      "state": "offline",
+      "detail": "INTERNAL: transport failure talking to http://127.0.0.1:4096"
+    }
+  ]
+}

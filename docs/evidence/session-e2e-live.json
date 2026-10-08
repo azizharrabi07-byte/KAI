@@ -1,0 +1,134 @@
+{
+  "at": "2026-10-06T04:41:57.839Z",
+  "steps": [
+    {
+      "step": "1. create session",
+      "idA": "sess_muw6z7d5_24yd",
+      "title": "Conversation 1"
+    },
+    {
+      "step": "2. title through conversation",
+      "title": "Help me design the restaurant QR ordering flow with a worker conf…",
+      "conversation_id": "sess_muw6z7d5_24yd"
+    },
+    {
+      "step": "3. several messages",
+      "lastReply": ""
+    },
+    {
+      "step": "4. search turn",
+      "tool_calls": [
+        {
+          "name": "filesystem_search",
+          "status": "EXECUTED",
+          "invocationId": "act_muw71qyz_t"
+        },
+        {
+          "name": "filesystem_search",
+          "status": "EXECUTED",
+          "invocationId": "act_muw71qz4_u"
+        },
+        {
+          "name": "filesystem_list",
+          "status": "EXECUTED",
+          "invocationId": "act_muw71qzf_v"
+        },
+        {
+          "name": "filesystem_read",
+          "status": "EXECUTED",
+          "invocationId": "act_muw71te0_w"
+        },
+        {
+          "name": "filesystem_metadata",
+          "status": "EXECUTED",
+          "invocationId": "act_muw71tea_x"
+        }
+      ],
+      "reply": "Found it. One match.\n\n## Result\n\n**`kai-session-e2e-gKVmsT\\workspace\\field-notes.txt`** — line 2:\n\n```\ntuesday\nthe keeper wrote kai-e2e-proof-muw6z77z here\n```\n\nFull path: `C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-session-e2e-gKVmsT\\workspace\\field-notes.txt`\n53 bytes, created/modified 2026-10-06 04:41:"
+    },
+    {
+      "step": "5. tool record in history",
+      "turns": 8,
+      "assistantTurns": 4,
+      "turnsWithTools": 4,
+      "firstTool": {
+        "name": "memory_list",
+        "status": "EXECUTED"
+      }
+    },
+    {
+      "step": "6. rename",
+      "title": "Restaurant QR SaaS Architecture"
+    },
+    {
+      "step": "7-9. reload restoration",
+      "sameId": true,
+      "title": "Restaurant QR SaaS Architecture",
+      "summary": {
+        "objective": "Help me design the restaurant QR ordering flow with a worker confirmation step",
+        "files": [
+          "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-session-e2e-gKVmsT\\workspace",
+          "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-session-e2e-gKVmsT\\workspace\\field-notes.txt",
+          "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-session-e2e-gKVmsT",
+          "C:\\Users\\DELL\\AppData\\Local\\Temp",
+          "C:\\Users\\DELL\\AppData\\Local\\Temp\\.ses",
+          "C:\\Users\\DELL\\AppData\\Local\\Temp\\.codebase-index",
+          "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-session-e2e-gKVmsT\\kai-sessions.db",
+          "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-session-e2e-gKVmsT\\kai-sessions.db-shm",
+          "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-session-e2e-gKVmsT\\kai-sessions.db-wal"
+        ],
+        "toolsUsed": [
+          "memory.list",
+          "filesystem.list",
+          "agents.list",
+          "missions.list",
+          "filesystem.read",
+          "filesystem.search",
+          "system.get_status",
+          "git.status",
+          "filesystem.metadata"
+        ],
+        "toolStats": {
+          "total": 33,
+          "executed": 30
+        },
+        "lastAssistantLine": "Found it. One match.",
+        "builtAt": "2026-10-06T04:44:05.106Z"
+      },
+      "turns": 8,
+      "turnsWithTools": 4,
+      "activeSessionId": "sess_muw6z7d5_24yd"
+    },
+    {
+      "step": "10. search finds it",
+      "hits": 1,
+      "matched": "title"
+    },
+    {
+      "step": "resume turn",
+      "reply": "## The decision\n\n**Supabase.** You stated it directly in this session:\n\n> \"We decided to keep Supabase as the persistence layer\"\n\nSo the design decision is *Supabase as the persistence layer* for the restaurant QR ordering flow — chosen over whatever else was on the table (nothing else was recorded "
+    },
+    {
+      "step": "11-12. delete + gone",
+      "approvalFlow": "parked(apr_muw724ny_0)->approved",
+      "getStatus": 404,
+      "stillListed": false,
+      "activeAfterDelete": null
+    },
+    {
+      "step": "13-15. switch + isolation",
+      "idB": "sess_muw724p4_f7ik",
+      "idC": "sess_muw724pb_7lt3",
+      "active": "sess_muw724p4_f7ik",
+      "betaTurns": [
+        "beta talks about sailing",
+        "I looked before answering, and I can't a"
+      ],
+      "gammaTurns": [
+        "gamma talks about cooking",
+        "I don't have anything to work from here,"
+      ]
+    }
+  ],
+  "verdict": "PASS: all 15 E2E steps verified against a real Core + real model"
+}

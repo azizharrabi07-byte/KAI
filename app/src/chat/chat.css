@@ -1,0 +1,550 @@
+/* KAI chat + sessions surfaces — KAI's OWN visual design.
+ *
+ * Every colour, size and spacing below is KAI's, expressed through the app's
+ * existing CSS variables (--card, --ink, --dim, --indigo, --font, --mono …) and
+ * KAI's own values. Nothing is taken from OpenGhost's stylesheet: the Markdown
+ * renderer is ported (MIT, ADAPT) but its presentation classes are styled here
+ * for the first time in KAI's palette. See NOTICE.md.
+ */
+
+/* ── The chat surface ─────────────────────────────────────────────────────── */
+
+.kai-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font);
+}
+
+.kai-chat-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--hairline);
+  flex: 0 0 auto;
+}
+
+.kai-chat-speaker {
+  font: 700 14px var(--font);
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+
+.kai-chat-title {
+  font: 400 12.5px var(--font);
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kai-chat-head .grow {
+  flex: 1 1 auto;
+}
+
+.kai-chat-conn {
+  font: 500 11px var(--font);
+  color: var(--dim-3);
+}
+
+.kai-chat-conn.is-on {
+  color: var(--green-2);
+}
+
+.kai-chat-conn.is-off {
+  color: var(--red-text);
+}
+
+.kai-chat-log {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 20px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scroll-behavior: smooth;
+}
+
+.kai-msg {
+  display: flex;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.kai-msg.is-user {
+  justify-content: flex-end;
+}
+
+.kai-msg .kai-avatar {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  margin-top: 2px;
+  background: linear-gradient(160deg, var(--green-2), var(--indigo));
+  color: #0b0c0e;
+  font: 700 12px var(--font);
+  display: grid;
+  place-items: center;
+}
+
+.kai-turn {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.kai-turn .kai-speaker-name {
+  font: 600 11.5px var(--font);
+  color: var(--dim-2);
+  margin-bottom: 3px;
+}
+
+.kai-bubble {
+  max-width: 78%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hairline);
+  border-radius: 14px 14px 4px 14px;
+  padding: 9px 13px;
+  font: 400 13.5px var(--font);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+.kai-turn .kai-md,
+.kai-turn .md-body {
+  font: 400 13.5px/1.62 var(--font);
+  color: var(--ink);
+  user-select: text;
+  word-break: break-word;
+}
+
+.kai-md p { margin: 0 0 10px; }
+.kai-md > :last-child { margin-bottom: 0; }
+.kai-md a { color: var(--cyan); text-underline-offset: 2px; }
+.kai-md code {
+  font: 400 12.5px var(--mono);
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+.kai-md .md-h { font-weight: 700; margin: 14px 0 8px; line-height: 1.3; }
+.kai-md h1.md-h { font-size: 19px; }
+.kai-md h2.md-h { font-size: 17px; }
+.kai-md h3.md-h { font-size: 15px; }
+.kai-md h4.md-h, .kai-md h5.md-h, .kai-md h6.md-h { font-size: 13.5px; }
+.kai-md ul, .kai-md ol { margin: 0 0 10px; padding-left: 22px; }
+.kai-md li { margin: 3px 0; }
+.kai-md li.md-task { list-style: none; position: relative; }
+.kai-md .md-box {
+  display: inline-block;
+  width: 13px; height: 13px;
+  margin: 0 6px 0 -19px;
+  border: 1.5px solid var(--dim-3);
+  border-radius: 4px;
+  vertical-align: -2px;
+}
+.kai-md li.md-task.is-done .md-box { background: var(--green-2); border-color: var(--green-2); }
+.kai-md blockquote {
+  margin: 0 0 10px;
+  padding: 6px 12px;
+  border-left: 3px solid var(--indigo);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0 8px 8px 0;
+}
+.kai-md .md-gap { height: 1px; background: var(--hairline); margin: 12px 0; }
+
+.kai-md .md-code {
+  margin: 10px 0;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card-flat);
+}
+.kai-md .md-code-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font: 500 10.5px var(--mono);
+  color: var(--dim-2);
+  text-transform: lowercase;
+}
+.kai-md .md-code pre { margin: 0; padding: 10px 12px; overflow-x: auto; }
+.kai-md .md-code code { background: none; padding: 0; font-size: 12.5px; line-height: 1.55; }
+.kai-md .md-copy {
+  background: none; border: 0; color: var(--dim-2); cursor: pointer;
+  font: 500 10.5px var(--font); padding: 0;
+}
+.kai-md .md-copy svg { width: 12px; height: 12px; }
+.kai-md .md-copy .md-check-icon { display: none; }
+
+.kai-md .hl-comment { color: var(--dim-3); font-style: italic; }
+.kai-md .hl-keyword { color: #c792ea; }
+.kai-md .hl-string { color: var(--green-2); }
+.kai-md .hl-number { color: var(--amber); }
+.kai-md .hl-type { color: var(--cyan); }
+.kai-md .hl-function { color: #82aaff; }
+.kai-md .hl-property { color: #ffcb6b; }
+.kai-md .hl-inserted { color: var(--green-2); }
+.kai-md .hl-deleted { color: var(--red-text); }
+
+.kai-md .md-table { margin: 10px 0; overflow-x: auto; }
+.kai-md table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.kai-md th, .kai-md td {
+  border: 1px solid var(--hairline);
+  padding: 6px 9px;
+  text-align: left;
+}
+.kai-md th { background: rgba(255, 255, 255, 0.04); font-weight: 600; }
+
+.kai-md .md-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0; }
+.kai-md .md-chip {
+  padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--hairline);
+  background: rgba(255, 255, 255, 0.05);
+  font: 500 12px var(--font);
+}
+.kai-md .md-arrow {
+  width: 16px; height: 1px; background: var(--dim-3); position: relative;
+}
+.kai-md .md-arrow::after {
+  content: ""; position: absolute; right: 0; top: -2.5px;
+  border-left: 5px solid var(--dim-3);
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+}
+
+/* The visual seam: a fenced diagram becomes a KAI-drawn flow after Core validates it. */
+.kai-md .md-diagram {
+  margin: 12px 0;
+  padding: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--card-flat);
+  min-height: 40px;
+  overflow: auto;
+}
+.kai-md .md-diagram-status { font: 400 11.5px var(--font); color: var(--dim-3); }
+.kai-md .md-diagram .kai-visual-svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+
+.kai-md .md-media { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.kai-md .md-math { margin: 10px 0; overflow-x: auto; }
+
+/* Ported math (tex) classes — KAI-styled. */
+.kai-md .mo { font-style: normal; padding: 0 1px; }
+.kai-md .mo.is-rel, .kai-md .mo.is-unary { padding: 0 2px; }
+.kai-md .mn { font-style: italic; }
+.kai-md .mf { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.86em; line-height: 1.05; }
+.kai-md .mf > span:first-child { border-bottom: 1px solid currentColor; padding: 0 3px; }
+.kai-md .ms { border-top: 1px solid currentColor; padding: 0 2px; }
+.kai-md .mdl { display: inline-block; width: 0.35em; }
+.kai-md .mgrid { display: inline-grid; grid-template-columns: repeat(var(--c, 1), auto); gap: 2px 8px; vertical-align: middle; }
+.kai-md .mop { font-size: 1.15em; }
+.kai-md .mt, .kai-md .ma { font-style: normal; }
+.kai-md .mx { font-size: 0.7em; vertical-align: super; }
+
+/* Streaming wave spans (from the ported StreamView). */
+.kai-md .md-w { display: inline-block; animation: kai-md-wave 220ms ease-out both; }
+@keyframes kai-md-wave {
+  from { opacity: 0; transform: translateY(3px); filter: blur(2px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+/* ── Live turn: thinking + activity ───────────────────────────────────────── */
+
+.kai-thinking {
+  display: inline-flex; gap: 4px; align-items: center;
+  padding: 4px 0;
+}
+.kai-thinking i {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--dim-2);
+  animation: kai-dot 1.1s infinite ease-in-out;
+}
+.kai-thinking i:nth-child(2) { animation-delay: 0.15s; }
+.kai-thinking i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes kai-dot { 0%, 60%, 100% { opacity: 0.35; } 30% { opacity: 1; } }
+
+.kai-activity {
+  display: flex; flex-direction: column; gap: 3px;
+  margin: 4px 0 6px;
+}
+.kai-activity-row {
+  display: flex; align-items: center; gap: 7px;
+  font: 400 11.5px var(--font);
+  color: var(--dim-2);
+}
+.kai-activity-row .tag {
+  font: 600 9.5px var(--font);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dim-3);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 0 6px;
+  flex: 0 0 auto;
+}
+.kai-activity-row.is-tool .tag { color: var(--cyan); }
+.kai-activity-row.is-worker .tag { color: #82aaff; }
+.kai-activity-row.is-approval .tag { color: var(--amber); }
+.kai-activity-row.is-memory .tag { color: var(--green-2); }
+
+/* ── Errors and approvals, inline in the log ──────────────────────────────── */
+
+.kai-error {
+  border: 1px solid rgba(244, 80, 94, 0.4);
+  background: rgba(244, 80, 94, 0.09);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font: 400 12.5px var(--font);
+  color: var(--red-text);
+}
+
+.kai-approval {
+  border: 1px solid rgba(245, 165, 36, 0.4);
+  background: rgba(245, 165, 36, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kai-approval .ap-title { font: 600 13px var(--font); color: var(--ink); }
+.kai-approval .ap-meta { font: 400 11.5px var(--font); color: var(--dim-2); }
+.kai-approval .ap-code {
+  font: 400 12px var(--mono);
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 7px;
+  padding: 7px 9px;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+  max-height: 160px;
+  overflow: auto;
+}
+.kai-approval .ap-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.kai-approval.is-answered { opacity: 0.72; }
+
+.kai-btn {
+  font: 600 12px var(--font);
+  border-radius: 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--hairline);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  cursor: pointer;
+}
+.kai-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.kai-btn.is-primary { background: var(--indigo); border-color: transparent; color: #fff; }
+.kai-btn.is-primary:hover { background: #7c7df5; }
+.kai-btn.is-danger { background: rgba(244, 80, 94, 0.16); border-color: rgba(244, 80, 94, 0.4); color: var(--red-text); }
+.kai-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ── Composer: a comfortably large input ──────────────────────────────────── */
+
+.kai-composer {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--hairline);
+  padding: 10px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--card);
+}
+.kai-composer .kai-attach {
+  font: 500 11px var(--font);
+  color: var(--dim-2);
+}
+.kai-composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.kai-input {
+  flex: 1 1 auto;
+  min-height: 76px;
+  max-height: 40vh;
+  resize: none;
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 11px 13px;
+  color: var(--ink);
+  font: 400 13.5px/1.5 var(--font);
+  outline: none;
+}
+.kai-input:focus { border-color: var(--indigo); }
+.kai-input::placeholder { color: var(--dim-3); }
+.kai-send {
+  flex: 0 0 auto;
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--indigo);
+  color: #fff;
+  font: 600 13px var(--font);
+  cursor: pointer;
+}
+.kai-send:disabled { opacity: 0.45; cursor: default; }
+.kai-hint { font: 400 10.5px var(--font); color: var(--dim-4); }
+
+/* ── The sessions surface ─────────────────────────────────────────────────── */
+
+.kai-sessions {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font);
+}
+.kai-sessions-head {
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.kai-sessions-titlebar { display: flex; align-items: center; gap: 10px; }
+.kai-sessions-titlebar .name { font: 700 15px var(--font); }
+.kai-sessions-titlebar .sum { font: 400 12px var(--font); color: var(--dim); }
+.kai-sessions-titlebar .grow { flex: 1 1 auto; }
+.kai-sessions-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kai-search {
+  flex: 1 1 220px;
+  min-width: 140px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  padding: 7px 11px;
+  color: var(--ink);
+  font: 400 12.5px var(--font);
+  outline: none;
+}
+.kai-search:focus { border-color: var(--indigo); }
+.kai-seg { display: inline-flex; border: 1px solid var(--hairline); border-radius: 9px; overflow: hidden; }
+.kai-seg button {
+  border: 0; background: none; color: var(--dim-2);
+  font: 500 11.5px var(--font); padding: 6px 11px; cursor: pointer;
+}
+.kai-seg button.on { background: rgba(255, 255, 255, 0.1); color: var(--ink); }
+.kai-check { display: inline-flex; align-items: center; gap: 6px; font: 400 11.5px var(--font); color: var(--dim-2); cursor: pointer; }
+
+.kai-sessions-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.kai-session {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.kai-session.is-active { border-color: rgba(52, 211, 153, 0.45); background: rgba(52, 211, 153, 0.06); }
+.kai-session.is-archived { opacity: 0.62; }
+.kai-session .kai-session-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; }
+.kai-session .kai-session-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.kai-session .kai-session-name {
+  font: 600 13px var(--font);
+  color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kai-session .kai-session-name.is-derived { font-weight: 500; }
+.kai-session .kai-session-meta { font: 400 11px var(--font); color: var(--dim-3); display: flex; gap: 8px; flex-wrap: wrap; }
+.kai-session .kai-session-actions { flex: 0 0 auto; display: flex; gap: 6px; }
+.kai-session .kai-session-input {
+  flex: 1 1 auto; min-width: 0;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  color: var(--ink);
+  font: 500 13px var(--font);
+  padding: 5px 9px;
+  outline: none;
+}
+.kai-empty { padding: 26px 14px; text-align: center; color: var(--dim-3); font: 400 12.5px var(--font); }
+.kai-sessions-note { padding: 8px 20px 14px; font: 400 11px var(--font); color: var(--dim-4); }
+.kai-sessions-note.is-error { color: var(--red-text); }
+
+/* ── Shell-route hosts: the page fills the outlet, the surface owns its scroll ─ */
+.kai-chat-host > .kai-chat,
+.kai-sessions-host > .kai-sessions {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+.kai-chat-approvals { display: flex; flex-direction: column; gap: 8px; }
+.kai-chat-approvals:empty { display: none; }
+.kai-activity-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kai-visual-host { margin: 8px 0; }
+.kai-sessions-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline);
+}
+
+/* ── Tool cards: what KAI actually ran, from Core's persisted record ─────── */
+
+.kai-tools { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 2px 44px; }
+.kai-tool {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  border: 1px solid var(--hairline);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 9px;
+  padding: 7px 11px;
+  font: 400 12px var(--font);
+  color: var(--dim-2);
+}
+.kai-tool-glyph { font-weight: 700; }
+.kai-tool.is-executed .kai-tool-glyph { color: var(--green-2); }
+.kai-tool.is-approval_required .kai-tool-glyph { color: var(--amber); }
+.kai-tool.is-failed .kai-tool-glyph,
+.kai-tool.is-invalid .kai-tool-glyph,
+.kai-tool.is-denied .kai-tool-glyph,
+.kai-tool.is-not_found .kai-tool-glyph { color: var(--red-text); }
+.kai-tool-name { font-family: var(--mono); color: var(--ink); }
+.kai-tool-status { text-transform: lowercase; }
+.kai-tool-detail {
+  flex-basis: 100%;
+  font: 400 11.5px var(--font);
+  color: var(--dim-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── Session digest lines: Core's persisted objective, rendered compact ──── */
+
+.kai-chat-summary {
+  padding: 6px 20px;
+  font: 400 11.5px var(--font);
+  color: var(--dim-3);
+  border-bottom: 1px solid var(--hairline);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kai-session .kai-session-excerpt {
+  font: 400 11.5px var(--font);
+  color: var(--dim-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

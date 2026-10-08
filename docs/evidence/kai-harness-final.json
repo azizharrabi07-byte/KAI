@@ -1,0 +1,202 @@
+{
+  "artifact": "kai-harness-final",
+  "at": "2026-10-05T14:56:11.214Z",
+  "note": "KAI's harness = its identity model + soul contract + the capabilities it holds directly. Evidenced from the live route /identity/model and the soul file on disk.",
+  "identityModelRoute": {
+    "status": 200,
+    "body": {
+      "service": "identity",
+      "model": {
+        "agentId": "kai",
+        "displayName": "KAI",
+        "version": "ab81578e",
+        "buildId": "41b87e8807fd5348",
+        "freshness": "fresh",
+        "soulChars": 2779,
+        "identityChars": 1240,
+        "userContextChars": 322,
+        "capabilities": [
+          "system",
+          "filesystem",
+          "git",
+          "shell",
+          "browser",
+          "computer",
+          "mcp"
+        ],
+        "limits": 4,
+        "authority": {
+          "memory": {
+            "subsystem": "MemoryEngine",
+            "methods": [
+              "write",
+              "search",
+              "get",
+              "digest",
+              "journal"
+            ]
+          },
+          "workforce": {
+            "subsystem": "WorkforceManager",
+            "methods": [
+              "register",
+              "list",
+              "delegate",
+              "select",
+              "available"
+            ]
+          },
+          "sessions": {
+            "subsystem": "SessionService",
+            "methods": [
+              "ensureActive",
+              "active",
+              "list",
+              "recordTurn"
+            ]
+          },
+          "policy": {
+            "subsystem": "PolicyEngine",
+            "methods": [
+              "check",
+              "mode",
+              "rules"
+            ]
+          },
+          "approvals": {
+            "subsystem": "ApprovalService",
+            "methods": [
+              "request",
+              "decide",
+              "list"
+            ]
+          },
+          "memoryShares": {
+            "subsystem": "SubagentMemoryShares (not wired)",
+            "methods": []
+          }
+        },
+        "binding": [
+          {
+            "field": "agentId",
+            "backedBy": "kai (the single Core agent id; subagents carry subagent:<id>)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "displayName",
+            "backedBy": "KAI (a real constant, and the label every renderer uses)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "identity",
+            "backedBy": "identity/IDENTITY.md via KaiIdentity.identity",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "soul",
+            "backedBy": "identity/SOUL.md via KaiIdentity.soul",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "capabilities",
+            "backedBy": "KAI_DIRECT_CAPABILITIES (agent/kai-capabilities.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "limits",
+            "backedBy": "KAI_LIMITS (agent/kai-capabilities.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "userContext",
+            "backedBy": "user/USER.md via KaiIdentity.user",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "memoryAuthority",
+            "backedBy": "the live MemoryEngine (memory/engine.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "workforceAuthority",
+            "backedBy": "the live WorkforceManager (workforce/manager.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "sessionAuthority",
+            "backedBy": "the live SessionService (sessions/service.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "policyAuthority",
+            "backedBy": "the live PolicyEngine (policies/gate.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "approvalAuthority",
+            "backedBy": "the live ApprovalService (approvals/service.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "memoryAuthority.shares",
+            "backedBy": "subagent memory-share governance (memory/shares.ts)",
+            "status": "NOT PROVEN",
+            "reason": "the runtime did not hand the model the share registry; cross-subagent sharing governance is carried beside the memory engine and is wired by the runtime stream"
+          }
+        ]
+      },
+      "harness": "Yes — I have my own harness, and it isn't Hermes's. I run as KAI Core, my own Node/TypeScript runtime on this machine, served over loopback to the KAI desktop app. My identity, user context, memory and rules are loaded from my own KAI_HOME resources, not from a worker; my authorities are real running subsystems — my own memory engine, workforce, session service, policy engine and approval service. When a task needs a model or a tool I don't hold, I delegate to a worker — Hermes, OpenCode, Codex. A worker provides information; a worker does not become the speaker. Internal provenance may still say worker = Hermes; that is correct and stays.",
+      "note": "The canonical identity model: the twelve owner fields resolved over the running Core's REAL subsystems. Each non-document authority names the live method set read off the object, so a field is the running subsystem, not a description of one. `binding[]` tags every field."
+    }
+  },
+  "soulFile": {
+    "path": "docs/KAI_SOUL.md",
+    "bytes": 20445,
+    "mtime": "2026-10-04T21:23:16.189Z",
+    "head": "# KAI — SOUL\n\n**What this document is.** The written record of *what KAI is*: a personal AI operating\nenvironment, strategic assistant, agent orchestrator and long-term execution partner —\nand the identity mechanism that makes that a property of KAI's own runtime rather than a\nprompt bolted onto someone else's.",
+    "sha256": "4395624169f01ab2af860c05c2d9a94a710b75f0eda2367e0d99c6b1506c84e2"
+  },
+  "runtimeArchitecture": {
+    "path": "docs/KAI_RUNTIME_ARCHITECTURE.md",
+    "bytes": 21789,
+    "mtime": "2026-10-04T21:24:57.543Z",
+    "head": "# KAI — Runtime Architecture\n\n**What this document is.** What actually runs KAI independently of any worker: the Core\nprocess, identity/harness loading, memory authority, the workforce, sessions, tools,\npolicy/approval, recovery, the scheduler, the event bus, and the artifact-identity\ninvariant — plus an explicit list of what is **still unwired**, because a runtime"
+  },
+  "capabilitiesHeldDirectly": [
+    {
+      "id": "system",
+      "availability": "AVAILABLE",
+      "risk": "READ"
+    },
+    {
+      "id": "browser",
+      "availability": "UNAVAILABLE",
+      "risk": "EXTERNAL"
+    },
+    {
+      "id": "computer",
+      "availability": "UNAVAILABLE",
+      "risk": "DESTRUCTIVE"
+    },
+    {
+      "id": "filesystem",
+      "availability": "UNAVAILABLE",
+      "risk": "WRITE"
+    },
+    {
+      "id": "git",
+      "availability": "UNAVAILABLE",
+      "risk": "READ"
+    },
+    {
+      "id": "shell",
+      "availability": "UNAVAILABLE",
+      "risk": "DESTRUCTIVE"
+    },
+    {
+      "id": "mcp",
+      "availability": "UNAVAILABLE",
+      "risk": "EXTERNAL"
+    }
+  ]
+}

@@ -1,0 +1,409 @@
+{
+  "artifact": "kai-tools-final",
+  "at": "2026-10-05T14:56:11.215Z",
+  "status": 200,
+  "count": 56,
+  "riskHistogram": {
+    "READ": 16,
+    "EXTERNAL": 4,
+    "WRITE": 29,
+    "DESTRUCTIVE": 7
+  },
+  "effectful": 3,
+  "sideEffecting": 41,
+  "tools": [
+    {
+      "id": "system.get_status",
+      "name": "Get system status",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": true
+    },
+    {
+      "id": "agents.list",
+      "name": "List agents",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": true
+    },
+    {
+      "id": "agents.run_task",
+      "name": "Run a task on a worker agent",
+      "risk": "EXTERNAL",
+      "sideEffecting": true,
+      "schemaDeclared": true
+    },
+    {
+      "id": "missions.list",
+      "name": "List missions",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": true
+    },
+    {
+      "id": "memory.list",
+      "name": "List memories",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": true
+    },
+    {
+      "id": "filesystem.read",
+      "name": "Read a file",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": true
+    },
+    {
+      "id": "filesystem.list",
+      "name": "List a directory",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": true
+    },
+    {
+      "id": "filesystem.write",
+      "name": "Write a file",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": true
+    },
+    {
+      "id": "git.status",
+      "name": "git status",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": true
+    },
+    {
+      "id": "git.log",
+      "name": "git log",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": true
+    },
+    {
+      "id": "git.diff",
+      "name": "git diff",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": true
+    },
+    {
+      "id": "shell.run",
+      "name": "Run a program",
+      "risk": "DESTRUCTIVE",
+      "sideEffecting": true,
+      "schemaDeclared": true
+    },
+    {
+      "id": "capability.system",
+      "name": "Use capability: System and state inspection",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": false
+    },
+    {
+      "id": "capability.browser",
+      "name": "Use capability: Browser (semantic-first)",
+      "risk": "EXTERNAL",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "capability.computer",
+      "name": "Use capability: Computer use (CUA)",
+      "risk": "DESTRUCTIVE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "capability.mcp",
+      "name": "Use capability: MCP servers and tools",
+      "risk": "EXTERNAL",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "capability.filesystem",
+      "name": "Use capability: Filesystem",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "capability.git",
+      "name": "Use capability: Git (read-only)",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": false
+    },
+    {
+      "id": "capability.shell",
+      "name": "Use capability: Shell (program execution)",
+      "risk": "DESTRUCTIVE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "mcp.register",
+      "name": "Register an MCP server",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "mcp.update",
+      "name": "Update an MCP server",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "mcp.enable",
+      "name": "Enable an MCP server",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "mcp.disable",
+      "name": "Disable an MCP server",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "mcp.remove",
+      "name": "Remove an MCP server",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "mcp.connect",
+      "name": "Connect an MCP server",
+      "risk": "EXTERNAL",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "mcp.disconnect",
+      "name": "Disconnect an MCP server",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "mcp.refresh",
+      "name": "Refresh an MCP server's tools",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "missions.create",
+      "name": "Create and start a mission",
+      "risk": "READ",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "skills.list",
+      "name": "List skills",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": false
+    },
+    {
+      "id": "skills.relevant",
+      "name": "Find relevant skills",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": false
+    },
+    {
+      "id": "skills.load",
+      "name": "Load a skill",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": false
+    },
+    {
+      "id": "memory.write",
+      "name": "Write a memory",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "memory.create",
+      "name": "Create a memory (legacy)",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "memory.share",
+      "name": "Share one subagent's private memory",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "notification.read",
+      "name": "Mark a notification read",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "approval.decide",
+      "name": "Decide an approval",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "workforce.register",
+      "name": "Register an employee",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "workforce.lifecycle",
+      "name": "Change an employee's lifecycle state",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "workforce.subagent",
+      "name": "Create a KAI subagent",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "soul.set",
+      "name": "Replace KAI's soul",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "maintenance.run",
+      "name": "Run KAI's self-maintenance",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "session.manage",
+      "name": "Manage a conversation session",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "mission.cancel",
+      "name": "Cancel a mission",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "schedule.manage",
+      "name": "Create or cancel a scheduled task",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "scheduler.recover",
+      "name": "Recover interrupted scheduled slots",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "learning.propose",
+      "name": "Propose a lesson from a turn",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "checkpoint.create",
+      "name": "Create a checkpoint",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "checkpoint.restore",
+      "name": "Restore a checkpoint",
+      "risk": "DESTRUCTIVE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "skill.delete",
+      "name": "Delete an installed skill",
+      "risk": "DESTRUCTIVE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "skill.toggle",
+      "name": "Enable or disable a skill",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "policy.set",
+      "name": "Change the live policy rules",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": false
+    },
+    {
+      "id": "session.search",
+      "name": "Search KAI's conversations",
+      "risk": "READ",
+      "sideEffecting": false,
+      "schemaDeclared": true
+    },
+    {
+      "id": "session.duplicate",
+      "name": "Duplicate a conversation session",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": true
+    },
+    {
+      "id": "session.close",
+      "name": "Close a conversation session",
+      "risk": "WRITE",
+      "sideEffecting": true,
+      "schemaDeclared": true
+    },
+    {
+      "id": "session.clear",
+      "name": "Clear a conversation's recorded turns",
+      "risk": "DESTRUCTIVE",
+      "sideEffecting": true,
+      "schemaDeclared": true
+    },
+    {
+      "id": "session.delete",
+      "name": "Delete a conversation session",
+      "risk": "DESTRUCTIVE",
+      "sideEffecting": true,
+      "schemaDeclared": true
+    }
+  ],
+  "note": "Measured from GET /tools on the running Core. The main-window UI reads this same route; it showed 56 after the shell priming fix."
+}

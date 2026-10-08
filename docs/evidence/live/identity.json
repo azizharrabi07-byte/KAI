@@ -1,0 +1,16 @@
+{
+  "service": "kai-core",
+  "coreVersion": "0.1.0",
+  "buildId": "41b87e8807fd5348",
+  "gitCommit": "fa8ce40eb3b2ef670d0333574323eaae0a85a683",
+  "protocolVersion": 1,
+  "pid": 2792,
+  "startedAt": "2026-10-05T15:06:29.534Z",
+  "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+  "onDiskBuildId": "41b87e8807fd5348",
+  "identityMatchesDisk": true,
+  "sourceBuildId": null,
+  "artifactMatchesSource": null,
+  "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+  "freshness": "fresh"
+}

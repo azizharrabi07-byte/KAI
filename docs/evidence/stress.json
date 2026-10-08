@@ -1,0 +1,33 @@
+{
+  "at": "2026-10-06T17:26:04.491Z",
+  "scenarios": {
+    "S1: 30 sequential turns all land in one transcript": {
+      "pass": true,
+      "detail": "p50=10ms p95=14ms max=22ms turns=60"
+    },
+    "S2: 40 concurrent turns stay isolated + intact": {
+      "pass": true,
+      "detail": "sessions=8 turnsEach=10"
+    },
+    "S3: 150-turn transcript exact": {
+      "pass": true,
+      "detail": "write=1517ms read=4ms"
+    },
+    "S4: every tool turn executes + records": {
+      "pass": true,
+      "detail": "turns=15 withTools=15 grounded=true"
+    },
+    "RSS growth under budget": {
+      "pass": true,
+      "detail": "+30MB"
+    },
+    "p95 turn under budget": {
+      "pass": true,
+      "detail": "14ms"
+    }
+  },
+  "verdict": "PASS",
+  "s1p95ms": 14,
+  "s3writeMs": 1517,
+  "s3readMs": 4
+}

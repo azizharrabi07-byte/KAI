@@ -1,0 +1,958 @@
+{
+  "label": "hermes-down",
+  "at": "2026-10-05T14:50:38.159Z",
+  "core": "http://127.0.0.1:8788",
+  "identity": {
+    "service": "kai-core",
+    "coreVersion": "0.1.0",
+    "buildId": "41b87e8807fd5348",
+    "gitCommit": "fa8ce40eb3b2ef670d0333574323eaae0a85a683",
+    "protocolVersion": 1,
+    "pid": 9104,
+    "startedAt": "2026-10-05T14:49:28.617Z",
+    "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+    "onDiskBuildId": "41b87e8807fd5348",
+    "identityMatchesDisk": true,
+    "sourceBuildId": null,
+    "artifactMatchesSource": null,
+    "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+    "freshness": "fresh"
+  },
+  "health": {
+    "status": "degraded",
+    "service": "kai-core",
+    "version": "0.1.0",
+    "hermes": {
+      "reachable": false,
+      "authorized": false,
+      "version": null,
+      "reason": "upstream_unreachable"
+    },
+    "opencode": {
+      "reachable": false,
+      "version": null,
+      "reason": "upstream_unreachable"
+    },
+    "checked_at": "2026-10-05T14:50:38.165Z"
+  },
+  "probes": [
+    {
+      "path": "/identity",
+      "status": 200,
+      "body": {
+        "service": "kai-core",
+        "coreVersion": "0.1.0",
+        "buildId": "41b87e8807fd5348",
+        "gitCommit": "fa8ce40eb3b2ef670d0333574323eaae0a85a683",
+        "protocolVersion": 1,
+        "pid": 9104,
+        "startedAt": "2026-10-05T14:49:28.617Z",
+        "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+        "onDiskBuildId": "41b87e8807fd5348",
+        "identityMatchesDisk": true,
+        "sourceBuildId": null,
+        "artifactMatchesSource": null,
+        "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "path": "/health",
+      "status": 200,
+      "body": {
+        "status": "degraded",
+        "service": "kai-core",
+        "version": "0.1.0",
+        "hermes": {
+          "reachable": false,
+          "authorized": false,
+          "version": null,
+          "reason": "upstream_unreachable"
+        },
+        "opencode": {
+          "reachable": false,
+          "version": null,
+          "reason": "upstream_unreachable"
+        },
+        "checked_at": "2026-10-05T14:50:38.091Z"
+      }
+    },
+    {
+      "path": "/independence",
+      "status": 200,
+      "body": {
+        "architecture": "KAI UI -> KAI Core -> KAI ModelProvider -> model -> KAI",
+        "inference": {
+          "owner": "kai",
+          "provider": "kai-model",
+          "model": "deepseek-v4.1-flash",
+          "configured": false,
+          "reachable": false,
+          "baseUrl": "https://opencode.ai/zen/go/v1",
+          "reason": "no API key configured",
+          "capabilities": {
+            "chat": false,
+            "stream": false,
+            "structured": false,
+            "embeddings": false,
+            "tools": false,
+            "models": {
+              "array": 0,
+              "sample": []
+            },
+            "defaultModel": "deepseek-v4.1-flash"
+          }
+        },
+        "workers": {
+          "hermes": {
+            "optional": true,
+            "role": "worker",
+            "reachable": false,
+            "authorized": false
+          }
+        },
+        "dependency": {
+          "normal_chat_turns": 0,
+          "delegated_turns": 0,
+          "normal_chat_calls_to_hermes": 0,
+          "delegated_calls_to_hermes": 0
+        }
+      }
+    },
+    {
+      "path": "/state",
+      "status": 200,
+      "body": {
+        "ok": true,
+        "startedAt": "2026-10-05T14:49:28.795Z",
+        "uptimeMs": 69308,
+        "database": {
+          "path": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\kai-core.db"
+        },
+        "agents": {
+          "array": 2,
+          "sample": [
+            {
+              "id": "hermes",
+              "state": "offline",
+              "health": {
+                "ok": false,
+                "latencyMs": 1,
+                "endpoint": "http://127.0.0.1:8642",
+                "detail": "AGENT_NOT_LISTENING: nothing is listening at http://127.0.0.1:8642"
+              }
+            },
+            {
+              "id": "opencode",
+              "state": "offline",
+              "health": {
+                "ok": false,
+                "latencyMs": 1,
+                "endpoint": "http://127.0.0.1:4096",
+                "detail": "INTERNAL: transport failure talking to http://127.0.0.1:4096"
+              }
+            }
+          ]
+        },
+        "missions": {
+          "active": 0,
+          "unfinished": 0
+        },
+        "notifications": {
+          "unread": 33
+        },
+        "approvals": {
+          "pending": 0
+        },
+        "scheduler": {
+          "running": true,
+          "enabled": 0,
+          "total": 11
+        },
+        "tools": {
+          "registered": 56
+        }
+      }
+    },
+    {
+      "path": "/tools",
+      "status": 200,
+      "body": {
+        "service": "tools",
+        "count": 56,
+        "tools": {
+          "array": 56,
+          "sample": [
+            {
+              "id": "system.get_status",
+              "name": "Get system status",
+              "description": "Read KAI Core's own process health: uptime, memory, platform and host facts.",
+              "permission": {
+                "risk": "READ",
+                "effectful": false,
+                "sideEffecting": false
+              },
+              "schema": {
+                "declared": true,
+                "schema": {
+                  "kind": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            },
+            {
+              "id": "agents.list",
+              "name": "List agents",
+              "description": "List the agents KAI knows about and their last reported state.",
+              "permission": {
+                "risk": "READ",
+                "effectful": false,
+                "sideEffecting": false
+              },
+              "schema": {
+                "declared": true,
+                "schema": {
+                  "kind": "object",
+                  "properties": {
+                    "limit": {
+                      "type": "integer",
+                      "description": "Maximum entries to return.",
+                      "minimum": 1,
+                      "maximum": 500
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          ]
+        },
+        "note": "Declared facts only: `permission.sideEffecting` is derived from the tool's EFFECT (risk !== READ || effectful), and a tool that declares no schema reports `declared: false` with the reason rather than an invented shape. Running a tool is POST /tools/:id/invoke, which goes through the ONE boundary (validate -> policy -> (approval) -> execute)."
+      }
+    },
+    {
+      "path": "/mcp",
+      "status": 200,
+      "body": {
+        "service": "mcp",
+        "capability": {
+          "id": "mcp",
+          "availability": "UNAVAILABLE",
+          "detail": "no MCP server is registered; register one (POST /mcp/servers) to give KAI MCP tools"
+        },
+        "counts": {
+          "servers": 0,
+          "enabled": 0,
+          "connected": 0,
+          "tools": 0,
+          "resources": 0
+        },
+        "servers": {
+          "array": 0,
+          "sample": []
+        },
+        "managementTools": {
+          "registered": {
+            "array": 8,
+            "sample": [
+              "mcp.register",
+              "mcp.update"
+            ]
+          },
+          "refused": {
+            "array": 0,
+            "sample": []
+          }
+        },
+        "persistence": {
+          "path": null,
+          "problem": null
+        },
+        "provenance": {
+          "recorded": 0
+        },
+        "note": "MCP servers are KAI-owned capabilities. Every MCP tool is registered into KAI's one tool registry (validate -> policy -> (approval) -> execute); every invocation is recorded in the MCP provenance ledger. A management call that parks answers 409 with an approvalId; retry the same request with it once a human decides."
+      }
+    },
+    {
+      "path": "/sessions",
+      "status": 200,
+      "body": {
+        "sessions": {
+          "array": 40,
+          "sample": [
+            {
+              "id": "sess_musv974c_7dhj",
+              "title": "Conversation 35",
+              "status": "ACTIVE",
+              "createdAt": "2026-10-03T20:50:30.348Z",
+              "updatedAt": "2026-10-05T12:15:39.404Z",
+              "turnCount": 280,
+              "lastTurnAt": "2026-10-05T12:15:39.401Z",
+              "agentId": "hermes",
+              "worker": "hermes",
+              "agentSessionId": "api_1791202535_b64fc64d"
+            },
+            {
+              "id": "sess_muuk9l8g_2r5r",
+              "title": "Bob — own session",
+              "status": "ACTIVE",
+              "createdAt": "2026-10-05T01:18:25.216Z",
+              "updatedAt": "2026-10-05T01:18:25.609Z",
+              "turnCount": 3,
+              "lastTurnAt": "2026-10-05T01:18:25.608Z",
+              "agentId": "kai:bob",
+              "agentOwner": "kai:bob"
+            }
+          ]
+        },
+        "activeSessionId": "sess_musv974c_7dhj"
+      }
+    },
+    {
+      "path": "/subagents",
+      "status": 200,
+      "body": {
+        "subagents": {
+          "array": 4,
+          "sample": [
+            {
+              "id": "alice",
+              "name": "Alice",
+              "role": "researcher",
+              "soul": "I am Alice, KAI's research persona. I read carefully and cite what I find.",
+              "workerId": "hermes",
+              "model": "sonnet",
+              "capabilities": [
+                "filesystem"
+              ],
+              "visual": {
+                "declared": {
+                  "variant": "kai-variant-teal",
+                  "colour": "#33bbaa",
+                  "outfit": "lab coat",
+                  "accessories": [
+                    "glasses"
+                  ]
+                }
+              },
+              "employeeId": "kai:alice",
+              "status": "READY",
+              "enabled": true,
+              "instanceId": "kai:alice#1",
+              "problems": [],
+              "activity": "idle",
+              "currentTask": null,
+              "pendingApprovalId": null,
+              "createdAt": "2026-10-05T14:49:28.796Z"
+            },
+            {
+              "id": "bob",
+              "name": "Bob",
+              "role": "engineer",
+              "soul": "I am Bob, KAI's engineering persona. I write small, tested patches and never claim a build is green without running it.",
+              "workerId": "opencode",
+              "capabilities": [
+                "filesystem",
+                "shell"
+              ],
+              "visual": {
+                "declared": {
+                  "variant": "kai-variant-amber",
+                  "colour": "#cc7722",
+                  "outfit": "hoodie",
+                  "accessories": [
+                    "headset"
+                  ]
+                }
+              },
+              "employeeId": "kai:bob",
+              "status": "READY",
+              "enabled": true,
+              "instanceId": "kai:bob#1",
+              "problems": [],
+              "activity": "idle",
+              "currentTask": null,
+              "pendingApprovalId": null,
+              "createdAt": "2026-10-05T14:49:28.796Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/agents",
+      "status": 200,
+      "body": {
+        "agents": {
+          "array": 2,
+          "sample": [
+            {
+              "id": "hermes",
+              "state": "offline",
+              "detail": "AGENT_NOT_LISTENING: nothing is listening at http://127.0.0.1:8642"
+            },
+            {
+              "id": "opencode",
+              "state": "offline",
+              "detail": "INTERNAL: transport failure talking to http://127.0.0.1:4096"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/employees",
+      "status": 200,
+      "body": {
+        "employees": {
+          "array": 7,
+          "sample": [
+            {
+              "id": "hermes",
+              "name": "Hermes",
+              "kind": "hermes",
+              "origin": "builtin:hermes",
+              "state": "READY",
+              "enabled": true,
+              "placeholder": false,
+              "capabilities": [
+                "filesystem",
+                "shell",
+                "browser",
+                "mcp"
+              ],
+              "grants": [],
+              "config": {},
+              "instanceId": "hermes#1",
+              "snapshot": {
+                "state": "READY",
+                "at": "2026-10-05T14:49:28.873Z",
+                "reachable": true,
+                "authenticated": true
+              },
+              "problems": [],
+              "history": [
+                "DISCOVERED",
+                "INSTALLED",
+                "READY"
+              ]
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "kind": "opencode",
+              "origin": "builtin:opencode",
+              "state": "READY",
+              "enabled": true,
+              "placeholder": false,
+              "capabilities": [
+                "filesystem",
+                "shell",
+                "git",
+                "browser",
+                "mcp"
+              ],
+              "grants": [],
+              "config": {},
+              "instanceId": "opencode#1",
+              "snapshot": {
+                "state": "READY",
+                "at": "2026-10-05T14:49:28.884Z",
+                "reachable": true,
+                "authenticated": true
+              },
+              "problems": [],
+              "history": [
+                "DISCOVERED",
+                "INSTALLED",
+                "READY"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/capabilities",
+      "status": 200,
+      "body": {
+        "capabilities": {
+          "array": 7,
+          "sample": [
+            {
+              "id": "system",
+              "name": "System and state inspection",
+              "availability": "AVAILABLE",
+              "risk": "READ",
+              "provider": "kai",
+              "supportedActions": [
+                "system.get_status",
+                "agents.list",
+                "missions.list",
+                "memory.list"
+              ]
+            },
+            {
+              "id": "browser",
+              "name": "Browser (semantic-first)",
+              "availability": "UNAVAILABLE",
+              "risk": "EXTERNAL",
+              "provider": "kai",
+              "supportedActions": [
+                "open",
+                "navigate",
+                "find",
+                "inspect",
+                "click",
+                "type",
+                "select",
+                "scroll",
+                "wait",
+                "read",
+                "back",
+                "forward",
+                "new_tab",
+                "close_tab",
+                "switch_tab",
+                "observe"
+              ],
+              "requirements": [
+                "a real CDP transport over the installed Edge/Chrome; semantic-first, screenshots only as a fallback"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/approvals",
+      "status": 200,
+      "body": {
+        "approvals": {
+          "array": 150,
+          "sample": [
+            {
+              "id": "apr_muuk9sgg_4",
+              "toolId": "mcp.register",
+              "action": "Register an MCP server",
+              "reason": "tool \"mcp.register\" performs a WRITE; writes are allowed only when a policy rule explicitly permits them, so this requires user approval",
+              "risk": "WRITE",
+              "createdAt": "2026-10-05T01:18:34.576Z",
+              "status": "APPROVED",
+              "expiresAt": "2026-10-05T01:28:34.576Z",
+              "decidedAt": "2026-10-05T01:18:48.048Z"
+            },
+            {
+              "id": "apr_muuk9l8o_3",
+              "toolId": "agents.run_task",
+              "action": "Run a task on a worker agent",
+              "reason": "tool \"agents.run_task\" acts outside this machine (EXTERNAL); outbound actions always require user approval",
+              "risk": "EXTERNAL",
+              "createdAt": "2026-10-05T01:18:25.224Z",
+              "status": "APPROVED",
+              "expiresAt": "2026-10-05T01:28:25.224Z",
+              "decidedAt": "2026-10-05T01:18:25.575Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/missions?limit=5",
+      "status": 200,
+      "body": {
+        "missions": {
+          "array": 5,
+          "sample": [
+            {
+              "id": "mission_muuii2za_0",
+              "title": "island-live-1791160142193",
+              "status": "COMPLETED",
+              "priority": 0,
+              "createdAt": "2026-10-05T00:29:02.230Z",
+              "updatedAt": "2026-10-05T00:29:02.246Z",
+              "steps": [],
+              "startedAt": "2026-10-05T00:29:02.239Z",
+              "completedAt": "2026-10-05T00:29:02.246Z"
+            },
+            {
+              "id": "mission_musxesxm_0",
+              "title": "Define KAI subagents: Alice, Bob",
+              "status": "COMPLETED",
+              "priority": 0,
+              "createdAt": "2026-10-03T21:50:51.130Z",
+              "updatedAt": "2026-10-03T21:50:51.210Z",
+              "steps": [
+                {
+                  "id": "step_mission_musxesxm_0_0",
+                  "missionId": "mission_musxesxm_0",
+                  "index": 0,
+                  "title": "define Alice (research persona on hermes)",
+                  "kind": "tool",
+                  "status": "COMPLETED",
+                  "sideEffecting": true,
+                  "target": "workforce.subagent",
+                  "input": {
+                    "id": "alice",
+                    "name": "Alice",
+                    "role": "researcher",
+                    "soul": "I am Alice, KAI's research persona. I read carefully and cite what I find.",
+                    "workerId": "hermes",
+                    "model": "sonnet",
+                    "capabilities": [
+                      "filesystem"
+                    ],
+                    "visual": {
+                      "variant": "kai-variant-teal",
+                      "colour": "#33bbaa",
+                      "outfit": "lab coat",
+                      "accessories": [
+                        "glasses"
+                      ]
+                    }
+                  },
+                  "output": {
+                    "subagent": {
+                      "spec": {
+                        "id": "alice",
+                        "name": "Alice",
+                        "role": "researcher",
+                        "soul": "I am Alice, KAI's research persona. I read carefully and cite what I find.",
+                        "workerId": "hermes",
+                        "capabilities": [
+                          "filesystem"
+                        ],
+                        "model": "sonnet",
+                        "visual": {
+                          "variant": "kai-variant-teal",
+                          "colour": "#33bbaa",
+                          "outfit": "lab coat",
+                          "accessories": [
+                            "glasses"
+                          ]
+                        }
+                      },
+                      "employeeId": "kai:alice",
+                      "createdAt": "2026-10-03T21:50:51.164Z"
+                    },
+                    "registered": {
+                      "ok": true,
+                      "employeeId": "kai:alice",
+                      "state": "DISCOVERED"
+                    }
+                  },
+                  "startedAt": "2026-10-03T21:50:51.155Z",
+                  "completedAt": "2026-10-03T21:50:51.182Z"
+                },
+                {
+                  "id": "step_mission_musxesxm_0_1",
+                  "missionId": "mission_musxesxm_0",
+                  "index": 1,
+                  "title": "define Bob (engineering persona on opencode)",
+                  "kind": "tool",
+                  "status": "COMPLETED",
+                  "sideEffecting": true,
+                  "target": "workforce.subagent",
+                  "input": {
+                    "id": "bob",
+                    "name": "Bob",
+                    "role": "engineer",
+                    "soul": "I am Bob, KAI's engineering persona. I write small, tested patches and never claim a build is green without running it.",
+                    "workerId": "opencode",
+                    "capabilities": [
+                      "filesystem",
+                      "shell"
+                    ],
+                    "visual": {
+                      "variant": "kai-variant-amber",
+                      "colour": "#cc7722",
+                      "outfit": "hoodie",
+                      "accessories": [
+                        "headset"
+                      ]
+                    }
+                  },
+                  "output": {
+                    "subagent": {
+                      "spec": {
+                        "id": "bob",
+                        "name": "Bob",
+                        "role": "engineer",
+                        "soul": "I am Bob, KAI's engineering persona. I write small, tested patches and never claim a build is green without running it.",
+                        "workerId": "opencode",
+                        "capabilities": [
+                          "filesystem",
+                          "shell"
+                        ],
+                        "visual": {
+                          "variant": "kai-variant-amber",
+                          "colour": "#cc7722",
+                          "outfit": "hoodie",
+                          "accessories": [
+                            "headset"
+                          ]
+                        }
+                      },
+                      "employeeId": "kai:bob",
+                      "createdAt": "2026-10-03T21:50:51.191Z"
+                    },
+                    "registered": {
+                      "ok": true,
+                      "employeeId": "kai:bob",
+                      "state": "DISCOVERED"
+                    }
+                  },
+                  "startedAt": "2026-10-03T21:50:51.187Z",
+                  "completedAt": "2026-10-03T21:50:51.205Z"
+                }
+              ],
+              "startedAt": "2026-10-03T21:50:51.143Z",
+              "completedAt": "2026-10-03T21:50:51.210Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/memory/search?q=a&limit=5",
+      "status": 200,
+      "body": {
+        "hits": {
+          "array": 5,
+          "sample": [
+            {
+              "entry": {
+                "id": "mem_murhf5pe_1",
+                "scope": "global",
+                "scopeId": "global",
+                "content": "My preferred project language is TypeScript.",
+                "source": "user_statement",
+                "provenance": "user_statement",
+                "type": "user_preference",
+                "importance": 5,
+                "confidence": 1,
+                "createdAt": "2026-10-02T21:35:27.650Z",
+                "updatedAt": "2026-10-02T21:35:27.650Z",
+                "date": "2026-10-02T21:35:27.650Z",
+                "hash": "cbbc73dc29f07ccd"
+              },
+              "score": 2.7768898785526104
+            },
+            {
+              "entry": {
+                "id": "mem_muu8cyr8_f",
+                "scope": "global",
+                "scopeId": "global",
+                "content": "what is your name and what harnezz u use?",
+                "source": "system_state",
+                "provenance": "model_candidate",
+                "type": "project_fact",
+                "importance": 4,
+                "confidence": 1,
+                "createdAt": "2026-10-04T19:45:07.316Z",
+                "updatedAt": "2026-10-04T19:45:07.316Z",
+                "date": "2026-10-04T19:45:07.316Z",
+                "hash": "128c28e16b4d58f2"
+              },
+              "score": 2.3056949282457873
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/skills",
+      "status": 200,
+      "body": {
+        "skills": {
+          "array": 2,
+          "sample": [
+            {
+              "id": "nightly-verification-routine-1f865f",
+              "name": "nightly-verification-routine",
+              "description": "1",
+              "tags": [
+                "learned"
+              ],
+              "source": "learned",
+              "contentHash": "4cfc1bb553fd8b0e8155cf6eecc307aa6c73c358f5c0fcfe5cc03f9c606303bc",
+              "status": "enabled",
+              "revision": 1,
+              "revisionCount": 1,
+              "installedAt": "2026-10-02T23:27:37.028Z",
+              "updatedAt": "2026-10-02T23:27:37.028Z",
+              "path": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\skills\\installed\\nightly-verification-routine-1f865f\\4cfc1bb553fd8b0e8155cf6eecc307aa6c73c358f5c0fcfe5cc03f9c606303bc"
+            },
+            {
+              "id": "ph4-nightly-deploy-912d29",
+              "name": "ph4-nightly-deploy",
+              "description": "1",
+              "tags": [
+                "learned"
+              ],
+              "source": "learned",
+              "contentHash": "2520f0784d52f9fd0c31f0e5d8ba70840fe0316c7f6962574ad6fd430c31ca79",
+              "status": "enabled",
+              "revision": 1,
+              "revisionCount": 1,
+              "installedAt": "2026-10-03T10:15:38.715Z",
+              "updatedAt": "2026-10-03T10:15:38.715Z",
+              "path": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\skills\\installed\\ph4-nightly-deploy-912d29\\2520f0784d52f9fd0c31f0e5d8ba70840fe0316c7f6962574ad6fd430c31ca79"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/schedules",
+      "status": 200,
+      "body": {
+        "schedules": {
+          "array": 11,
+          "sample": [
+            {
+              "id": "sched_b5b439ba-c141-4aa8-a049-dbef64de1712",
+              "title": "ph4 policyfire 1791045816493",
+              "kind": "once",
+              "action": "mission.create",
+              "enabled": false,
+              "failureCount": 0,
+              "createdAt": "2026-10-03T16:43:36.494Z",
+              "updatedAt": "2026-10-03T16:44:05.676Z",
+              "runAt": "2026-10-03T16:43:40.493Z",
+              "payload": {
+                "title": "ph4 policyfire mission",
+                "steps": [
+                  {
+                    "title": "write",
+                    "kind": "tool",
+                    "target": "memory.write",
+                    "input": {
+                      "content": "should be denied",
+                      "type": "note"
+                    }
+                  }
+                ]
+              },
+              "lastRun": "2026-10-03T16:44:05.676Z"
+            },
+            {
+              "id": "sched_e1c0e111-2b1b-4056-9a1d-04feead1cadc",
+              "title": "ph4 once 1791045792213",
+              "kind": "once",
+              "action": "mission.create",
+              "enabled": false,
+              "failureCount": 0,
+              "createdAt": "2026-10-03T16:43:12.214Z",
+              "updatedAt": "2026-10-03T16:43:35.673Z",
+              "runAt": "2026-10-03T16:43:16.211Z",
+              "payload": {
+                "title": "ph4 scheduled mission"
+              },
+              "lastRun": "2026-10-03T16:43:35.673Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/recovery/status",
+      "status": 200,
+      "body": {
+        "ledger": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\recovery-ledger.db",
+        "open": {
+          "array": 0,
+          "sample": []
+        },
+        "total": 52
+      }
+    },
+    {
+      "path": "/actions?limit=5",
+      "status": 200,
+      "body": {
+        "actions": {
+          "array": 5,
+          "sample": [
+            {
+              "coreBuildId": "15cbfd66e9c04ac5",
+              "actionId": "act_muv5rrr9_2",
+              "executorType": "kai",
+              "toolId": "session.manage",
+              "policyDecision": "allow",
+              "decisionSource": "rule:kai-internal-state",
+              "startedAt": "2026-10-05T11:20:25.413Z",
+              "completedAt": "2026-10-05T11:20:25.414Z",
+              "resultState": "EXECUTED"
+            },
+            {
+              "coreBuildId": "15cbfd66e9c04ac5",
+              "actionId": "act_muv5qook_1",
+              "executorType": "kai",
+              "toolId": "session.manage",
+              "policyDecision": "allow",
+              "decisionSource": "rule:kai-internal-state",
+              "startedAt": "2026-10-05T11:19:34.772Z",
+              "completedAt": "2026-10-05T11:19:34.773Z",
+              "resultState": "EXECUTED"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/checkpoints",
+      "status": 200,
+      "body": {
+        "checkpoints": {
+          "array": 12,
+          "sample": [
+            {
+              "id": "ckpt_murkx4o1_y5a2fj",
+              "target": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-ckpt-acceptance",
+              "sha": "f359a749ab67a610ae9998864b0613d26b277185",
+              "createdAt": "2026-10-02T23:13:25.207Z",
+              "fileCount": 1,
+              "manifest": [
+                {
+                  "path": "note.txt",
+                  "sha256": "9160d4be34c8695bd172a76c7c7966587ea5a4d991ad22c87b2b91af54aa9ebb",
+                  "size": 7,
+                  "type": "file"
+                }
+              ],
+              "label": "acceptance"
+            },
+            {
+              "id": "ckpt_murni599_b5rm5v",
+              "target": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-c2-repo",
+              "sha": "c6f702d60573c92129d0cb6236e6e5c714268927",
+              "createdAt": "2026-10-03T00:25:44.943Z",
+              "fileCount": 1,
+              "manifest": [
+                {
+                  "path": "app.txt",
+                  "sha256": "25718360e05d3c2d0963d1381e9dd4dae5fca789244ee4b9f861adcc0cc96218",
+                  "size": 9,
+                  "type": "file"
+                }
+              ],
+              "label": "c2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/prompts/compose",
+      "status": 404,
+      "body": {
+        "error": "not_found",
+        "reason": "unknown_route",
+        "path": "/prompts/compose"
+      }
+    }
+  ]
+}

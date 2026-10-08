@@ -1,0 +1,43 @@
+{
+  "at": "2026-10-07T11:34:48.238Z",
+  "uid": "muy15yk6",
+  "scenarios": {
+    "(1) multi-tool task names files + verdict, COMPLETED": {
+      "pass": true,
+      "detail": "state=COMPLETED tools=filesystem.search,filesystem.read reply=## Result\nFiles: loader-audit.txt, tool-loop.txt. Evidence: the loader reads turns newest-first but drops tool records on reload. Verdict: RC1-VERDICT the loade"
+    },
+    "(2) budget-cut PAUSES, continue resumes SAME task to COMPLETED": {
+      "pass": true,
+      "detail": "paused=true state1=PAUSED resumed=true state2=COMPLETED reply2=## Result\nRC2 resumed and finished: the loader drops tool records. Verdict: RC2-VERDICT-DONE fix the loader to keep tool"
+    },
+    "(3) empty synthesis pauses honestly, never bare progress": {
+      "pass": true,
+      "detail": "state=PAUSED reply=Task paused because the execution budget was reached. Completed: filesystem.search, filesystem.search. Remaining: these planned calls never ran: filesystem_search. Say continue and I'll pick up from t"
+    },
+    "(4) providers live, models/use parks then applies + survives restart": {
+      "pass": true,
+      "detail": "providers=hermes,kai-model,opencode kaiModels=deepseek-v4.1-flash,rc-model,rc-switched-model,rc-settings-model hermesModels=hermes-rc-model selected=true survives=true"
+    },
+    "(5) /models /providers /tools /skills /agents /mcp run live": {
+      "pass": true,
+      "detail": "models=## ✓ KAI model (backing KAI now)\n\n- `rc-model`\n- ✓ `rc-switc tools-hit=true skills=259 agents=## KAI agents\n\nNo subagent personas exist. Create one from t mcp=## MCP\n\n- servers: 0 (enabled: 0, connected: 0)\n- tools adap"
+    },
+    "(6) @agent parks + Allow collects; @skill loads body": {
+      "pass": true,
+      "detail": "create=201 parked=true collected=true reply=I'm Rcc, KAI's courier. opencode mock output: You are acting as KAI's subagent \" skill=true bodyLoaded=true"
+    },
+    "(7) 3 sessions interleave isolated, transcripts intact": {
+      "pass": true,
+      "detail": "isolated=true intact=true active=true"
+    },
+    "(8) persona create/message/edit/reload-persist/persona-run": {
+      "pass": true,
+      "detail": "create=201 direct=true edit=true/true persists=true run=true runReply=I'm RcAgent, KAI's field researcher. opencode mock output: You are acting as KAI's subagen"
+    },
+    "(9) settings park/approve/persist with effective sources": {
+      "pass": true,
+      "detail": "effective=rc-settings-model source=settings storedKeys=model.name"
+    }
+  },
+  "verdict": "PASS"
+}

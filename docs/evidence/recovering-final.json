@@ -1,0 +1,611 @@
+{
+  "title": "RECOVERING \u2014 the nine-point live chain, real event to visible character",
+  "generatedAt": "2026-10-04T18:37:46.429679",
+  "codeHead": "5839f96ee678956287212154988e0b4427212652",
+  "verdict": "RECOVERING is REACHED and EXITED live, from the real Core event through the running renderer to the visible character. The renderer receipt (window.__kaiEngine.state / .renderer.pose / window.__kaiProbe) is the proof, not a faceState() substitution. The brief's predicted exit terminal (ERROR) did NOT hold: the cancel tool's own action.executed superseded it 5 ms later, so the settled pose is USING_TOOL \u2014 reported plainly.",
+  "artifact": {
+    "exe": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\kai.exe",
+    "exeMtime": "2026-10-04T18:31:14.962746",
+    "buildId": "b0f49fd850ddca78",
+    "gitCommit": "5839f96ee678956287212154988e0b4427212652",
+    "protocolVersion": 1,
+    "corePid": 14928,
+    "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+    "onDiskBuildId": "b0f49fd850ddca78",
+    "identityMatchesDisk": true,
+    "sourceBuildId": null,
+    "artifactMatchesSource": null,
+    "freshness": "fresh",
+    "bundleStamp": {
+      "buildId": "b0f49fd850ddca78",
+      "gitCommit": "5839f96ee678956287212154988e0b4427212652"
+    },
+    "note": "exe mtime moved 18:09 -> 18:31 by `cd app && npx tauri build` with the prebuild ENABLED (bundle restamped commit 5839f96e, the code HEAD). /identity pid 14928 == netstat owner of 8788. No refusal (exit 5) occurred; nothing was bypassed."
+  },
+  "seed": {
+    "script": "docs/evidence/recovery-seed.mts",
+    "note": "Seeds the exact state a real crash leaves (RUNNING side-effecting step + AFTER_ACCEPT ledger record) using the product's OWN storage + acceptance-ledger modules. The previous .ts was un-runnable under docs/ (no package.json -> CommonJS -> 'Cannot use import statement outside a module'); renamed to .mts (always ESM). Isolated KAI_CORE_DB so the user's real store is untouched.",
+    "missionId": "mission_muu3hf2l_0",
+    "stepId": "step_mission_muu3hf2l_0_0",
+    "executionId": "exec_mission_muu3hf2l_0_step_mission_muu3hf2l_0_0",
+    "ledgerPhase": "AFTER_ACCEPT",
+    "ledgerPath": "C:\\Users\\DELL\\.hermes\\profiles\\kai\\cache\\scratch\\recovering-proof\\recovery-ledger.db",
+    "coreDbPath": "C:\\Users\\DELL\\.hermes\\profiles\\kai\\cache\\scratch\\recovering-proof\\kai-core.db"
+  },
+  "points": {
+    "1_create_recovery_blocked": {
+      "claim": "A real recovery-blocked condition exists in the real product database, and the real Core's recover() acted on it.",
+      "evidence": {
+        "missionAfterBoot": "status=WAITING, metadata.recoveryBlocked=true, error.code=AGENT_RUN_ABANDONED",
+        "recoveryError": "crash recovery: remaining step step_mission_muu3hf2l_0_0 (\"send the irreversible thing\") is side-effecting; refusing to re-run it automatically (spec \u00a729)",
+        "recoveryStatus": {
+          "ledger": "C:\\Users\\DELL\\.hermes\\profiles\\kai\\cache\\scratch\\recovering-proof\\recovery-ledger.db",
+          "open": [
+            {
+              "executionId": "exec_mission_muu3hf2l_0_step_mission_muu3hf2l_0_0",
+              "kind": "mission_step",
+              "sideEffecting": true,
+              "phase": "AFTER_ACCEPT",
+              "status": "RUNNING",
+              "ownerId": "owner_22084_muu3hf2d_fn54t",
+              "sideEffectCount": 1,
+              "startedAt": "2026-10-04T17:28:37.008Z",
+              "refId": "mission_muu3hf2l_0",
+              "stepId": "step_mission_muu3hf2l_0_0",
+              "acceptedAt": "2026-10-04T17:28:37.008Z",
+              "detail": "seed: effect crossed the boundary, process died before completion"
+            }
+          ],
+          "total": 1
+        },
+        "notification": "ntf_muu3n1h3_0 type=mission.recovery_blocked title=\"1 mission(s) need a decision\""
+      },
+      "tag": "END-TO-END PROVEN",
+      "caveat": "The trigger is SEEDED via the product's own storage/ledger layer (a simulated mid-side-effect crash, the same shape core/tests/fixtures/recovery-child.ts leaves). It is not produced by an HTTP route \u2014 a crash cannot be. The recovery decision, the block and the notification are all the real Core's."
+    },
+    "2_observe_core_event": {
+      "claim": "The actual Core event is observed on the real SSE stream.",
+      "evidence": {
+        "endpoint": "GET http://127.0.0.1:8788/core/events",
+        "rawFrame": "{\"id\":\"evt_muu3n1h7_e\",\"type\":\"notification.created\",\"timestamp\":\"2026-10-04T17:32:59.323Z\",\"source\":\"core\",\"payload\":{\"id\":\"ntf_muu3n1h3_0\",\"type\":\"mission.recovery_blocked\",\"title\":\"1 mission(s) need a decision\",\"priority\":\"HIGH\",\"createdAt\":\"2026-10-04T17:32:59.319Z\",\"read\":false,\"message\":\"These were interrupted with a step that changes something outside KAI, so they were not resumed automatically.\"}}",
+        "wireType": "notification.created",
+        "nestedSemanticType": "mission.recovery_blocked",
+        "eventId": "evt_muu3n1h7_e",
+        "delivery": "received by a client that connected AFTER the Core listened -> the /core/events catch-up replay (core.bus.recent(), oldest-first) delivered it. This is the FOURTH LINK."
+      },
+      "tag": "END-TO-END PROVEN"
+    },
+    "3_bridge_preserves_semantic_information": {
+      "claim": "The app bridge preserves the nested semantic type (payload.type) so the runtime machine can see mission.recovery_blocked.",
+      "evidence": {
+        "wireEnvelope": "notification.created",
+        "nested": "mission.recovery_blocked",
+        "code": "app/src/core/core-state.ts CoreEventRow retains payload verbatim; app/src/island/core-bridge.ts forwards payload; app/src/core/runtime-state.ts resolves notification.created -> payload.type.",
+        "endToEndProof": "the running renderer reached RECOVERING (point 7), which is only possible if payload.type survived reducer -> bridge -> stateForEvent."
+      },
+      "tag": "END-TO-END PROVEN"
+    },
+    "4_stateForEvent_returns_RECOVERING": {
+      "claim": "stateForEvent() maps the wrapped event to RECOVERING.",
+      "evidence": {
+        "unit": "app/tests/runtime-state.test.ts: 'a notification.created wrapping mission.recovery_blocked maps to RECOVERING' -> {state: RECOVERING, cause: mission.recovery_blocked}",
+        "live": "the running renderer's runtime is RECOVERING from this exact wire event (point 7)"
+      },
+      "tag": "END-TO-END PROVEN",
+      "caveat": "UNIT PROVEN by the pinned test; the live receipt upgrades it to END-TO-END PROVEN."
+    },
+    "5_runtime_enters_RECOVERING": {
+      "claim": "The app runtime machine enters RECOVERING.",
+      "evidence": {
+        "probeRuntime": "RECOVERING",
+        "runtimeLabel": "KAI is recovering\u2026"
+      },
+      "tag": "END-TO-END PROVEN"
+    },
+    "6_faceState_changes": {
+      "claim": "The state the orb is asked to show changes to recovering.",
+      "evidence": {
+        "engineState": "recovering",
+        "note": "faceState() is private; the island feeds it to engine.setState(faceState()) every sync. The RUNNING renderer's own engine.state is the stronger, direct evidence and is used instead of a faceState() read."
+      },
+      "tag": "END-TO-END PROVEN",
+      "caveat": "faceState() itself was not read (private). The renderer receipt stands in and is stronger."
+    },
+    "7_renderer_receives": {
+      "claim": "The actual renderer receives it: window.__kaiEngine.state and .renderer.pose.",
+      "evidence": {
+        "engineState": "recovering",
+        "rendererPose": "verifying",
+        "poseMapping": "KAI_STATE_POSE.RECOVERING = 'verifying' (app/src/character/types.ts). Observed pose == 'verifying'.",
+        "probe": {
+          "mode": "expanded",
+          "view": "overview",
+          "runtime": "RECOVERING",
+          "runtimeLabel": "KAI is recovering\u2026",
+          "conn": "ONLINE",
+          "connError": null,
+          "note": "1 mission(s) need a decision",
+          "turnError": null,
+          "activeSessionId": null,
+          "sessionIds": [],
+          "historyLength": 0,
+          "historyLast": null
+        },
+        "canvas": {
+          "w": 139,
+          "h": 197
+        }
+      },
+      "tag": "END-TO-END PROVEN"
+    },
+    "8_visible_character": {
+      "claim": "The visible character reflects it \u2014 a screenshot captured from the real island, inspected with vision.",
+      "evidence": {
+        "screenshots": [
+          "docs/evidence/recovering-island.png",
+          "docs/evidence/recovering-orb.png"
+        ],
+        "vision_island": "Dark island UI. Left panel 'KAI your agent' shows a stylized glowing orb: dark translucent centre with a fine grid texture, two bright glowing white eyes with pupils, a thin glowing yellow ring orbiting the top, a soft purple-blue aura. Text reads 'KAI is recovering...'. Below: 'Using: Hermes (idle), OpenCode (error), VS Code (idle)', '0 of my sessions'. Right panel 'KAI'S SUBAGENTS' -> 'none'. Explicitly NOT a solid black disc.",
+        "vision_orb": "The bot-canvas render: a large dark sphere with a fine mesh/dot texture, bright white rounded-rectangle eyes with specular highlights, a soft white/blue halo, and a single thin tilted yellow dotted ring (halo) above it. A detailed character, not a black disc."
+      },
+      "tag": "END-TO-END PROVEN",
+      "caveat": "A single frame of a moving pose; vision confirms the character's features and the 'KAI is recovering...' label, which is the visible signal."
+    },
+    "9_exit": {
+      "claim": "The state EXITS on a real subsequent event (a resolution), and the renderer is not stuck.",
+      "evidence": {
+        "trigger": "POST /missions/mission_muu3hf2l_0/cancel -> 200, mission.status CANCELLED",
+        "wire": [
+          {
+            "t": "2026-10-04T17:33:44.358Z",
+            "type": "mission.cancelled",
+            "mapsTo": "ERROR",
+            "raw": "{\"id\":\"evt_muu3o086_h\",\"type\":\"mission.cancelled\",\"timestamp\":\"2026-10-04T17:33:44.358Z\",\"source\":\"mission:mission_muu3hf2l_0\",\"payload\":{\"missionId\":\"mission_muu3hf2l_0\"},\"missionId\":\"mission_muu3hf2l_0\"}"
+          },
+          {
+            "t": "2026-10-04T17:33:44.363Z",
+            "type": "action.executed",
+            "toolId": "mission.cancel",
+            "mapsTo": "USING_TOOL"
+          }
+        ],
+        "rendererAfterCancel": {
+          "engineState": "using_tool",
+          "rendererPose": "toolcall",
+          "probe": {
+            "mode": "expanded",
+            "view": "note",
+            "runtime": "USING_TOOL",
+            "runtimeLabel": "KAI is using a tool\u2026",
+            "conn": "ONLINE",
+            "connError": null,
+            "note": "Mission cancelled",
+            "turnError": null,
+            "activeSessionId": null,
+            "sessionIds": [],
+            "historyLength": 0,
+            "historyLast": null
+          },
+          "canvas": {
+            "w": 122,
+            "h": 179
+          }
+        },
+        "observedTerminal": "USING_TOOL / pose 'toolcall' (the cancel tool's OWN action event, 5 ms after mission.cancelled)",
+        "subsequentRealEvent": "a later real approval.requested moved the renderer to WAITING_APPROVAL / pose 'needsuser' (probe.note 'Mission cancelled') \u2014 the machine keeps tracking real events and is NOT stuck on RECOVERING",
+        "secondExitAttempt": "POST /approvals/apr_muu3qvo9_0/decide {approved:false} -> mission FAILED (mission.failed maps to ERROR) but the renderer again settled at USING_TOOL (the decide tool's action.executed)"
+      },
+      "tag": "END-TO-END PROVEN",
+      "caveat": "The brief PREDICTED the cancel would settle on ERROR. It does not: mission.cancelled -> ERROR is applied, then the gate's own action.executed (toolId mission.cancel) arrives 5 ms later and maps to USING_TOOL, which settles. This is a consistent ordering fact (same for the approval-decision exit), not a state-machine failure \u2014 RECOVERING is genuinely left by a real subsequent event. Flagged, not hidden."
+    }
+  },
+  "regression": {
+    "coreTsc": "clean (npx tsc -p tsconfig.json --noEmit)",
+    "coreTests": "740 tests, 727 pass, 0 fail, 13 skipped",
+    "appTsc": "clean (npx tsc --noEmit)",
+    "appTests": "118 tests, 118 pass, 0 fail",
+    "memoryScopeCheck": {
+      "request": "GET /memory/search?scope=bogus",
+      "status": 400,
+      "body": {
+        "error": true,
+        "reason": "\"scope\" must be one of global, session, mission, employee, project, subagent; got \"bogus\""
+      },
+      "verdict": "PASS \u2014 the refusal lists the canonical scopes INCLUDING subagent: 'global, session, mission, employee, project, subagent'."
+    }
+  },
+  "notProven": [
+    "The brief's predicted exit terminal ERROR for POST /missions/:id/cancel is NOT what the renderer settles on \u2014 it settles on USING_TOOL (the cancel's own action.executed, 5 ms after mission.cancelled). Reported above, not rounded up.",
+    "faceState() itself was not read (private method); the running renderer's window.__kaiEngine.state is used instead and is stronger evidence.",
+    "The recovery-blocked condition was SEEDED (simulated crash via the product's own storage layer), not produced by an HTTP route."
+  ],
+  "raw": {
+    "wireTypes": [
+      "stream.ready",
+      "agent.registered",
+      "core.status_changed",
+      "core.started",
+      "agent.connected",
+      "agent.error",
+      "notification.created",
+      "scheduler.started",
+      "mission.cancelled",
+      "action.executed"
+    ],
+    "wire": [
+      {
+        "raw": "{\"type\":\"stream.ready\"}",
+        "event": {
+          "type": "stream.ready"
+        },
+        "at": "2026-10-04T17:33:42.124Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1ei_0\",\"type\":\"agent.registered\",\"timestamp\":\"2026-10-04T17:32:59.226Z\",\"source\":\"core\",\"payload\":{\"id\":\"hermes\",\"name\":\"Hermes Agent\"}}",
+        "event": {
+          "id": "evt_muu3n1ei_0",
+          "type": "agent.registered",
+          "timestamp": "2026-10-04T17:32:59.226Z",
+          "source": "core",
+          "payload": {
+            "id": "hermes",
+            "name": "Hermes Agent"
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1ei_1\",\"type\":\"agent.registered\",\"timestamp\":\"2026-10-04T17:32:59.226Z\",\"source\":\"core\",\"payload\":{\"id\":\"opencode\",\"name\":\"OpenCode\"}}",
+        "event": {
+          "id": "evt_muu3n1ei_1",
+          "type": "agent.registered",
+          "timestamp": "2026-10-04T17:32:59.226Z",
+          "source": "core",
+          "payload": {
+            "id": "opencode",
+            "name": "OpenCode"
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1ej_2\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.227Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.registered\",\"employeeId\":\"hermes\",\"name\":\"Hermes\",\"placeholder\":false}}",
+        "event": {
+          "id": "evt_muu3n1ej_2",
+          "type": "core.status_changed",
+          "timestamp": "2026-10-04T17:32:59.227Z",
+          "source": "workforce",
+          "payload": {
+            "workforce": "workforce.registered",
+            "employeeId": "hermes",
+            "name": "Hermes",
+            "placeholder": false
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1en_3\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.231Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.registered\",\"employeeId\":\"opencode\",\"name\":\"OpenCode\",\"placeholder\":false}}",
+        "event": {
+          "id": "evt_muu3n1en_3",
+          "type": "core.status_changed",
+          "timestamp": "2026-10-04T17:32:59.231Z",
+          "source": "workforce",
+          "payload": {
+            "workforce": "workforce.registered",
+            "employeeId": "opencode",
+            "name": "OpenCode",
+            "placeholder": false
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1ep_4\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.233Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.registered\",\"employeeId\":\"codex\",\"name\":\"Codex\",\"placeholder\":false}}",
+        "event": {
+          "id": "evt_muu3n1ep_4",
+          "type": "core.status_changed",
+          "timestamp": "2026-10-04T17:32:59.233Z",
+          "source": "workforce",
+          "payload": {
+            "workforce": "workforce.registered",
+            "employeeId": "codex",
+            "name": "Codex",
+            "placeholder": false
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1fo_5\",\"type\":\"core.started\",\"timestamp\":\"2026-10-04T17:32:59.268Z\",\"source\":\"core\",\"payload\":{\"dbPath\":\"C:/Users/DELL/.hermes/profiles/kai/cache/scratch/recovering-proof/kai-core.db\",\"pid\":14928}}",
+        "event": {
+          "id": "evt_muu3n1fo_5",
+          "type": "core.started",
+          "timestamp": "2026-10-04T17:32:59.268Z",
+          "source": "core",
+          "payload": {
+            "dbPath": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/recovering-proof/kai-core.db",
+            "pid": 14928
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1ga_6\",\"type\":\"agent.connected\",\"timestamp\":\"2026-10-04T17:32:59.290Z\",\"source\":\"core\",\"payload\":{\"id\":\"hermes\"}}",
+        "event": {
+          "id": "evt_muu3n1ga_6",
+          "type": "agent.connected",
+          "timestamp": "2026-10-04T17:32:59.290Z",
+          "source": "core",
+          "payload": {
+            "id": "hermes"
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1gi_7\",\"type\":\"agent.error\",\"timestamp\":\"2026-10-04T17:32:59.298Z\",\"source\":\"core\",\"payload\":{\"id\":\"opencode\",\"phase\":\"connect\",\"detail\":\"INTERNAL: INTERNAL: transport failure talking to http://127.0.0.1:4096\"}}",
+        "event": {
+          "id": "evt_muu3n1gi_7",
+          "type": "agent.error",
+          "timestamp": "2026-10-04T17:32:59.298Z",
+          "source": "core",
+          "payload": {
+            "id": "opencode",
+            "phase": "connect",
+            "detail": "INTERNAL: INTERNAL: transport failure talking to http://127.0.0.1:4096"
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1gi_8\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.298Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.state_changed\",\"employeeId\":\"hermes\",\"from\":\"DISCOVERED\",\"to\":\"READY\",\"via\":[\"INSTALLED\",\"READY\"]}}",
+        "event": {
+          "id": "evt_muu3n1gi_8",
+          "type": "core.status_changed",
+          "timestamp": "2026-10-04T17:32:59.298Z",
+          "source": "workforce",
+          "payload": {
+            "workforce": "workforce.state_changed",
+            "employeeId": "hermes",
+            "from": "DISCOVERED",
+            "to": "READY",
+            "via": [
+              "INSTALLED",
+              "READY"
+            ]
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1gl_9\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.301Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.health_checked\",\"employeeId\":\"hermes\",\"state\":\"READY\",\"snapshot\":{\"state\":\"READY\",\"at\":\"2026-10-04T17:32:59.298Z\",\"reachable\":true,\"authenticated\":true}}}",
+        "event": {
+          "id": "evt_muu3n1gl_9",
+          "type": "core.status_changed",
+          "timestamp": "2026-10-04T17:32:59.301Z",
+          "source": "workforce",
+          "payload": {
+            "workforce": "workforce.health_checked",
+            "employeeId": "hermes",
+            "state": "READY",
+            "snapshot": {
+              "state": "READY",
+              "at": "2026-10-04T17:32:59.298Z",
+              "reachable": true,
+              "authenticated": true
+            }
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1go_a\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.304Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.state_changed\",\"employeeId\":\"opencode\",\"from\":\"DISCOVERED\",\"to\":\"READY\",\"via\":[\"INSTALLED\",\"READY\"]}}",
+        "event": {
+          "id": "evt_muu3n1go_a",
+          "type": "core.status_changed",
+          "timestamp": "2026-10-04T17:32:59.304Z",
+          "source": "workforce",
+          "payload": {
+            "workforce": "workforce.state_changed",
+            "employeeId": "opencode",
+            "from": "DISCOVERED",
+            "to": "READY",
+            "via": [
+              "INSTALLED",
+              "READY"
+            ]
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1gr_b\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.307Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.health_checked\",\"employeeId\":\"opencode\",\"state\":\"READY\",\"snapshot\":{\"state\":\"READY\",\"at\":\"2026-10-04T17:32:59.304Z\",\"reachable\":true,\"authenticated\":true}}}",
+        "event": {
+          "id": "evt_muu3n1gr_b",
+          "type": "core.status_changed",
+          "timestamp": "2026-10-04T17:32:59.307Z",
+          "source": "workforce",
+          "payload": {
+            "workforce": "workforce.health_checked",
+            "employeeId": "opencode",
+            "state": "READY",
+            "snapshot": {
+              "state": "READY",
+              "at": "2026-10-04T17:32:59.304Z",
+              "reachable": true,
+              "authenticated": true
+            }
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1gu_c\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.310Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.state_changed\",\"employeeId\":\"codex\",\"from\":\"DISCOVERED\",\"to\":\"UNAVAILABLE\",\"via\":[\"UNAVAILABLE\"]}}",
+        "event": {
+          "id": "evt_muu3n1gu_c",
+          "type": "core.status_changed",
+          "timestamp": "2026-10-04T17:32:59.310Z",
+          "source": "workforce",
+          "payload": {
+            "workforce": "workforce.state_changed",
+            "employeeId": "codex",
+            "from": "DISCOVERED",
+            "to": "UNAVAILABLE",
+            "via": [
+              "UNAVAILABLE"
+            ]
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1gw_d\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.313Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.health_checked\",\"employeeId\":\"codex\",\"state\":\"UNAVAILABLE\",\"snapshot\":{\"state\":\"UNAVAILABLE\",\"at\":\"2026-10-04T17:32:59.309Z\",\"reachable\":false,\"authenticated\":false,\"problems\":[\"the codex CLI is not installed on this machine\"]}}}",
+        "event": {
+          "id": "evt_muu3n1gw_d",
+          "type": "core.status_changed",
+          "timestamp": "2026-10-04T17:32:59.313Z",
+          "source": "workforce",
+          "payload": {
+            "workforce": "workforce.health_checked",
+            "employeeId": "codex",
+            "state": "UNAVAILABLE",
+            "snapshot": {
+              "state": "UNAVAILABLE",
+              "at": "2026-10-04T17:32:59.309Z",
+              "reachable": false,
+              "authenticated": false,
+              "problems": [
+                "the codex CLI is not installed on this machine"
+              ]
+            }
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1h7_e\",\"type\":\"notification.created\",\"timestamp\":\"2026-10-04T17:32:59.323Z\",\"source\":\"core\",\"payload\":{\"id\":\"ntf_muu3n1h3_0\",\"type\":\"mission.recovery_blocked\",\"title\":\"1 mission(s) need a decision\",\"priority\":\"HIGH\",\"createdAt\":\"2026-10-04T17:32:59.319Z\",\"read\":false,\"message\":\"These were interrupted with a step that changes something outside KAI, so they were not resumed automatically.\"}}",
+        "event": {
+          "id": "evt_muu3n1h7_e",
+          "type": "notification.created",
+          "timestamp": "2026-10-04T17:32:59.323Z",
+          "source": "core",
+          "payload": {
+            "id": "ntf_muu3n1h3_0",
+            "type": "mission.recovery_blocked",
+            "title": "1 mission(s) need a decision",
+            "priority": "HIGH",
+            "createdAt": "2026-10-04T17:32:59.319Z",
+            "read": false,
+            "message": "These were interrupted with a step that changes something outside KAI, so they were not resumed automatically."
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1h9_f\",\"type\":\"scheduler.started\",\"timestamp\":\"2026-10-04T17:32:59.325Z\",\"source\":\"scheduler\",\"payload\":{\"tickMs\":30000}}",
+        "event": {
+          "id": "evt_muu3n1h9_f",
+          "type": "scheduler.started",
+          "timestamp": "2026-10-04T17:32:59.325Z",
+          "source": "scheduler",
+          "payload": {
+            "tickMs": 30000
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3n1hl_g\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.337Z\",\"source\":\"memory\",\"payload\":{\"upkeep\":\"cycle\",\"reason\":\"startup\",\"summary\":\"cycle(startup): capture=0, organize=0, tidy=0, expire=0, journal=1\"}}",
+        "event": {
+          "id": "evt_muu3n1hl_g",
+          "type": "core.status_changed",
+          "timestamp": "2026-10-04T17:32:59.337Z",
+          "source": "memory",
+          "payload": {
+            "upkeep": "cycle",
+            "reason": "startup",
+            "summary": "cycle(startup): capture=0, organize=0, tidy=0, expire=0, journal=1"
+          }
+        },
+        "at": "2026-10-04T17:33:42.125Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3o086_h\",\"type\":\"mission.cancelled\",\"timestamp\":\"2026-10-04T17:33:44.358Z\",\"source\":\"mission:mission_muu3hf2l_0\",\"payload\":{\"missionId\":\"mission_muu3hf2l_0\"},\"missionId\":\"mission_muu3hf2l_0\"}",
+        "event": {
+          "id": "evt_muu3o086_h",
+          "type": "mission.cancelled",
+          "timestamp": "2026-10-04T17:33:44.358Z",
+          "source": "mission:mission_muu3hf2l_0",
+          "payload": {
+            "missionId": "mission_muu3hf2l_0"
+          },
+          "missionId": "mission_muu3hf2l_0"
+        },
+        "at": "2026-10-04T17:33:44.368Z"
+      },
+      {
+        "raw": "{\"id\":\"evt_muu3o08b_i\",\"type\":\"action.executed\",\"timestamp\":\"2026-10-04T17:33:44.363Z\",\"source\":\"core\",\"payload\":{\"coreBuildId\":\"b0f49fd850ddca78\",\"actionId\":\"act_muu3o08a_0\",\"executorType\":\"kai\",\"toolId\":\"mission.cancel\",\"policyDecision\":\"allow\",\"decisionSource\":\"rule:kai-internal-state\",\"startedAt\":\"2026-10-04T17:33:44.349Z\",\"completedAt\":\"2026-10-04T17:33:44.362Z\",\"resultState\":\"EXECUTED\",\"missionId\":\"mission_muu3hf2l_0\"},\"missionId\":\"mission_muu3hf2l_0\"}",
+        "event": {
+          "id": "evt_muu3o08b_i",
+          "type": "action.executed",
+          "timestamp": "2026-10-04T17:33:44.363Z",
+          "source": "core",
+          "payload": {
+            "coreBuildId": "b0f49fd850ddca78",
+            "actionId": "act_muu3o08a_0",
+            "executorType": "kai",
+            "toolId": "mission.cancel",
+            "policyDecision": "allow",
+            "decisionSource": "rule:kai-internal-state",
+            "startedAt": "2026-10-04T17:33:44.349Z",
+            "completedAt": "2026-10-04T17:33:44.362Z",
+            "resultState": "EXECUTED",
+            "missionId": "mission_muu3hf2l_0"
+          },
+          "missionId": "mission_muu3hf2l_0"
+        },
+        "at": "2026-10-04T17:33:44.368Z"
+      }
+    ],
+    "recoveryStatus": {
+      "status": 200,
+      "body": {
+        "ledger": "C:\\Users\\DELL\\.hermes\\profiles\\kai\\cache\\scratch\\recovering-proof\\recovery-ledger.db",
+        "open": [
+          {
+            "executionId": "exec_mission_muu3hf2l_0_step_mission_muu3hf2l_0_0",
+            "kind": "mission_step",
+            "sideEffecting": true,
+            "phase": "AFTER_ACCEPT",
+            "status": "RUNNING",
+            "ownerId": "owner_22084_muu3hf2d_fn54t",
+            "sideEffectCount": 1,
+            "startedAt": "2026-10-04T17:28:37.008Z",
+            "refId": "mission_muu3hf2l_0",
+            "stepId": "step_mission_muu3hf2l_0_0",
+            "acceptedAt": "2026-10-04T17:28:37.008Z",
+            "detail": "seed: effect crossed the boundary, process died before completion"
+          }
+        ],
+        "total": 1
+      }
+    },
+    "identity": {
+      "service": "kai-core",
+      "coreVersion": "0.1.0",
+      "buildId": "b0f49fd850ddca78",
+      "gitCommit": "5839f96ee678956287212154988e0b4427212652",
+      "protocolVersion": 1,
+      "pid": 14928,
+      "startedAt": "2026-10-04T17:32:59.152Z",
+      "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+      "onDiskBuildId": "b0f49fd850ddca78",
+      "identityMatchesDisk": true,
+      "sourceBuildId": null,
+      "artifactMatchesSource": null,
+      "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+      "freshness": "fresh"
+    }
+  }
+}

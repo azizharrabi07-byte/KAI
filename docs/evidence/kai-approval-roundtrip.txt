@@ -1,0 +1,37 @@
+# Permission / approval round trip — captured 2026-10-01T19:09:32+01:00
+#
+# 1. The relay server exists and accepts a client:
+$ python pipe-probe.py
+total pipes: 340
+pipes containing 'kai': ['kai-S-1-5-21-2720510131-810976395-3426585012-1001']
+expected server name: kai-S-1-5-21-2720510131-810976395-3426585012-1001
+present: True
+open() succeeded — the server is listening
+
+# 2. kai.log, both runs of the round trip (kai-hook -> pipe -> island -> click -> pipe -> kai-hook):
+$ grep -E 'hook (Permission)?|ui  decide|decision id' "$LOCALAPPDATA/KAI/kai.log" | tail -12
+2026-10-01 18:36:15 hook PermissionRequest id=10636-1
+2026-10-01 18:36:19 ui  decide allow req=10636-1
+2026-10-01 18:36:19 decision id=10636-1 allow
+2026-10-01 18:36:19 hook id=10636-1 answered allow
+2026-10-01 18:39:57 hook PermissionRequest id=10520-1
+2026-10-01 18:40:54 ui  decide allow req=10520-1
+2026-10-01 18:40:54 decision id=10520-1 allow
+2026-10-01 18:40:54 hook id=10520-1 answered allow
+
+# 3. kai-hook's stdout for the run above (the file is approval-response.txt):
+$ cat approval-response.txt
+{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}
+hook exit=0
+
+# 4. OpenCode's own permission queue, unchanged throughout:
+$ curl -s http://127.0.0.1:4096/permission
+[]
+$ curl -s http://127.0.0.1:8788/agents/opencode/permissions   # through KAI Core
+{
+  "agent": "opencode",
+  "data": []
+}
+# 5. The server's own create-permission route auto-resolves under this config:
+$ curl -X POST http://127.0.0.1:4096/api/session/<new session>/permission -d '{"action":"bash","resources":["..."]}'
+  -> {"data":{"id":"per_0f88f50d5001MG7olMO5NFO5I0","effect":"allow"}}   (no pending request is left behind)

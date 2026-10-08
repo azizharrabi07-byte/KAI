@@ -1,0 +1,10 @@
+{
+  "at": "2026-10-06T17:59:19.382Z",
+  "steps": [
+    {
+      "step": "servers",
+      "count": 1
+    }
+  ],
+  "verdict": "PASS"
+}

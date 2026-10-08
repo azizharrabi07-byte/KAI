@@ -1,0 +1,25 @@
+core /identity: {"service":"kai-core","coreVersion":"0.1.0","buildId":"2de85812ffd99f1f","gitCommit":"60141e76c2e06278731b42863044f3e80eaf6d87","protocolVersion":1,"pid":46100,"startedAt":"2026-10-03T16:06:35.236Z"}
+
+=== driving the six runtime states with real triggers ===
+PASS  THINKING: glow=rgb(167, 139, 250)  opacity=0.65  label="KAI is using a tool…"  orbHash=13d8a50d  -> pose-orb-thinking.png  pose-island-thinking.png
+  trigger POST /notifications/ntf_muskuruk_1/read -> 200
+PASS  USING_TOOL: glow=rgb(99, 102, 241)  opacity=0.65  label="KAI finished"  orbHash=371e7cac  -> pose-orb-using_tool.png  pose-island-using_tool.png
+  trigger POST /missions -> 201 COMPLETED
+PASS  SUCCESS: glow=rgb(52, 211, 153)  opacity=0.65  label="KAI is using a tool…"  orbHash=b208ca7c  -> pose-orb-success.png  pose-island-success.png
+  trigger POST /missions -> 201 FAILED
+PASS  ERROR: glow=rgb(244, 80, 94)  opacity=0.65  label="KAI finished"  orbHash=55b92eb9  -> pose-orb-error.png  pose-island-error.png
+  trigger POST /notifications/ntf_musl49ec_3/read -> 200
+PASS  USING_TOOL: glow=rgb(99, 102, 241)  opacity=0.65  label="KAI is using a tool…"  orbHash=55b92eb9  -> pose-orb-using_tool.png  pose-island-using_tool.png
+  agent mission -> 201 WAITING_APPROVAL
+  approving parked approval apr_musl4aub_3 ( agents.run_task )
+  trigger decide -> 200
+PASS  WORKING: glow=rgb(59, 158, 255)  opacity=0.65  label="KAI is working…"  orbHash=55b92eb9  -> pose-orb-working.png  pose-island-working.png
+  trigger POST /capabilities/computer/test -> 409 tool "capability.computer" is DESTRUCTIVE; destructive actions always require user approva
+PASS  WAITING_APPROVAL: glow=rgb(245, 165, 36)  opacity=0.65  label="KAI needs your approval"  orbHash=55b92eb9  -> pose-orb-waiting_approval.png  pose-island-waiting_approval.png
+
+=== summary ===
+observed states: 6 / 6
+distinct glows: 6  distinct labels: 4  -> allDistinct: false
+repeated pose (USING_TOOL x2): entry1.hash=371e7cac entry2.hash=55b92eb9 identical=false
+orb animation (distinct hashes in last 40 x 200ms samples): 4 -> moving: true
+wrote poses-test-results.json

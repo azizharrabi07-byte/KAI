@@ -1,0 +1,236 @@
+{
+  "at": "2026-10-08T00:47:38.165Z",
+  "scenarios": [
+    {
+      "name": "boot: chat surface mounted",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "boot: composer present",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "A: assistant answer visible WITHOUT any tab change",
+      "pass": true,
+      "detail": "browser repro answer: the lighthouse stands"
+    },
+    {
+      "name": "A: thread visible, hero hidden after turn",
+      "pass": true,
+      "detail": "{\"thread\":\"block\",\"hero\":\"none\"}"
+    },
+    {
+      "name": "B: transcript intact after sessions round-trip",
+      "pass": true,
+      "detail": "browser repro answer: the lighthouse stands"
+    },
+    {
+      "name": "B: no landing after return",
+      "pass": true,
+      "detail": "{\"thread\":\"block\",\"hero\":\"none\"}"
+    },
+    {
+      "name": "C: tool-turn answer visible without tab change",
+      "pass": true,
+      "detail": "browser repro answer: the lighthouse stands\nsearched: no lighthouse here, scan complete"
+    },
+    {
+      "name": "C: tool execution card visible",
+      "pass": true,
+      "detail": "1 card(s)"
+    },
+    {
+      "name": "D: mid-stream navigation keeps the answer + no landing",
+      "pass": true,
+      "detail": "{\"thread\":\"block\",\"hero\":\"none\"}"
+    },
+    {
+      "name": "F: `/` shows registry commands",
+      "pass": true,
+      "detail": "8 rows"
+    },
+    {
+      "name": "F: `/m` filters live",
+      "pass": true,
+      "detail": "/compress,/models,/mcp,/memory"
+    },
+    {
+      "name": "F: Enter executes the command for real",
+      "pass": true,
+      "detail": "ette\n- `Enter` — send · `Shift+Enter` — newline\n- `Ctrl/Cmd+Shift+Enter` — plan only (drafts, runs nothing)\n- `Ctrl/Cmd+Shift+S` — stop the active mission/run\n- `Esc` — close the open popover / dialog"
+    },
+    {
+      "name": "E: overlapping opens resolve to exactly one intact transcript",
+      "pass": true,
+      "detail": "{\"showsAlpha\":true,\"showsBeta\":false,\"thread\":\"block\",\"hero\":\"none\",\"header\":\"Alpha semaphore message · 2 turns · alpha semaphore message\"}"
+    },
+    {
+      "name": "G: `@` lists the live agent",
+      "pass": true,
+      "detail": "Scout,scan,screen-reader-testing"
+    },
+    {
+      "name": "G: `@Scout` parks visibly with an Allow card",
+      "pass": true,
+      "detail": "browser repro answer: the lighthouse stands\nI handed \"survey the workspace\" to scout, but the run is waiting for your approval — Allow it and I'll collect the result."
+    },
+    {
+      "name": "G: Allow collects the persona-authored result",
+      "pass": true,
+      "detail": "our approval — Allow it and I'll collect the result.\nI'm Scout, KAI's researcher. opencode mock output: You are acting as KAI's subagent \"Scout\" (researcher). I am careful. @Scout survey the workspace"
+    },
+    {
+      "name": "H: the rail is the minimal permanent set",
+      "pass": true,
+      "detail": "chat,sessions,agents,settings"
+    },
+    {
+      "name": "H: rail -> chat shows its section + reports truthfully",
+      "pass": true,
+      "detail": "{\"sectionOn\":true,\"reported\":\"chat\",\"snippet\":\"KAIAlpha semaphore message · 4 turns · alpha semaphore messageKAI// AUTONOMOUS OPERATORDone, happyRUNTIME ACTIVE0"
+    },
+    {
+      "name": "H: rail -> sessions shows its section + reports truthfully",
+      "pass": true,
+      "detail": "{\"sectionOn\":true,\"reported\":\"sessions\",\"snippet\":\"SessionsYour conversations with KAI — real, on Core.Alpha semaphore messageactive · 4 turns · no worker yet ·"
+    },
+    {
+      "name": "H: rail -> agents shows its section + reports truthfully",
+      "pass": true,
+      "detail": "{\"sectionOn\":true,\"reported\":\"agents\",\"snippet\":\"AgentsKAI leads. Agents take focused jobs and work in parallel.New agent1 active0 working now0 turned offScoutr"
+    },
+    {
+      "name": "H: rail -> settings shows its section + reports truthfully",
+      "pass": true,
+      "detail": "{\"sectionOn\":true,\"reported\":\"settings\",\"snippet\":\"SettingsHow KAI behaves.Soulidentity vab81578eView soulEdit soulModeldeepseek-v4.1-flash · https://opencode.a"
+    },
+    {
+      "name": "H: contextual -> home reachable + reports truthfully",
+      "pass": true,
+      "detail": "{\"sectionOn\":true,\"reported\":\"home\"}"
+    },
+    {
+      "name": "H: contextual -> missions reachable + reports truthfully",
+      "pass": true,
+      "detail": "{\"sectionOn\":true,\"reported\":\"missions\"}"
+    },
+    {
+      "name": "H: contextual -> workers reachable + reports truthfully",
+      "pass": true,
+      "detail": "{\"sectionOn\":true,\"reported\":\"workers\"}"
+    },
+    {
+      "name": "H: contextual -> tools reachable + reports truthfully",
+      "pass": true,
+      "detail": "{\"sectionOn\":true,\"reported\":\"tools\"}"
+    },
+    {
+      "name": "H: contextual -> mcp reachable + reports truthfully",
+      "pass": true,
+      "detail": "{\"sectionOn\":true,\"reported\":\"mcp\"}"
+    },
+    {
+      "name": "H: contextual -> activity reachable + reports truthfully",
+      "pass": true,
+      "detail": "{\"sectionOn\":true,\"reported\":\"activity\"}"
+    },
+    {
+      "name": "H: contextual -> memory reachable + reports truthfully",
+      "pass": true,
+      "detail": "{\"sectionOn\":true,\"reported\":\"memory\"}"
+    },
+    {
+      "name": "H: contextual -> skills reachable + reports truthfully",
+      "pass": true,
+      "detail": "{\"sectionOn\":true,\"reported\":\"skills\"}"
+    },
+    {
+      "name": "H: #/memory deep link lands on memory",
+      "pass": true,
+      "detail": "{\"memoryOn\":true,\"reported\":\"memory\"}"
+    },
+    {
+      "name": "I: /models lists the live registry",
+      "pass": true,
+      "detail": "tive)\n- `repro-model`\n\n## ✓ Hermes Agent (worker)\n\n- `hermes-agent`\n\n## ✗ OpenCode (worker — unreachable)\n\n- models: none listed — worker offline — no catalogue"
+    },
+    {
+      "name": "I: /providers lists live provider state",
+      "pass": true,
+      "detail": "onfigured\n  models: worker offline — no catalogue\n\nSelect KAI's model with `/models use <model>`; worker models are not selectable (workers route by worker id)."
+    },
+    {
+      "name": "I: Settings shows the Model + Providers areas",
+      "pass": true,
+      "detail": "{\"model\":true,\"providers\":true}"
+    },
+    {
+      "name": "I: 'continue' with no open task is a normal turn (no corruption)",
+      "pass": true,
+      "detail": "logue\n\nSelect KAI's model with `/models use <model>`; worker models are not selectable (workers route by worker id).\nbrowser repro answer: the lighthouse stands"
+    },
+    {
+      "name": "J: work item created via the loop",
+      "pass": true,
+      "detail": "status=201"
+    },
+    {
+      "name": "J: work item completes verified",
+      "pass": true,
+      "detail": "state=COMPLETED"
+    },
+    {
+      "name": "J: Bench shows the worker with measured history",
+      "pass": true,
+      "detail": "{\"bench\":true,\"worker\":true}"
+    },
+    {
+      "name": "J: work-item inspector opens with the objective",
+      "pass": true,
+      "detail": "clicked modal=true text=true"
+    },
+    {
+      "name": "J: Settings shows the Autonomy section",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "J: activity log recorded the run",
+      "pass": true,
+      "detail": "Done | Verified | Reviewer checking | browser-worker working | Planned: Browser J: survey the workspace and report findings"
+    },
+    {
+      "name": "J: Activity route renders",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "J: mission inspector opens with objective + linked work",
+      "pass": true,
+      "detail": "clicked modal=true"
+    },
+    {
+      "name": "K: KAI operator identity header",
+      "pass": true,
+      "detail": "{\"role\":\"// AUTONOMOUS OPERATOR\",\"strip\":true,\"pills\":\"RUNTIME ACTIVE0 APPROVALS\",\"chips\":[\"@\",\"/work\",\"/status\",\"/bench\",\"/abort\"],\"char\":t"
+    },
+    {
+      "name": "K: live activity strip present",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "K: state pills report runtime",
+      "pass": true,
+      "detail": "RUNTIME ACTIVE0 APPROVALS"
+    },
+    {
+      "name": "K: console chips present",
+      "pass": true,
+      "detail": "@,/work,/status,/bench,/abort"
+    }
+  ],
+  "verdict": "PASS"
+}

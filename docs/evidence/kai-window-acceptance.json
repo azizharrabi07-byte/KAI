@@ -1,0 +1,357 @@
+{
+  "harness": "kai-window-acceptance",
+  "at": "2026-10-05T14:54:59.758Z",
+  "steps": [
+    "launched C:/Users/DELL/Desktop/kai/app/target/release/kai.exe pid=24004",
+    "CDP debug port answered",
+    "Core /identity: UNREACHABLE",
+    "windows at launch: tray_icon_app 1440 x 788 visible=false | KAI 1429 x 946 visible=false | KAI 1034 x 459 visible=true | Settings - KAI 634 x 792 visible=false | Tao Thread Event Target 16 x 16 visible=true | com.aziz.kai-siw 16 x 16 visible=true",
+    "page settings http://tauri.localhost/settings.html outer=432x524 inner=431x524 dpr=1.435416579246521",
+    "page island http://tauri.localhost/ outer=722x320 inner=721x320 dpr=1.435416579246521",
+    "page main http://tauri.localhost/shell.html outer=985x631 inner=985x631 dpr=1.435416579246521",
+    "invoked open_main_window in the island webview → \"ok\"",
+    "windows after Open KAI: KAI 1866 x 1051 visible=true | tray_icon_app 1440 x 788 visible=false | Settings - KAI 634 x 792 visible=false | KAI 345 x 9 visible=true | Tao Thread Event Target 16 x 16 visible=true | com.aziz.kai-siw 16 x 16 visible=true",
+    "page settings outer=432x524 inner=431x524",
+    "page island outer=242x7 inner=241x8",
+    "page main outer=1290x705 inner=1289x704",
+    "ACCEPTANCE: main=1290x705 (inner 1289x704, dpr 1.435416579246521) island=242x7 (inner 241x8) mainIsRealWindow=true mainIs345x9=false"
+  ],
+  "launch": {
+    "path": "C:/Users/DELL/Desktop/kai/app/target/release/kai.exe",
+    "pid": 24004,
+    "at": "2026-10-05T14:54:59.760Z"
+  },
+  "windowsAtLaunch": [
+    {
+      "pid": 24004,
+      "hwnd": "0xC04C2",
+      "class": "tray_icon_app",
+      "title": "",
+      "visible": false,
+      "x": 196,
+      "y": 196,
+      "width": 1440,
+      "height": 788,
+      "size": "1440 x 788"
+    },
+    {
+      "pid": 24004,
+      "hwnd": "0x120894",
+      "class": "Tauri Window",
+      "title": "KAI",
+      "visible": false,
+      "x": 245,
+      "y": 71,
+      "width": 1429,
+      "height": 946,
+      "size": "1429 x 946"
+    },
+    {
+      "pid": 24004,
+      "hwnd": "0x1906E0",
+      "class": "Tauri Window",
+      "title": "KAI",
+      "visible": true,
+      "x": 159,
+      "y": 0,
+      "width": 1034,
+      "height": 459,
+      "size": "1034 x 459"
+    },
+    {
+      "pid": 24004,
+      "hwnd": "0x140040",
+      "class": "Tauri Window",
+      "title": "Settings - KAI",
+      "visible": false,
+      "x": 643,
+      "y": 148,
+      "width": 634,
+      "height": 792,
+      "size": "634 x 792"
+    },
+    {
+      "pid": 24004,
+      "hwnd": "0x1E066C",
+      "class": "Tao Thread Event Target",
+      "title": "",
+      "visible": true,
+      "x": 0,
+      "y": 0,
+      "width": 16,
+      "height": 16,
+      "size": "16 x 16"
+    },
+    {
+      "pid": 24004,
+      "hwnd": "0x22081C",
+      "class": "com.aziz.kai-sic",
+      "title": "com.aziz.kai-siw",
+      "visible": true,
+      "x": 0,
+      "y": 0,
+      "width": 16,
+      "height": 16,
+      "size": "16 x 16"
+    }
+  ],
+  "pagesAtLaunch": [
+    {
+      "which": "settings",
+      "url": "http://tauri.localhost/settings.html",
+      "title": "Settings — KAI",
+      "geom": {
+        "outerW": 432,
+        "outerH": 524,
+        "innerW": 431,
+        "innerH": 524,
+        "screenX": 454,
+        "screenY": 126,
+        "dpr": 1.435416579246521,
+        "docTitle": "Settings — KAI",
+        "win": null,
+        "rootKids": -1,
+        "hasShellProbe": false,
+        "route": null,
+        "text": "KAI0.1.1 KAI's appearance Subagent preset KAI KAI-Coder KAI-Research KAI-Browser Body colour (skin) blue black yellow Colour treatment aqua wake sky mint sun rose plan help progress error ultra Outfit"
+      },
+      "screenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/accept-settings.png"
+    },
+    {
+      "which": "island",
+      "url": "http://tauri.localhost/",
+      "title": "KAI",
+      "geom": {
+        "outerW": 722,
+        "outerH": 320,
+        "innerW": 721,
+        "innerH": 320,
+        "screenX": 111,
+        "screenY": 0,
+        "dpr": 1.435416579246521,
+        "docTitle": "KAI",
+        "win": null,
+        "rootKids": 3,
+        "hasShellProbe": false,
+        "route": null,
+        "text": "KAI Core is offline — reconnecting… Open KAI ⠿ – ✕ KAI your agent KAI Core is offline Using: Hermes idle OpenCode idle VS Code idle KAI Core offline My Sessions… Settings… KAI’S SUBAGENTS none No suba"
+      },
+      "screenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/accept-island.png"
+    },
+    {
+      "which": "main",
+      "url": "http://tauri.localhost/shell.html",
+      "title": "KAI",
+      "geom": {
+        "outerW": 985,
+        "outerH": 631,
+        "innerW": 985,
+        "innerH": 631,
+        "screenX": 176,
+        "screenY": 72,
+        "dpr": 1.435416579246521,
+        "docTitle": "KAI",
+        "win": "main",
+        "rootKids": 1,
+        "hasShellProbe": true,
+        "route": "chat",
+        "text": "0 KAI no session yet — your next message starts one Feelings Commands Ctrl K Details 0 Good afternoon. What are we building? 0 agents, 0 tools Ask first Plan Auto What can you do? What are you working"
+      },
+      "screenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/accept-main.png"
+    }
+  ],
+  "openKai": {
+    "invokedIn": "island webview",
+    "result": "ok"
+  },
+  "windowsAfterOpen": [
+    {
+      "pid": 24004,
+      "hwnd": "0x120894",
+      "class": "Tauri Window",
+      "title": "KAI",
+      "visible": true,
+      "x": 35,
+      "y": 35,
+      "width": 1866,
+      "height": 1051,
+      "size": "1866 x 1051"
+    },
+    {
+      "pid": 24004,
+      "hwnd": "0xC04C2",
+      "class": "tray_icon_app",
+      "title": "",
+      "visible": false,
+      "x": 196,
+      "y": 196,
+      "width": 1440,
+      "height": 788,
+      "size": "1440 x 788"
+    },
+    {
+      "pid": 24004,
+      "hwnd": "0x140040",
+      "class": "Tauri Window",
+      "title": "Settings - KAI",
+      "visible": false,
+      "x": 643,
+      "y": 148,
+      "width": 634,
+      "height": 792,
+      "size": "634 x 792"
+    },
+    {
+      "pid": 24004,
+      "hwnd": "0x1906E0",
+      "class": "Tauri Window",
+      "title": "KAI",
+      "visible": true,
+      "x": 159,
+      "y": 0,
+      "width": 345,
+      "height": 9,
+      "size": "345 x 9"
+    },
+    {
+      "pid": 24004,
+      "hwnd": "0x1E066C",
+      "class": "Tao Thread Event Target",
+      "title": "",
+      "visible": true,
+      "x": 0,
+      "y": 0,
+      "width": 16,
+      "height": 16,
+      "size": "16 x 16"
+    },
+    {
+      "pid": 24004,
+      "hwnd": "0x22081C",
+      "class": "com.aziz.kai-sic",
+      "title": "com.aziz.kai-siw",
+      "visible": true,
+      "x": 0,
+      "y": 0,
+      "width": 16,
+      "height": 16,
+      "size": "16 x 16"
+    }
+  ],
+  "pagesAfterOpen": [
+    {
+      "which": "settings",
+      "url": "http://tauri.localhost/settings.html",
+      "title": "Settings — KAI",
+      "geom": {
+        "outerW": 432,
+        "outerH": 524,
+        "innerW": 431,
+        "innerH": 524,
+        "screenX": 454,
+        "screenY": 126,
+        "dpr": 1.435416579246521,
+        "docTitle": "Settings — KAI",
+        "win": null,
+        "rootKids": -1,
+        "hasShellProbe": false,
+        "route": null,
+        "text": "KAI0.1.1 KAI's appearance Subagent preset KAI KAI-Coder KAI-Research KAI-Browser Body colour (skin) blue black yellow Colour treatment aqua wake sky mint sun rose plan help progress error ultra Outfit"
+      },
+      "screenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/accept-settings.png"
+    },
+    {
+      "which": "island",
+      "url": "http://tauri.localhost/",
+      "title": "KAI",
+      "geom": {
+        "outerW": 242,
+        "outerH": 7,
+        "innerW": 241,
+        "innerH": 8,
+        "screenX": 111,
+        "screenY": 0,
+        "dpr": 1.435416579246521,
+        "docTitle": "KAI",
+        "win": null,
+        "rootKids": 3,
+        "hasShellProbe": false,
+        "route": null,
+        "text": "KAI Core is offline — reconnecting… Open KAI ⠿ – ✕ KAI your agent KAI Core is offline Using: Hermes idle OpenCode idle VS Code idle KAI Core offline My Sessions… Settings… KAI’S SUBAGENTS none No suba"
+      },
+      "screenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/accept-island.png"
+    },
+    {
+      "which": "main",
+      "url": "http://tauri.localhost/shell.html",
+      "title": "KAI",
+      "geom": {
+        "outerW": 1290,
+        "outerH": 705,
+        "innerW": 1289,
+        "innerH": 704,
+        "screenX": 30,
+        "screenY": 47,
+        "dpr": 1.435416579246521,
+        "docTitle": "KAI",
+        "win": "main",
+        "rootKids": 1,
+        "hasShellProbe": true,
+        "route": "chat",
+        "text": "0 KAI no session yet — your next message starts one Feelings Commands Ctrl K Details 0 Good afternoon. What are we building? 0 agents, 0 tools Ask first Plan Auto What can you do? What are you working"
+      },
+      "screenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/accept-main.png"
+    }
+  ],
+  "acceptance": {
+    "question": "is the main window a real, large application window, and is 345x9 only the island's collapsed strip?",
+    "mainWindow": "1290x705 (inner 1289x704, dpr 1.435416579246521)",
+    "islandWindow": "242x7 (inner 241x8)",
+    "mainIsRealWindow": true,
+    "mainIs345x9": false,
+    "osWindows": [
+      {
+        "title": "KAI",
+        "class": "Tauri Window",
+        "size": "1866 x 1051",
+        "visible": true,
+        "at": "35,35"
+      },
+      {
+        "title": "",
+        "class": "tray_icon_app",
+        "size": "1440 x 788",
+        "visible": false,
+        "at": "196,196"
+      },
+      {
+        "title": "Settings - KAI",
+        "class": "Tauri Window",
+        "size": "634 x 792",
+        "visible": false,
+        "at": "643,148"
+      },
+      {
+        "title": "KAI",
+        "class": "Tauri Window",
+        "size": "345 x 9",
+        "visible": true,
+        "at": "159,0"
+      },
+      {
+        "title": "",
+        "class": "Tao Thread Event Target",
+        "size": "16 x 16",
+        "visible": true,
+        "at": "0,0"
+      },
+      {
+        "title": "com.aziz.kai-siw",
+        "class": "com.aziz.kai-sic",
+        "size": "16 x 16",
+        "visible": true,
+        "at": "0,0"
+      }
+    ]
+  }
+}

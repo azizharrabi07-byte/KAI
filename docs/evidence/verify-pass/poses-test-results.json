@@ -1,0 +1,121 @@
+{
+  "generatedAt": "2026-10-03T17:10:54.879Z",
+  "core": {
+    "service": "kai-core",
+    "coreVersion": "0.1.0",
+    "buildId": "2de85812ffd99f1f",
+    "gitCommit": "9c1d4f8af04536b822bca1a548c67406bdb071a0",
+    "protocolVersion": 1,
+    "pid": 44684,
+    "startedAt": "2026-10-03T17:10:10.876Z"
+  },
+  "islandUrl": "http://tauri.localhost/",
+  "states": {
+    "THINKING": {
+      "observed": true,
+      "glow": "rgb(167, 139, 250)",
+      "opacity": "0.65",
+      "label": "KAI is thinking…",
+      "expectedGlow": "rgb(167, 139, 250)",
+      "expectedLabel": "KAI is thinking…",
+      "labelMatches": true,
+      "pose": "thinking",
+      "orbHash": "e45b05b3",
+      "orbPng": "pose-orb-thinking.png",
+      "islandPng": "pose-island-thinking.png"
+    },
+    "WORKING": {
+      "observed": true,
+      "glow": "rgb(59, 158, 255)",
+      "opacity": "0.65",
+      "label": "KAI is working…",
+      "expectedGlow": "rgb(59, 158, 255)",
+      "expectedLabel": "KAI is working…",
+      "labelMatches": true,
+      "pose": "working",
+      "orbHash": "a8a85258",
+      "orbPng": "pose-orb-working.png",
+      "islandPng": "pose-island-working.png"
+    },
+    "USING_TOOL": {
+      "observed": true,
+      "glow": "rgb(99, 102, 241)",
+      "opacity": "0.65",
+      "label": "KAI is using a tool…",
+      "expectedGlow": "rgb(99, 102, 241)",
+      "expectedLabel": "KAI is using a tool…",
+      "labelMatches": true,
+      "pose": "scan",
+      "orbHash": "7686b3eb",
+      "orbPng": "pose-orb-using_tool.png",
+      "islandPng": "pose-island-using_tool.png"
+    },
+    "WAITING_APPROVAL": {
+      "observed": true,
+      "glow": "rgb(245, 165, 36)",
+      "opacity": "0.65",
+      "label": "KAI needs your approval",
+      "expectedGlow": "rgb(245, 165, 36)",
+      "expectedLabel": "KAI needs your approval",
+      "labelMatches": true,
+      "pose": "needsuser",
+      "orbHash": "2bedd724",
+      "orbPng": "pose-orb-waiting_approval.png",
+      "islandPng": "pose-island-waiting_approval.png"
+    },
+    "SUCCESS": {
+      "observed": true,
+      "glow": "rgb(52, 211, 153)",
+      "opacity": "0.65",
+      "label": "KAI finished",
+      "expectedGlow": "rgb(52, 211, 153)",
+      "expectedLabel": "KAI finished",
+      "labelMatches": true,
+      "pose": "success",
+      "orbHash": "cb6a9e0d",
+      "orbPng": "pose-orb-success.png",
+      "islandPng": "pose-island-success.png"
+    },
+    "ERROR": {
+      "observed": true,
+      "glow": "rgb(244, 80, 94)",
+      "opacity": "0.65",
+      "label": "KAI hit an error",
+      "expectedGlow": "rgb(244, 80, 94)",
+      "expectedLabel": "KAI hit an error",
+      "labelMatches": true,
+      "pose": "error",
+      "orbHash": "d903c7f6",
+      "orbPng": "pose-orb-error.png",
+      "islandPng": "pose-island-error.png"
+    }
+  },
+  "distinctness": {
+    "observedCount": 6,
+    "distinctGlows": 6,
+    "distinctLabels": 6,
+    "allDistinct": true
+  },
+  "repeatedPose": {
+    "state": "USING_TOOL",
+    "entry1": {
+      "t": 763107,
+      "hash": "7686b3eb",
+      "glow": "rgb(99, 102, 241)",
+      "label": "KAI is using a tool…"
+    },
+    "entry2": {
+      "t": 767044,
+      "hash": "3a610ea7",
+      "glow": "rgb(99, 102, 241)",
+      "label": "KAI is using a tool…"
+    },
+    "identical": false,
+    "note": "two separate entries into USING_TOOL (SUCCESS/ERROR in between) must not produce the same canvas hash"
+  },
+  "animation": {
+    "distinctHashesInLast40Samples": 40,
+    "sampleEveryMs": 200,
+    "moving": true
+  }
+}

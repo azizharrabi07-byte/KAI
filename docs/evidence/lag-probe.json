@@ -1,0 +1,306 @@
+{
+  "at": "2026-10-07T11:25:07.595Z",
+  "metrics": {
+    "composer_keystroke_to_paint_ms": {
+      "median": 15.6,
+      "samples": [
+        15.6,
+        15.4,
+        20.2,
+        13.7,
+        16.2
+      ],
+      "unit": "ms",
+      "n": 5
+    },
+    "palette_open_ms": {
+      "median": 16,
+      "samples": [
+        14.9,
+        16,
+        16.1,
+        15.5,
+        16.9
+      ],
+      "unit": "ms",
+      "n": 5
+    },
+    "palette_row_count": {
+      "median": 28,
+      "samples": [
+        28
+      ],
+      "unit": "rows",
+      "n": 1
+    },
+    "slash_filter_per_keystroke_ms": {
+      "median": 16.8,
+      "samples": [
+        17.1,
+        16.8,
+        16.6,
+        12.9,
+        17.1,
+        16.8,
+        16.4,
+        17.8,
+        16.1,
+        15.9,
+        29.6,
+        17.2,
+        15.5,
+        19.1,
+        16.9
+      ],
+      "unit": "ms",
+      "n": 15
+    },
+    "slash_filter_k1_ms": {
+      "median": 16.8,
+      "samples": [
+        17.1,
+        16.8,
+        16.6,
+        12.9,
+        17.1
+      ],
+      "unit": "ms",
+      "n": 5
+    },
+    "slash_filter_k2_ms": {
+      "median": 16.4,
+      "samples": [
+        16.8,
+        16.4,
+        17.8,
+        16.1,
+        15.9
+      ],
+      "unit": "ms",
+      "n": 5
+    },
+    "slash_filter_k3_ms": {
+      "median": 17.2,
+      "samples": [
+        29.6,
+        17.2,
+        15.5,
+        19.1,
+        16.9
+      ],
+      "unit": "ms",
+      "n": 5
+    },
+    "slash_row_count": {
+      "median": 1,
+      "samples": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "unit": "rows",
+      "n": 5
+    },
+    "mention_filter_per_keystroke_ms": {
+      "median": 16.8,
+      "samples": [
+        17.1,
+        17.2,
+        16.2,
+        16.9,
+        16.7,
+        17.4,
+        11.4,
+        18.3,
+        15,
+        16.7,
+        16.9,
+        18.5,
+        11.4,
+        16.8,
+        16.6
+      ],
+      "unit": "ms",
+      "n": 15
+    },
+    "mention_labels": {
+      "median": 1,
+      "samples": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "unit": "rows",
+      "n": 5
+    },
+    "stream_first_delta_ms": {
+      "median": 733.5,
+      "samples": [
+        756.7,
+        739.6,
+        715.3,
+        733.5,
+        718.4
+      ],
+      "unit": "ms",
+      "n": 5
+    },
+    "short_turn_full_ms": {
+      "median": 735.1,
+      "samples": [
+        759.4,
+        741.3,
+        718.4,
+        735.1,
+        719.8
+      ],
+      "unit": "ms",
+      "n": 5
+    },
+    "tool_card_ms": {
+      "median": 1414.9,
+      "samples": [
+        1414.9
+      ],
+      "unit": "ms",
+      "n": 1
+    },
+    "tool_card_count": {
+      "median": 1,
+      "samples": [
+        1,
+        1
+      ],
+      "unit": "cards",
+      "n": 2
+    },
+    "session_tab_open_ms": {
+      "median": 41.8,
+      "samples": [
+        47.1,
+        41.8,
+        38.5,
+        46.9,
+        41
+      ],
+      "unit": "ms",
+      "n": 5
+    },
+    "session_back_to_chat_ms": {
+      "median": 43.3,
+      "samples": [
+        43.3,
+        103.7,
+        29.6,
+        33,
+        45.7
+      ],
+      "unit": "ms",
+      "n": 5
+    },
+    "session_roundtrip_ms": {
+      "median": 86.7,
+      "samples": [
+        90.4,
+        145.5,
+        68.1,
+        79.9,
+        86.7
+      ],
+      "unit": "ms",
+      "n": 5
+    },
+    "rail_route_each_ms": {
+      "median": null,
+      "samples": [],
+      "unit": "ms",
+      "n": 0,
+      "per_route": {
+        "home": 50.1,
+        "chat": 54.1,
+        "sessions": 34,
+        "missions": 35.9,
+        "agents": 39,
+        "workers": 35.1,
+        "tools": 59.3,
+        "mcp": 34.2,
+        "activity": 35.8,
+        "memory": 37.2,
+        "skills": 47.6,
+        "settings": 39.6
+      }
+    },
+    "rail_route_switch_ms": {
+      "median": 39.3,
+      "samples": [
+        30.4,
+        36.3,
+        37.8,
+        38.4,
+        38.5,
+        43.7,
+        43.9,
+        39.3,
+        43.6,
+        42.2
+      ],
+      "unit": "ms",
+      "n": 10
+    }
+  },
+  "budgets": {
+    "input_ms": 50,
+    "palette_ms": 200,
+    "autocomplete_ms": 100,
+    "first_delta_ms": 3000,
+    "session_switch_ms": 1000,
+    "route_switch_ms": 1000
+  },
+  "verdict": "PASS",
+  "notes": [
+    "@ picker labels (last round): Scout",
+    "no /providers or /tasks traffic during typing (0 typed-window requests; on-demand only — no regression)"
+  ],
+  "request_watch": {
+    "typing_request_count": 0,
+    "typing_requests": [],
+    "providers_or_tasks_during_typing": [],
+    "all_routes_seen": [
+      "GET /tools",
+      "GET /mcp",
+      "GET /maintenance/status",
+      "GET /actions?limit=50",
+      "GET /state",
+      "GET /subagents",
+      "GET /skills",
+      "GET /commands",
+      "GET /sessions/active",
+      "GET /approvals?status=PENDING",
+      "GET /sessions?limit=20",
+      "GET /missions?limit=50",
+      "GET /agents",
+      "GET /memory?limit=100",
+      "GET /soul",
+      "GET /settings",
+      "GET /providers",
+      "GET /core/events",
+      "GET /subagents/runs",
+      "GET /skills/staging",
+      "GET /models",
+      "POST /subagents",
+      "POST /chat/stream",
+      "POST /sessions",
+      "POST /chat",
+      "GET /sessions?limit=100&includeArchived=true"
+    ]
+  },
+  "viewport": {
+    "w": 1280,
+    "h": 720
+  },
+  "resolution_note": "default Playwright viewport (same as browser-repro.mjs: no viewport override)"
+}

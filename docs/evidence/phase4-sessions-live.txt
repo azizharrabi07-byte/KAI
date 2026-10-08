@@ -1,0 +1,12 @@
+island target: http://tauri.localhost/ (3B5B90C08D1078D00283EB54D38A37AA)
+sessions view reached: true
+sessions view DOM: "SessionsNewph4 renamedUseRenameArchiveConversation 8activeRenameArchiveConversation 5UseRenameArchiveConversation 4UseRenameArchive+4 more8 session(s) · active: Conversation 8"
+core sessions before: [["sess_musd1nhv_igaj","ph4 renamed","ACTIVE"],["sess_musd1q2j_gz4h","Conversation 8","ACTIVE"],["sess_musc3788_9vmt","Conversation 5","ACTIVE"],["sess_musc33ww_82m9","Conversation 4","ACTIVE"],["sess_musc70jj_ysd","Conversation 6","ACTIVE"],["sess_musc2s7i_bst4","ph4 renamed","ACTIVE"],["sess_mus8lsve_f8ev","ph4 renamed","ACTIVE"],["sess_mus8kjtc_8hzm","Conversation 1","ACTIVE"]]
+clicked New: true
+sessions view DOM after New: "SessionsNewConversation 9UseRenameArchiveph4 renamedUseRenameArchiveConversation 8activeRenameArchiveConversation 5UseRenameArchive+5 more9 session(s) · active: Conversation 8"
+core sessions after New: [["sess_musd4gyl_la6r","Conversation 9","ACTIVE"],["sess_musd1nhv_igaj","ph4 renamed","ACTIVE"],["sess_musd1q2j_gz4h","Conversation 8","ACTIVE"],["sess_musc3788_9vmt","Conversation 5","ACTIVE"],["sess_musc33ww_82m9","Conversation 4","ACTIVE"],["sess_musc70jj_ysd","Conversation 6","ACTIVE"],["sess_musc2s7i_bst4","ph4 renamed","ACTIVE"],["sess_mus8lsve_f8ev","ph4 renamed","ACTIVE"],["sess_mus8kjtc_8hzm","Conversation 1","ACTIVE"]]
+clicked Use: true -> core active: sess_musd4gyl_la6r (Conversation 9)
+sessions view DOM after Use: "SessionsNewConversation 9activeRenameArchiveph4 renamedUseRenameArchiveConversation 8UseRenameArchiveConversation 5UseRenameArchive+5 more9 session(s) · active: Conversation 9"
+clicked Archive: true -> archived sessions in Core: [["sess_musd4gyl_la6r","Conversation 9"]]
+sessions view DOM after Archive: "SessionsNewConversation 9Restoreph4 renamedUseRenameArchiveConversation 8UseRenameArchiveConversation 5UseRenameArchive+5 more9 session(s) · active: none"
+done

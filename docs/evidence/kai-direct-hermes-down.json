@@ -1,0 +1,234 @@
+{
+  "at": "2026-10-04T19:32:50.759Z",
+  "note": "Hermes (127.0.0.1:8642) stopped",
+  "reads": [
+    {
+      "path": "/identity",
+      "status": 200,
+      "summary": {
+        "service": "kai-core",
+        "coreVersion": "0.1.0",
+        "buildId": "b52353fd7400a6c1",
+        "gitCommit": "8fea1bf34901a31b28b935adcdf23704f4707cb1",
+        "protocolVersion": 1,
+        "pid": 9044,
+        "startedAt": "2026-10-04T19:18:28.552Z",
+        "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json"
+      }
+    },
+    {
+      "path": "/state",
+      "status": 200,
+      "summary": {
+        "ok": true,
+        "startedAt": "2026-10-04T19:18:28.733Z",
+        "uptimeMs": 862118,
+        "database": "object",
+        "agents": "array(2)",
+        "missions": "object",
+        "notifications": "object",
+        "approvals": "object"
+      }
+    },
+    {
+      "path": "/actions",
+      "status": 200,
+      "summary": {
+        "actions": "array(746)"
+      }
+    },
+    {
+      "path": "/employees",
+      "status": 200,
+      "summary": {
+        "employees": "array(6)"
+      }
+    },
+    {
+      "path": "/capabilities",
+      "status": 200,
+      "summary": {
+        "capabilities": "array(7)"
+      }
+    },
+    {
+      "path": "/agents",
+      "status": 200,
+      "summary": {
+        "agents": "array(2)"
+      }
+    },
+    {
+      "path": "/missions",
+      "status": 200,
+      "summary": {
+        "missions": "array(121)"
+      }
+    },
+    {
+      "path": "/memory?scope=subagent",
+      "status": 200,
+      "summary": {
+        "memories": "array(7)"
+      }
+    },
+    {
+      "path": "/memory/search?scope=subagent",
+      "status": 400,
+      "summary": {
+        "error": true,
+        "reason": "the \"subagent\" memory scope needs a scopeId naming a real subagent",
+        "code": "MEMORY_SCOPE_SUBJECT_UNKNOWN"
+      }
+    },
+    {
+      "path": "/skills",
+      "status": 200,
+      "summary": {
+        "skills": "array(2)"
+      }
+    },
+    {
+      "path": "/policy",
+      "status": 200,
+      "summary": {
+        "policy": "object"
+      }
+    },
+    {
+      "path": "/schedules",
+      "status": 200,
+      "summary": {
+        "schedules": "array(11)"
+      }
+    },
+    {
+      "path": "/recovery/status",
+      "status": 200,
+      "summary": {
+        "ledger": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\recovery-ledger.db",
+        "open": "array(0)",
+        "total": 52
+      }
+    },
+    {
+      "path": "/maintenance/status",
+      "status": 200,
+      "summary": {
+        "maintenance": "object"
+      }
+    },
+    {
+      "path": "/approvals",
+      "status": 200,
+      "summary": {
+        "approvals": "array(134)"
+      }
+    },
+    {
+      "path": "/notifications",
+      "status": 200,
+      "summary": {
+        "notifications": "array(56)"
+      }
+    },
+    {
+      "path": "/sessions/active",
+      "status": 200,
+      "summary": {
+        "session": "object"
+      }
+    }
+  ],
+  "capabilityMeasure": {
+    "status": 200,
+    "body": {
+      "capability": "object",
+      "status": "object"
+    }
+  },
+  "writePark": {
+    "status": 409,
+    "body": {
+      "error": true,
+      "reason": "tool \"policy.set\" performs a WRITE; writes are allowed only when a policy rule explicitly permits them, so this requires user approval; approval \"apr_muu7x6mx_4\" is pending",
+      "approvalRequired": true,
+      "approvalId": "apr_muu7x6mx_4"
+    }
+  },
+  "approvalId": "apr_muu7x6mx_4",
+  "approvalDecide": {
+    "status": 200,
+    "body": {
+      "approval": {
+        "id": "apr_muu7x6mx_4",
+        "toolId": "policy.set",
+        "action": "Change the live policy rules",
+        "reason": "tool \"policy.set\" performs a WRITE; writes are allowed only when a policy rule explicitly permits them, so this requires user approval",
+        "risk": "WRITE",
+        "createdAt": "2026-10-04T19:32:51.033Z",
+        "status": "APPROVED",
+        "expiresAt": "2026-10-04T19:42:51.033Z",
+        "decidedAt": "2026-10-04T19:32:51.056Z"
+      },
+      "reissued": true,
+      "result": {
+        "applied": 0,
+        "dropped": 0,
+        "reason": "applied 0 caller rule(s); KAI's baseline internal-state rule is always in force",
+        "mode": "normal",
+        "state": {
+          "mode": "normal",
+          "scope": {
+            "kind": "global"
+          },
+          "updatedAt": "2026-10-04T19:18:28.638Z"
+        },
+        "rules": [
+          {
+            "id": "kai-internal-state",
+            "risk": "WRITE",
+            "outcome": "allow",
+            "tools": [
+              "memory.write",
+              "memory.create",
+              "notification.read",
+              "approval.decide",
+              "workforce.register",
+              "workforce.lifecycle",
+              "workforce.subagent",
+              "mission.cancel",
+              "schedule.manage",
+              "scheduler.recover",
+              "learning.propose",
+              "checkpoint.create",
+              "session.manage",
+              "maintenance.run"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "approvalReissue": {
+    "status": 200,
+    "body": {
+      "policy": "object",
+      "applied": 0,
+      "dropped": 0,
+      "reason": "applied 0 caller rule(s); KAI's baseline internal-state rule is always in force"
+    }
+  },
+  "sessionCreate": {
+    "status": 201,
+    "body": {
+      "session": "object"
+    }
+  },
+  "chatAlive": {
+    "status": 200,
+    "agent": "core",
+    "intent": "unknown",
+    "reply": "I don't have a rule for that, and no agent is connected right now, so I can't hand it off."
+  }
+}

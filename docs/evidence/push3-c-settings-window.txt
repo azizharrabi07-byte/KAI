@@ -1,0 +1,106 @@
+kai.exe: 7996 
+
+################ 1. the settings window BEFORE anything asks for it ################
+$ win-styles.ps1 -TitleMatch Settings
+{
+    "value":  [
+                  {
+                      "hwnd":  656978,
+                      "class":  "Tauri Window",
+                      "title":  "Settings - KAI",
+                      "visible":  false,
+                      "enabled":  true,
+                      "style":  "0x04CF0000",
+                      "exstyle":  "0x00040110",
+                      "exflags":  "",
+                      "layered":  "none",
+                      "rect":  "643,148 634x792",
+                      "ws_visible":  false
+                  }
+              ],
+    "Count":  1
+}
+$ node docs/evidence/cdp.mjs eval "document.visibilityState" --target settings
+visible | Settings — KAI | http://tauri.localhost/settings.html
+
+################ 2. the real user path: gear, then Settings… ################
+$ (real mouse: park, wake at the strip, click to expand) - the gear only exists on an expanded island
+{"requested":"400,700","actual":"400,700"}
+{"requested":"959,4","actual":"959,4"}
+{"clicked":"959,30","actual":"959,30"}
+640pxx160px (expanded = 640px x 210px)
+
+$ cdp eval  # where the gear is, in page coordinates
+  629.5319895744324 24.981860637664795 1.435416579246521
+$ win-client.ps1 -TitleMatch KAI -TitleExact -X 629.5319895744324 -Y 24.981860637664795 -Dpr 1.435416579246521 -Action click    # REAL click on the gear
+real click at 1347,36 (page 629.531989574432,24.9818606376648); cursor now 1347,36
+$ cdp eval  # is the in-island settings view the one on screen?
+settings view present, its .view.on = true
+$ cdp eval  # where the 'Settings…' button is
+  628.0297889709473 125.29028749465942 1.435416579246521
+$ win-client.ps1 -TitleMatch KAI -TitleExact -X 628.0297889709473 -Y 125.29028749465942 -Dpr 1.435416579246521 -Action click     # REAL click on Settings…
+real click at 1344,180 (page 628.029788970947,125.290287494659); cursor now 1344,180
+
+################ 3. after the click ################
+$ win-styles.ps1 -TitleMatch Settings
+{
+    "value":  [
+                  {
+                      "hwnd":  656978,
+                      "class":  "Tauri Window",
+                      "title":  "Settings - KAI",
+                      "visible":  true,
+                      "enabled":  true,
+                      "style":  "0x14CF0000",
+                      "exstyle":  "0x00040110",
+                      "exflags":  "",
+                      "layered":  "none",
+                      "rect":  "643,148 634x792",
+                      "ws_visible":  true
+                  }
+              ],
+    "Count":  1
+}
+$ win-input.ps1 -Action rect -ProcessName kai        # the island window
+{"pid":7996,"handle":1771132,"left":787,"top":0,"width":345,"height":9,"dpi":106,"scale":1.1042}
+$ win-styles.ps1 -TitleMatch KAI -TitleExact          # the island window's own style
+{
+    "value":  [
+                  {
+                      "hwnd":  1771132,
+                      "class":  "Tauri Window",
+                      "title":  "KAI",
+                      "visible":  true,
+                      "enabled":  true,
+                      "style":  "0x14C80000",
+                      "exstyle":  "0x00040118",
+                      "exflags":  "WS_EX_TOPMOST",
+                      "layered":  "none",
+                      "rect":  "787,0 345x9",
+                      "ws_visible":  true
+                  }
+              ],
+    "Count":  1
+}
+$ cdp eval  # the island's own state: retracted, so it cannot cover the window
+184pxx2.86e-05px
+$ kai.log
+2026-10-02 10:54:54 settings window shown
+$ powershell -File docs/evidence/screen-capture.ps1 -Out docs/evidence/push3-c-settings-visible.png
+wrote docs/evidence/push3-c-settings-visible.png  (1920x1080 from 0,0)
+
+################ 4. a REAL click on a real control in the settings window ################
+$ cdp eval --target settings  # where the button is
+  104.36321640014648|262.22788524627686|1.435416579246521|Reinstall hooks…
+$ cdp eval --target settings  # the page's text before the click
+KAI0.1.1 | Claude Code | KAI is hooked into your Claude Code sessions. Tool calls, questions and permission requests show up
+$ win-client.ps1 -TitleMatch Settings -X 104.36321640014648 -Y 262.22788524627686 -Dpr 1.435416579246521 -Action click   # REAL click
+real click at 801,557 (page 104.363216400146,262.227885246277); cursor now 801,557
+$ cdp eval --target settings  # the page's text AFTER the click
+KAI0.1.1 | Claude Code | This is exactly what will change in your settings.json. Your own hooks are left untouched. | No change. | Backup → C:\Users\DELL\.claude\settings.json.bak-20261002-105500 | Back up and write | Cancel | Claude | No key yet — the chat needs one. | API key | Save key | Model | Claude Opus 5 | Claude Son
+$ cdp eval --target settings  # does it now show the diff preview it would write?
+diff preview rendered, 1 lines
+
+-- leave the hooks exactly as they were: click Cancel (renderer-level is fine for undo) --
+Cancel clicked
+KAI0.1.1 | Claude Code | KAI is hooked into your Claude Code sessions. Tool calls, questions a

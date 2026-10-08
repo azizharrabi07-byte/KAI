@@ -1,0 +1,97 @@
+{
+  "schema": "kai-capabilities/1",
+  "generatedAt": "2026-10-03T20:18:39Z",
+  "auditor": "read-only capability audit subagent",
+  "repoHead": {
+    "commit": "9ffa57b",
+    "subject": "verify(appearance): live product evidence — skin+outfit apply, persist across restart",
+    "branch": "master"
+  },
+  "treeState": {
+    "note": "Five other agents were editing this repo during the audit. All committed-HEAD facts are labelled; all uncommitted ('in-flight') facts are labelled separately and must not be read as landed.",
+    "workingTreeModified": [
+      "app/src-tauri/src/island.rs",
+      "app/src-tauri/src/lib.rs",
+      "app/src-tauri/src/settings.rs",
+      "app/src-tauri/src/tray.rs",
+      "app/src/character/engine.ts",
+      "app/src/character/orb.ts",
+      "app/src/island/island.ts",
+      "core/src/chat/relay.ts",
+      "core/src/server.ts",
+      "core/tests/session-switch.test.ts"
+    ],
+    "untrackedInFlight": [
+      "app/assets/kai/KAI_ACTION_INVENTORY.md",
+      "core/tests/routing-relay.test.ts",
+      "core/scripts/_probe-subagent.ts"
+    ]
+  },
+  "liveCore": {
+    "endpoint": "http://127.0.0.1:8788",
+    "service": "kai-core",
+    "coreVersion": "0.1.0",
+    "buildId": "f9ec04f5a7576be7",
+    "gitCommit": "9ffa57be3ff90ca3373a431bb722ac15a875e5e1",
+    "protocolVersion": 1,
+    "pid": 24140,
+    "startedAt": "2026-10-03T19:58:45.150Z",
+    "databasePath": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\kai-core.db",
+    "hermes": { "reachable": true, "authorized": true, "endpoint": "http://127.0.0.1:8642" },
+    "opencode": { "reachable": true, "version": "1.18.33", "endpoint": "http://127.0.0.1:4096" }
+  },
+  "measuredCounts": [
+    { "metric": "capabilities", "value": 7, "source": "GET /capabilities", "raw": "system, browser, computer, mcp, filesystem, git, shell" },
+    { "metric": "tools registered", "value": 42, "source": "GET /state → tools.registered", "raw": "{\"tools\":{\"registered\":42}}" },
+    { "metric": "employees", "value": 3, "source": "GET /employees", "raw": "hermes READY, opencode READY, codex UNAVAILABLE" },
+    { "metric": "available workers (agents)", "value": 2, "source": "GET /agents and GET /state", "raw": "hermes idle, opencode idle; codex UNAVAILABLE" },
+    { "metric": "skills installed", "value": 2, "source": "GET /skills + filesystem %LOCALAPPDATA%\\KAI\\core\\skills\\installed", "raw": "nightly-verification-routine-1f865f, ph4-nightly-deploy-912d29" },
+    { "metric": "candidate (staged) skills", "value": 4, "source": "GET /skills/staging", "raw": "4 staged entries" },
+    { "metric": "memory records", "value": 7, "source": "GET /memory", "raw": "7 memories returned (legacy /memory)" },
+    { "metric": "sessions", "value": 33, "source": "GET /sessions", "raw": "33 sessions" },
+    { "metric": "subagents", "value": 2, "source": "filesystem %LOCALAPPDATA%\\KAI\\core\\kai-subagents.json", "raw": "alice, bob" },
+    { "metric": "schedules", "value": 11, "source": "GET /schedules and GET /state", "raw": "total 11, enabled 0" },
+    { "metric": "checkpoints", "value": 12, "source": "GET /checkpoints", "raw": "12 checkpoints" },
+    { "metric": "approvals (total)", "value": 116, "source": "GET /approvals", "raw": "116 approval records" },
+    { "metric": "missions (total)", "value": 107, "source": "GET /missions", "raw": "107 missions, active 0, unfinished 0" },
+    { "metric": "notifications", "value": 49, "source": "GET /notifications", "raw": "49 total, 17 unread" },
+    { "metric": "recovery ledger records", "value": 42, "source": "GET /recovery/status", "raw": "{\"open\":[],\"total\":42}" },
+    { "metric": "MCP servers configured in product", "value": 0, "source": "GET /capabilities/mcp", "raw": "status UNAVAILABLE: 'no MCP server is configured or connected'" },
+    { "metric": "plugins", "value": 0, "source": "grep across core/src and app/src", "raw": "no KAI plugin registry, loader, route, or UI exists" },
+    { "metric": "character skins", "value": 3, "source": "app/src/character/orb.ts SKN via variant.ts SKINS", "raw": "blue, black, yellow" },
+    { "metric": "character accessories (outfits)", "value": 8, "source": "app/src/character/variant.ts ACCESSORY_SET", "raw": "none, hair, cap, bat, phones, cat, crown, halo" },
+    { "metric": "character colour themes", "value": 11, "source": "app/src/character/orb.ts THM via variant.ts THEMES", "raw": "aqua, wake, sky, mint, sun, rose, plan, help, progress, error, ultra" },
+    { "metric": "character named poses", "value": 34, "source": "app/assets/kai/KAI_ACTION_INVENTORY.md (NM table)", "raw": "34 pose buttons" },
+    { "metric": "character eye expressions", "value": 23, "source": "app/assets/kai/KAI_ACTION_INVENTORY.md (EY table)", "raw": "23 named eye expressions" },
+    { "metric": "character pose-z gallery faces", "value": 30, "source": "app/assets/kai/KAI_ACTION_INVENTORY.md (PZ/KEEP)", "raw": "30 kept faces" },
+    { "metric": "runtime character states", "value": 12, "source": "app/src/core/runtime-state.ts KaiRuntimeState", "raw": "IDLE, LISTENING, THINKING, PLANNING, WORKING, USING_TOOL, DELEGATING, WAITING, WAITING_APPROVAL, SUCCESS, ERROR, OFFLINE" }
+  ],
+  "capabilityHealthProbedAtHead": [
+    { "id": "system", "probeAvailability": "AVAILABLE", "detail": "no transport connected", "method": "GET /capabilities/system + POST /capabilities/system/test" },
+    { "id": "browser", "probeAvailability": "AVAILABLE", "detail": "CDP transport connects (Edge/Chrome found); declared snapshot is UNAVAILABLE until probed", "method": "GET /capabilities/browser" },
+    { "id": "computer", "probeAvailability": "AVAILABLE", "detail": "cua-driver connected", "method": "GET /capabilities/computer" },
+    { "id": "mcp", "probeAvailability": "UNAVAILABLE", "detail": "no MCP server is configured or connected", "method": "GET /capabilities/mcp" },
+    { "id": "filesystem", "probeAvailability": "AVAILABLE", "detail": "node fs is available; filesystem.read/list are READ, filesystem.write is WRITE", "method": "GET /capabilities/filesystem" },
+    { "id": "git", "probeAvailability": "AVAILABLE", "detail": "git version 2.53.0.windows.3", "method": "GET /capabilities/git + POST /capabilities/git/test (real repo status returned)" },
+    { "id": "shell", "probeAvailability": "AVAILABLE", "detail": "program execution works via node.exe", "method": "GET /capabilities/shell" }
+  ],
+  "liveChatIntentsExercised": [
+    { "q": "who are you?", "intent": "identity", "fromState": true, "reply": "I am KAI. Hermes and OpenCode are workers I can use; I'm still KAI when they are unavailable." },
+    { "q": "are you hermes?", "intent": "identity", "fromState": true, "reply": "No — Hermes is a worker I can use, not what I am. I am KAI." },
+    { "q": "status", "intent": "status.summary", "fromState": true, "reply": "KAI status: 2 agent(s) — hermes (idle), opencode (idle); 0 active mission(s); 0 approval(s) pending." },
+    { "q": "what missions are running?", "intent": "mission.list", "fromState": true, "reply": "No missions are running right now." }
+  ],
+  "externalDependencies": [
+    { "name": "cua-driver", "path": "C:\\Users\\DELL\\AppData\\Local\\Programs\\Cua\\cua-driver\\bin\\cua-driver.exe", "version": "0.28.2", "state": "present", "transport": "MCP stdio + named pipe \\\\.\\pipe\\cua-driver" },
+    { "name": "Edge", "path": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe", "state": "present" },
+    { "name": "Chrome", "path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", "state": "present" },
+    { "name": "git", "version": "2.53.0.windows.3", "state": "on PATH" },
+    { "name": "codex CLI", "state": "absent", "blocker": "codex registered as UNAVAILABLE: 'the codex CLI is not installed on this machine'" }
+  ],
+  "identityFiles": {
+    "KAI_HOME": "%LOCALAPPDATA%\\KAI (env override KAI_HOME)",
+    "SOUL.md": { "path": "%LOCALAPPDATA%\\KAI\\SOUL.md", "sizeBytes": 2790, "mtime": "2026-10-03T21:05 +0100" },
+    "USER.md": { "path": "%LOCALAPPDATA%\\KAI\\USER.md", "sizeBytes": 328, "mtime": "2026-10-02T21:43 +0100" },
+    "MEMORY.md": { "path": "%LOCALAPPDATA%\\KAI\\MEMORY.md", "sizeBytes": 212, "mtime": "2026-10-02T21:43 +0100" }
+  }
+}

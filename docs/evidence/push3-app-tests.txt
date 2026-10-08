@@ -1,0 +1,72 @@
+
+> kai-app@0.1.1 test
+> node --test "tests/*.test.ts"
+
+✔ parseFrame: a comment line is recognised as a keep-alive (3.2061ms)
+✔ parseFrame: a single data line (0.3212ms)
+✔ parseFrame: multi-line data is joined with newlines (0.5012ms)
+✔ parseFrame: CRLF is tolerated (data, id, comment) (0.2904ms)
+✔ parseFrame: unknown fields are ignored, a bare field is empty (0.3667ms)
+✔ parseEvent: a good JSON object passes through (0.5017ms)
+✔ parseEvent: malformed JSON returns null instead of throwing (0.304ms)
+✔ parseEvent: non-object JSON is invalid consistently (0.2109ms)
+✔ ready frame is proof of life, not a business event: ready + 2 events => 2 events (8.68ms)
+✔ state sequence for a successful connect is CONNECTING then ONLINE (1.254ms)
+✔ onState fires on real transitions only, never twice with the same value (0.9317ms)
+[core-events] dropped malformed frame
+[core-events] dropped malformed frame
+[core-events] dropped malformed frame
+✔ malformed frame never reaches onEvent and does not throw (1.4589ms)
+✔ a rejected attempt stays CONNECTING with a retry at the FIRST backoff value (1.0564ms)
+✔ consecutive failures walk the schedule then repeat the last value (0.9989ms)
+✔ a success after failures resets the schedule to the first delay (0.6343ms)
+✔ disconnect aborts the in-flight request and prevents any further retry (0.5625ms)
+✔ disconnect aborts the live signal and a late frame cannot flip state back to ONLINE (0.6769ms)
+✔ reconnect cannot leave two live connections (2.1039ms)
+✔ a fresh slice knows nothing and says so (4.7682ms)
+✔ an agent event updates the agent row the island shows (2.2341ms)
+✔ a disconnect marks the agent offline and an error keeps the reason (0.39ms)
+✔ mission lifecycle updates state, and a failed mission keeps its reason (0.5821ms)
+✔ counts come from the mirror, not from a guess (0.3664ms)
+✔ the same notification is never reported twice (an SSE reconnect must not duplicate it) (0.1935ms)
+✔ notification.read flips the flag and clears it from the unread count (0.1779ms)
+✔ an approval request appears pending and is settled by its decision (0.2125ms)
+✔ core going away flips the connection to OFFLINE with a reason; a snapshot restores it (0.3654ms)
+✔ the event list is bounded — a long-running Core must not grow the island (1.1035ms)
+✔ hostile payloads cannot crash the reducer (1.026ms)
+✔ event text is human-readable, and names the agent or mission when it can (0.2257ms)
+✔ a healthy /state parses into the typed summary (34.696ms)
+✔ a refused connection is CORE_OFFLINE (0.3959ms)
+✔ a 401 is AUTH_REQUIRED (0.4081ms)
+✔ a 500 with {error,reason} is REQUEST_FAILED and carries the reason (0.5394ms)
+✔ an AbortError from fetch is TIMEOUT (0.2948ms)
+✔ the timeout really aborts the request and clears its timer (27.3766ms)
+✔ a 200 with an HTML body is INVALID_RESPONSE (0.6081ms)
+✔ truncated JSON is INVALID_RESPONSE (0.4249ms)
+✔ /agents maps the array (0.9806ms)
+✔ chat handles the Core answer shape (0.5207ms)
+✔ chat handles the pre-existing agent shape (0.3301ms)
+✔ a missing field in an otherwise valid response does not throw (0.8038ms)
+✔ a record missing a required field is dropped, not invented (0.358ms)
+✔ no method ever rejects, even against a synchronously throwing fetch (1.467ms)
+✔ the request URL is built from a custom baseUrl (1.1733ms)
+✔ list query params are assembled from the options (0.2439ms)
+✔ a 404 on an unknown agent is REQUEST_FAILED with the route reason (0.1949ms)
+✔ the live Hermes sample renders as an age, not as 20707d (2.0062ms)
+✔ very recent: seconds and milliseconds agree (0.2549ms)
+✔ one minute ago (0.1814ms)
+✔ one hour ago (0.2166ms)
+✔ one day ago (0.1888ms)
+✔ ISO strings still work (GitHub's shape) (1.5357ms)
+✔ a stringified seconds value is not sent to the Date parser (0.4338ms)
+✔ a future timestamp never renders a negative age (0.184ms)
+✔ unusable input renders nothing rather than nonsense (1.8172ms)
+✔ milliseconds stay milliseconds (0.3606ms)
+ℹ tests 57
+ℹ suites 0
+ℹ pass 57
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 245.1448
