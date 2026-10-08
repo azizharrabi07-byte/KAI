@@ -1,0 +1,37 @@
+KAI PHASE 2 — LIVE PRODUCT ACCEPTANCE (in progress)
+==================================================
+Run 2026-10-02 against the Core the REAL kai.exe spawned over HTTP.
+Core identity checked first: buildId=8325353e1d63dc33 gitCommit=69fbb47e protocol=1
+(== HEAD), port 8788 owner pid == the Core that reported that identity.
+
+MEMORY — VERIFIED LIVE
+  M1  PASS  write a preference            POST /memory/write -> 201, id mem_murhf5pe_1,
+                                          scope=global, provenance=user_statement
+  M2a PASS  survives a real restart       after killing and relaunching kai.exe:
+                                          GET /memory/search?q=project language -> hits 1
+  M2b PASS  A REAL COMPOSED TURN ANSWERS FROM PERSISTED MEMORY
+                                          POST /chat "What project language do I prefer?"
+                                          -> "Your preferred project language is TypeScript."
+                                          This is the acceptance that matters: it proves
+                                          write -> persist -> restart -> recall -> COMPOSED
+                                          prompt -> worker -> correct answer, in the product.
+  M3  PASS  deterministic dedup           writing the same fact twice -> deduped=true, same id
+  M4  PASS  expired is not recalled       entry with a past `until` wrote 201, then
+                                          search found 0 hits
+  M5  PASS  over budget REFUSES with a machine-readable reason
+                                          HTTP 403 {"reason":"writing this 959 B fact would
+                                          put the mission memory at 32.3 KB/32.0 KB",
+                                          "code":"MEMORY_LIMIT_EXCEEDED"}
+                                          A refusal with the actual numbers, not a silent write.
+
+NOT YET RUN LIVE (built and unit-verified, but NOT demonstrated in the product):
+  skills S1-S4 (discovery, progressive disclosure, staged approve->install, hash-mismatch
+  refusal), scheduler R1-R4 (fire, survive restart, no double fire, current policy),
+  checkpoints create/restore, recovery classify, learning I1-I3, and Part A's product-level
+  acceptance (a real OpenCode task, a cancel, no duplicate execution).
+
+CORRECTIONS FOUND BY RUNNING IT (my own test script, not the product): an initial run reported
+a dead Core as PASS for two checks because a refusal was counted as "any status other than
+200"; a dead server is not a refusal. Fixed to require a real 4xx. A second run failed M1 on an
+invalid `type` value of my own; the valid set is user_preference|project_fact|agent_fact|
+mission_context|note.

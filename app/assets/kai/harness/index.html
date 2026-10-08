@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>KAI orb — port verification</title>
+<style>
+  body { margin: 0; background: radial-gradient(circle at 50% 40%, #12203F 0, #0B1224 64%);
+         color: #CFE6FF; font: 500 12px system-ui, sans-serif; padding: 16px; }
+  h1 { font-size: 14px; font-weight: 600; margin: 0 0 10px; letter-spacing: .04em; }
+  h2 { font-size: 11px; font-weight: 600; opacity: .7; margin: 14px 0 6px; text-transform: uppercase; }
+  #stage { display: flex; gap: 16px; align-items: flex-start; }
+  .grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tile { display: flex; flex-direction: column; align-items: center; }
+  .cap { font-size: 10px; opacity: .8; margin-top: 2px; }
+</style></head>
+<body>
+  <h1>KAI orb — ported from KAI_matrix_orb_v17.html</h1>
+  <div id="stage"></div>
+  <h2>States → poses</h2><div id="states" class="grid"></div>
+  <h2>Poses (boot + BN)</h2><div id="poses" class="grid"></div>
+  <h2>Accessories</h2><div id="accessories" class="grid"></div>
+  <h2>Skins (working + hair)</h2><div id="skins" class="grid"></div>
+  <script src="demo.js"></script>
+</body></html>

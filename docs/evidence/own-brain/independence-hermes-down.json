@@ -1,0 +1,35 @@
+{
+  "architecture": "KAI UI -> KAI Core -> KAI ModelProvider -> model -> KAI",
+  "inference": {
+    "owner": "kai",
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "configured": true,
+    "reachable": true,
+    "baseUrl": "https://opencode.ai/zen/go/v1",
+    "reason": null,
+    "capabilities": {
+      "chat": true,
+      "stream": true,
+      "structured": true,
+      "embeddings": true,
+      "tools": false,
+      "models": [],
+      "defaultModel": "deepseek-v4.1-flash"
+    }
+  },
+  "workers": {
+    "hermes": {
+      "optional": true,
+      "role": "worker",
+      "reachable": false,
+      "authorized": false
+    }
+  },
+  "dependency": {
+    "normal_chat_turns": 5,
+    "delegated_turns": 0,
+    "normal_chat_calls_to_hermes": 0,
+    "delegated_calls_to_hermes": 0
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "agent": "core",
+  "from_state": true,
+  "intent": "independence",
+  "conversation_id": "sess_musv974c_7dhj",
+  "reply": "No — I don't need a worker to exist, to boot, to know who I am or to speak. My identity and my runtime are my own; a worker is an ability I can use, never what I am. Workers are Hermes, OpenCode, Codex. A worker provides information; a worker does not become the speaker. Internal provenance may still say worker = Hermes; that is correct and stays. Right now Hermes is offline; either way I remain KAI and will say if it is unavailable.",
+  "data": {
+    "worker": "hermes"
+  },
+  "brain": null,
+  "dependency": {
+    "normal_chat_calls_to_hermes": 0
+  }
+}

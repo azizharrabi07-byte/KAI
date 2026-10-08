@@ -1,0 +1,91 @@
+{
+  "identity": {
+    "service": "kai-core",
+    "coreVersion": "0.1.0",
+    "buildId": "2de85812ffd99f1f",
+    "gitCommit": "55197687d27208006fe06293ce64d6bfc9bcb155",
+    "protocolVersion": 1,
+    "pid": 70564,
+    "startedAt": "2026-10-03T15:16:46.820Z"
+  },
+  "postStatus": 200,
+  "before": {
+    "glow": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)",
+    "opacity": "0.15",
+    "head": "KAI",
+    "label": "KAI is idle"
+  },
+  "series": [
+    {
+      "ms": 300,
+      "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+      "opacity": "0.65",
+      "head": "KAI",
+      "label": "KAI is idle"
+    },
+    {
+      "ms": 600,
+      "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+      "opacity": "0.65",
+      "head": "KAI",
+      "label": "KAI is idle"
+    },
+    {
+      "ms": 900,
+      "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+      "opacity": "0.65",
+      "head": "KAI",
+      "label": "KAI is idle"
+    },
+    {
+      "ms": 1200,
+      "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+      "opacity": "0.65",
+      "head": "KAI",
+      "label": "KAI is idle"
+    },
+    {
+      "ms": 1500,
+      "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+      "opacity": "0.65",
+      "head": "KAI",
+      "label": "KAI is idle"
+    },
+    {
+      "ms": 1800,
+      "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+      "opacity": "0.65",
+      "head": "KAI",
+      "label": "KAI is idle"
+    },
+    {
+      "ms": 2100,
+      "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+      "opacity": "0.65",
+      "head": "KAI",
+      "label": "KAI is idle"
+    },
+    {
+      "ms": 2400,
+      "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+      "opacity": "0.65",
+      "head": "KAI",
+      "label": "KAI is idle"
+    },
+    {
+      "ms": 2700,
+      "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+      "opacity": "0.65",
+      "head": "KAI",
+      "label": "KAI is idle"
+    },
+    {
+      "ms": 3000,
+      "glow": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)",
+      "opacity": "0.65",
+      "head": "KAI",
+      "label": "KAI is idle"
+    }
+  ],
+  "verdict": "FAIL (stale label: pose moved, label did not)"
+}

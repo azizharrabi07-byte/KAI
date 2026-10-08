@@ -1,0 +1,27 @@
+{
+  "name": "@kai/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "KAI Core \u2014 control-plane service bridging the KAI desktop app (Tauri) to the Hermes Agent api-server and the OpenCode headless server.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/build-info.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "//bundle": "Builds the shipped Core into core/bundle: no test files, plus the package.json that makes it ESM where there is no core/ package.json (an installed app).",
+    "bundle": "node scripts/bundle.mjs",
+    "start": "node dist/server.js",
+    "//test": "Runs every *.test.ts under core/tests and core/src straight from TypeScript (Node 26 strips types). scripts/test.mjs discovers the files itself - npm runs scripts through cmd.exe on Windows, which does not expand globs - and loads API_SERVER_KEY from the Hermes install for the live-auth suites without printing it. --with-dist also runs compiled tests.",
+    "test": "node scripts/test.mjs",
+    "test:dist": "npm run build && node scripts/test.mjs --with-dist",
+    "//build": "Compiles, then stamps dist/build-info.json with a content-derived build id (see scripts/build-info.mjs). Identity must be rebuilt with the code or it lies."
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}

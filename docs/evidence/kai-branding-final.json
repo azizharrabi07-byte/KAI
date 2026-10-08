@@ -1,0 +1,1306 @@
+{
+  "audit": "KAI branding-string audit",
+  "jsonPath": "C:\\Users\\DELL\\Desktop\\kai\\docs\\evidence\\kai-branding-final.json",
+  "scope": {
+    "trees": [
+      "app/src/**",
+      "app/*.html",
+      "app/package.json",
+      "app/src-tauri/tauri.conf.json",
+      "app/src-tauri/src/**",
+      "core/src/**",
+      "core/bundle/**"
+    ],
+    "excluded": [
+      "node_modules",
+      "dist",
+      "target",
+      ".git",
+      "tests",
+      "*.test.ts",
+      "*.test.js",
+      "*.map"
+    ],
+    "matchedStrings": [
+      "OpenGhost",
+      "Ghost",
+      "Hermes Agent",
+      "Nous Research",
+      "default profile"
+    ],
+    "note": "One entry per unique (file,line); 'matched' lists which audited strings occur on the line ('OpenGhost' lines also match 'Ghost')."
+  },
+  "summary": {
+    "userVisibleCount": 4,
+    "internalCount": 111,
+    "totalHits": 115,
+    "topRisk": "Highest SOURCE exposure (intentional worker-vs-product labelling, USER_VISIBLE): Settings heading \"KAI's worker: Hermes Agent\" (app/src/settings/main.ts:131); island status toasts \"Hermes Agent online\"/\"Hermes Agent not running\" (app/src-tauri/src/integrations.rs:929,951); and the Windows bundle longDescription naming \"Hermes Agent, OpenCode, VS Code\" (app/src-tauri/tauri.conf.json:81). The known WORKER-SPEAKS-AS-KAI leak no longer exists in current SOURCE: the guard is in core/src/chat/relay.ts (SELF_IDENTIFICATION 100-140; probe relayGuardIsLive:279), mirrored in the shipped bundle core/bundle/chat/relay.js, and core/bundle/server.js:1025 refuses to serve if the compiled guard is a no-op. The live leak is now RUNTIME DATA: %LOCALAPPDATA%\\KAI\\core\\kai-sessions.db table session_turns holds 22 assistant turns containing \"Hermes Agent\" (18 with \"Nous Research\"), e.g. turn_muswixjr_8nkh \"Hermes Agent, by Nous Research — running on your Windows box through the opencode-go provider.\", rendered as KAI's own chat turns. The guard is heuristic, so novel worker phrasings remain a residual source risk."
+  },
+  "hits": [
+    {
+      "file": "app/src/chat/chat.css",
+      "line": 5,
+      "text": " * KAI's own values. Nothing is taken from OpenGhost's stylesheet: the Markdown",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "CSS header comment; not rendered."
+    },
+    {
+      "file": "app/src/chat/vendor/highlight.ts",
+      "line": 3,
+      "text": "// Ported from OpenGhost `highlight.js` (MIT), classification REUSE per",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/chat/vendor/highlight.ts",
+      "line": 7,
+      "text": "// Portions adapted from OpenGhost (github.com/ANDRETRIPOL/OpenGhost),",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/chat/vendor/markdown.ts",
+      "line": 3,
+      "text": "// Ported from OpenGhost `markdown.js` (MIT), classification ADAPT per",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/chat/vendor/markdown.ts",
+      "line": 9,
+      "text": "// Portions adapted from OpenGhost (github.com/ANDRETRIPOL/OpenGhost),",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/chat/vendor/markdown.ts",
+      "line": 29,
+      "text": "// media/link presentation, so these OpenGhost globals stay absent here.",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/chat/vendor/stream-view.ts",
+      "line": 3,
+      "text": "// Ported from OpenGhost `stream-view.js` (MIT), classification ADAPT per",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/chat/vendor/stream-view.ts",
+      "line": 8,
+      "text": "// Portions adapted from OpenGhost (github.com/ANDRETRIPOL/OpenGhost),",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/chat/vendor/tex.ts",
+      "line": 3,
+      "text": "// Ported from OpenGhost `tex.js` (MIT), classification REUSE per",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/chat/vendor/tex.ts",
+      "line": 7,
+      "text": "// Portions adapted from OpenGhost (github.com/ANDRETRIPOL/OpenGhost),",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/settings/main.ts",
+      "line": 51,
+      "text": "// ── KAI's worker: Hermes Agent ────────────────────────────────────────────────",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/settings/main.ts",
+      "line": 53,
+      "text": "/** The key KAI's Core uses for Hermes Agent's authenticated routes. */",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/settings/main.ts",
+      "line": 57,
+      "text": " * Where the Hermes Agent api-server key lives.",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/settings/main.ts",
+      "line": 59,
+      "text": " * This is genuinely a WORKER's key: Hermes Agent is one of KAI's workers, and KAI",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/settings/main.ts",
+      "line": 131,
+      "text": "    h(\"h2\", {}, dot, h(\"span\", { text: \"KAI's worker: Hermes Agent\" })),",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "USER_VISIBLE",
+      "note": "USER_VISIBLE: <h2> heading text rendered in the Settings page: \"KAI's worker: Hermes Agent\"."
+    },
+    {
+      "file": "app/src/views/activity.ts",
+      "line": 14,
+      "text": "// Portions adapted from OpenGhost (github.com/ANDRETRIPOL/OpenGhost), MIT License,",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/views/chat.ts",
+      "line": 26,
+      "text": "// KAI's own chat/sessions stylesheet (authored for this surface; no OpenGhost CSS).",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/views/integrations.ts",
+      "line": 432,
+      "text": "// ── KAI control layer: Hermes Agent ───────────────────────────────────────────",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/views/integrations.ts",
+      "line": 435,
+      "text": " * Hermes Agent's api-server card. Every value comes from the poller, which reads",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/views/mcp.ts",
+      "line": 25,
+      "text": "// Portions adapted from OpenGhost (github.com/ANDRETRIPOL/OpenGhost), MIT License,",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/views/tools.ts",
+      "line": 16,
+      "text": "// Portions adapted from OpenGhost (github.com/ANDRETRIPOL/OpenGhost), MIT License,",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/views/tools.ts",
+      "line": 21,
+      "text": "// CSS. OpenGhost's risk classifier is a front-end regex heuristic and is",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/views/tools.ts",
+      "line": 34,
+      "text": "// ── KAI's own palette (KAI-authored values; never OpenGhost's styles.css) ─────",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/views/tools.ts",
+      "line": 89,
+      "text": " * top-level array) and the OpenGhost-style function shape (`{ function: {",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/views/tools.ts",
+      "line": 97,
+      "text": "  // Unwrap the OpenGhost-style `{ function: { parameters } }` envelope.",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/views/tools.ts",
+      "line": 300,
+      "text": "// ── Approval-card PRESENTATION (adapted from OpenGhost `approval-card.js`) ────",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/views/tools.ts",
+      "line": 302,
+      "text": "// The idea kept from OpenGhost: the card LEADS with what the step is for in",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/visual/engine.ts",
+      "line": 3,
+      "text": "// The scene-graph idea is adapted from OpenGhost's MIT-covered `diagram.js`:",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/visual/engine.ts",
+      "line": 6,
+      "text": "// KAI's own TypeScript, drawing KAI's own palette. No OpenGhost stylesheet,",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/visual/layout.ts",
+      "line": 3,
+      "text": "// Adapted from the layout engine in OpenGhost's MIT-covered `diagram.js`",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/visual/mount.ts",
+      "line": 16,
+      "text": "// from OpenGhost's MIT-covered `diagram.js`; the host, the styling and the",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/visual/mount.ts",
+      "line": 17,
+      "text": "// contract are KAI's own. No OpenGhost stylesheet, class name or visual identity",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/visual/types.ts",
+      "line": 9,
+      "text": "// The mechanism this module's siblings implement is adapted from OpenGhost's",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/visual/types.ts",
+      "line": 11,
+      "text": "// and the styling are KAI's own; no OpenGhost source or visual identity is used.",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src/visual/visual.css",
+      "line": 5,
+      "text": " * from OpenGhost's stylesheet: no class name, no colour value, no layout recipe.",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "CSS header comment; not rendered."
+    },
+    {
+      "file": "app/src-tauri/tauri.conf.json",
+      "line": 81,
+      "text": "    \"longDescription\": \"KAI is a personal AI companion and control layer. It sits at the top of your screen, shows what the agents installed on your machine are doing (Hermes Agent, OpenCode, VS Code), and lets you approve, answer, chat and drop files without leaving what you are doing.\",",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "USER_VISIBLE",
+      "note": "USER_VISIBLE: bundle longDescription; shown in installer / Windows app metadata."
+    },
+    {
+      "file": "app/src-tauri/src/claude.rs",
+      "line": 443,
+      "text": "    /// self-description (\"running on the default profile (deepseek-v4.1-flash via",
+      "matched": [
+        "default profile"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src-tauri/src/claude.rs",
+      "line": 462,
+      "text": "            \"Nous Research\",",
+      "matched": [
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Rust #[test] fixture listing worker-identity leak tokens; test-only."
+    },
+    {
+      "file": "app/src-tauri/src/claude.rs",
+      "line": 465,
+      "text": "            \"default profile\",",
+      "matched": [
+        "default profile"
+      ],
+      "classification": "INTERNAL",
+      "note": "Rust #[test] fixture listing worker-identity leak tokens; test-only."
+    },
+    {
+      "file": "app/src-tauri/src/core_process.rs",
+      "line": 224,
+      "text": "    // Last resort on this host: the node shipped with the Hermes Agent install that",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src-tauri/src/integrations.rs",
+      "line": 84,
+      "text": "    // agent servers (Hermes Agent's api-server and OpenCode's headless server)",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src-tauri/src/integrations.rs",
+      "line": 812,
+      "text": "//   Hermes Agent api-server   http://127.0.0.1:8642",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "app/src-tauri/src/integrations.rs",
+      "line": 929,
+      "text": "                label: \"Hermes Agent online\".into(),",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "USER_VISIBLE",
+      "note": "USER_VISIBLE: IntegrationEvent label rendered as an island task step/toast (\"Hermes Agent online\")."
+    },
+    {
+      "file": "app/src-tauri/src/integrations.rs",
+      "line": 951,
+      "text": "            label: \"Hermes Agent not running\".into(),",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "USER_VISIBLE",
+      "note": "USER_VISIBLE: IntegrationEvent label rendered as an island task step/toast (\"Hermes Agent not running\")."
+    },
+    {
+      "file": "app/src-tauri/src/secrets.rs",
+      "line": 13,
+      "text": "    // Hermes Agent api-server key (Bearer for the authenticated /v1 and",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/config.ts",
+      "line": 10,
+      "text": "  /** Base URL of the Hermes Agent api-server. Default http://127.0.0.1:8642 */",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/agent/kai-capabilities.ts",
+      "line": 73,
+      "text": " * self-description rendered as KAI's speech (\"I'm Hermes Agent, a Nous Research",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/agent/kai-capabilities.ts",
+      "line": 177,
+      "text": " * body, the worker answered \"I'm a Hermes Agent instance (Nous Research) … nothing",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/agent/kai-capabilities.ts",
+      "line": 194,
+      "text": "    \"Never identify yourself as Hermes, OpenCode, Codex, Nous Research, or any other product or runtime.\",",
+      "matched": [
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "System-instruction string sent to a delegated worker; never rendered."
+    },
+    {
+      "file": "core/src/agent/kai-home.ts",
+      "line": 22,
+      "text": " * no `Nous Research`, no `Hermes Agent` self-claim and no `HERMES_*` path anywhere in",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/agents/hermes.ts",
+      "line": 5,
+      "text": " * HermesClient — typed client for the Hermes Agent api-server.",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/agents/mock.ts",
+      "line": 232,
+      "text": "  return buildMock(\"hermes\", \"Hermes Agent (mock)\", HERMES_CAPS, options);",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Worker adapter registry display name; emitted in agent.registered but not rendered by the shipping UI."
+    },
+    {
+      "file": "core/src/agents/adapters/hermesAdapter.ts",
+      "line": 187,
+      "text": "   * subagent then answered \"I'm a Hermes Agent instance (Nous Research)\". KAI",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/agents/adapters/hermesAdapter.ts",
+      "line": 290,
+      "text": "    name: \"Hermes Agent\",",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Worker adapter registry display name; emitted in agent.registered but not rendered by the shipping UI."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 11,
+      "text": " * hood it's Hermes Agent by Nous Research\" — and a worker could describe KAI's",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 22,
+      "text": " * This is deliberately NOT `if (text.includes(\"Hermes Agent by Nous Research\"))`.",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 57,
+      "text": " * A product name may carry its own qualifier (\"Hermes Agent\", \"Claude Code\"),",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 60,
+      "text": " * the appositive \"Hermes Agent here\" form.",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 71,
+      "text": " * bare appositive — \"Hermes Agent, by Nous Research — running on your Windows",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 72,
+      "text": " * box through the opencode-go provider.\" / \"Hermes Agent (Nous Research),",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 87,
+      "text": " * Hermes Agent by Nous Research\", the REVERSE order \"...Hermes Agent is what I",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 92,
+      "text": " * asked \"who am i talking to?\" it answered \"You're talking to Hermes Agent",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 93,
+      "text": " * (Nous Research) — this session runs on Hermes's api_server…\", and to \"hello",
+      "matched": [
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 94,
+      "text": " * hermes\" it answered \"Hey Aziz — Hermes Agent here, running on your Windows",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 112,
+      "text": "  // \"Hermes Agent here\", \"Hermes here\" — the worker names itself as the speaker.",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 130,
+      "text": "  // \"Hermes Agent, by Nous Research — running on your Windows box…\"",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 132,
+      "text": "  // \"Hermes Agent (Nous Research), running on your Windows machine…\" — a product",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 138,
+      "text": "  // A bare product name as the whole reply: \"Hermes.\" / \"Hermes Agent!\"",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/chat/relay.ts",
+      "line": 279,
+      "text": "    raw: \"Hermes Agent, by Nous Research — running on your Windows box.\",",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Relay-guard startup self-test probe literal; never shown to the user."
+    },
+    {
+      "file": "core/src/chat/router.ts",
+      "line": 958,
+      "text": "   * Hermes Agent by Nous Research\"). KAI answers who it is itself, and a",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/visual/spec.ts",
+      "line": 9,
+      "text": " * The shape is deliberately the one the OpenGhost audit named (see",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/visual/spec.ts",
+      "line": 19,
+      "text": " * is adapted from OpenGhost's MIT-covered `diagram.js`; the CODE, the types, the",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/visual/spec.ts",
+      "line": 20,
+      "text": " * limits and the renderer that consumes this contract are KAI's own. No OpenGhost",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/visual/spec.ts",
+      "line": 21,
+      "text": " * source, no OpenGhost visual identity, and no OpenGhost stylesheet is imported —",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/src/workforce/discovery.ts",
+      "line": 574,
+      "text": "    name: \"Hermes Agent\",",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "TrustedSource catalog entry; name/description not rendered by the shipping UI; 'instructions' only reachable via an internal install-refused error detail."
+    },
+    {
+      "file": "core/src/workforce/discovery.ts",
+      "line": 575,
+      "text": "    description: \"Hermes Agent api-server\",",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "TrustedSource catalog entry; name/description not rendered by the shipping UI; 'instructions' only reachable via an internal install-refused error detail."
+    },
+    {
+      "file": "core/src/workforce/discovery.ts",
+      "line": 592,
+      "text": "    install: { kind: \"manual\", instructions: \"Install Hermes Agent, then start its api-server.\" },",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "TrustedSource catalog entry; name/description not rendered by the shipping UI; 'instructions' only reachable via an internal install-refused error detail."
+    },
+    {
+      "file": "core/src/workforce/subagent.ts",
+      "line": 348,
+      "text": " * so a subagent turn reads as the subagent, never as \"I'm Hermes Agent…\". When the",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Source comment; not rendered."
+    },
+    {
+      "file": "core/bundle/config.d.ts",
+      "line": 6,
+      "text": "    /** Base URL of the Hermes Agent api-server. Default http://127.0.0.1:8642 */",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/agent/kai-capabilities.d.ts",
+      "line": 47,
+      "text": " * self-description rendered as KAI's speech (\"I'm Hermes Agent, a Nous Research",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/agent/kai-capabilities.d.ts",
+      "line": 111,
+      "text": " * body, the worker answered \"I'm a Hermes Agent instance (Nous Research) … nothing",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/agent/kai-capabilities.js",
+      "line": 37,
+      "text": " * self-description rendered as KAI's speech (\"I'm Hermes Agent, a Nous Research",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/agent/kai-capabilities.js",
+      "line": 103,
+      "text": " * body, the worker answered \"I'm a Hermes Agent instance (Nous Research) … nothing",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/agent/kai-capabilities.js",
+      "line": 120,
+      "text": "        \"Never identify yourself as Hermes, OpenCode, Codex, Nous Research, or any other product or runtime.\",",
+      "matched": [
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/agent/kai-home.d.ts",
+      "line": 22,
+      "text": " * no `Nous Research`, no `Hermes Agent` self-claim and no `HERMES_*` path anywhere in",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/agent/kai-home.js",
+      "line": 22,
+      "text": " * no `Nous Research`, no `Hermes Agent` self-claim and no `HERMES_*` path anywhere in",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/agents/hermes.js",
+      "line": 4,
+      "text": " * HermesClient — typed client for the Hermes Agent api-server.",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/agents/mock.js",
+      "line": 158,
+      "text": "    return buildMock(\"hermes\", \"Hermes Agent (mock)\", HERMES_CAPS, options);",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/agents/adapters/hermesAdapter.d.ts",
+      "line": 28,
+      "text": "     * subagent then answered \"I'm a Hermes Agent instance (Nous Research)\". KAI",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/agents/adapters/hermesAdapter.js",
+      "line": 224,
+      "text": "        name: \"Hermes Agent\",",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 10,
+      "text": " * hood it's Hermes Agent by Nous Research\" — and a worker could describe KAI's",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 21,
+      "text": " * This is deliberately NOT `if (text.includes(\"Hermes Agent by Nous Research\"))`.",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 34,
+      "text": " * A product name may carry its own qualifier (\"Hermes Agent\", \"Claude Code\"),",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 37,
+      "text": " * the appositive \"Hermes Agent here\" form.",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 46,
+      "text": " * bare appositive — \"Hermes Agent, by Nous Research — running on your Windows",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 47,
+      "text": " * box through the opencode-go provider.\" / \"Hermes Agent (Nous Research),",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 60,
+      "text": " * Hermes Agent by Nous Research\", the REVERSE order \"...Hermes Agent is what I",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 65,
+      "text": " * asked \"who am i talking to?\" it answered \"You're talking to Hermes Agent",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 66,
+      "text": " * (Nous Research) — this session runs on Hermes's api_server…\", and to \"hello",
+      "matched": [
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 67,
+      "text": " * hermes\" it answered \"Hey Aziz — Hermes Agent here, running on your Windows",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 85,
+      "text": "    // \"Hermes Agent here\", \"Hermes here\" — the worker names itself as the speaker.",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 100,
+      "text": "    // \"Hermes Agent, by Nous Research — running on your Windows box…\"",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 102,
+      "text": "    // \"Hermes Agent (Nous Research), running on your Windows machine…\" — a product",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 105,
+      "text": "    // A bare product name as the whole reply: \"Hermes.\" / \"Hermes Agent!\"",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/relay.js",
+      "line": 240,
+      "text": "        raw: \"Hermes Agent, by Nous Research — running on your Windows box.\",",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/chat/router.js",
+      "line": 705,
+      "text": "     * Hermes Agent by Nous Research\"). KAI answers who it is itself, and a",
+      "matched": [
+        "Hermes Agent",
+        "Nous Research"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/visual/spec.d.ts",
+      "line": 6,
+      "text": " * The shape is deliberately the one the OpenGhost audit named (see",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/visual/spec.d.ts",
+      "line": 16,
+      "text": " * is adapted from OpenGhost's MIT-covered `diagram.js`; the CODE, the types, the",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/visual/spec.d.ts",
+      "line": 17,
+      "text": " * limits and the renderer that consumes this contract are KAI's own. No OpenGhost",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/visual/spec.d.ts",
+      "line": 18,
+      "text": " * source, no OpenGhost visual identity, and no OpenGhost stylesheet is imported —",
+      "matched": [
+        "OpenGhost",
+        "Ghost"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/workforce/discovery.js",
+      "line": 357,
+      "text": "        name: \"Hermes Agent\",",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/workforce/discovery.js",
+      "line": 358,
+      "text": "        description: \"Hermes Agent api-server\",",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/workforce/discovery.js",
+      "line": 375,
+      "text": "        install: { kind: \"manual\", instructions: \"Install Hermes Agent, then start its api-server.\" },",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/workforce/subagent.d.ts",
+      "line": 110,
+      "text": " * so a subagent turn reads as the subagent, never as \"I'm Hermes Agent…\". When the",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    },
+    {
+      "file": "core/bundle/workforce/subagent.js",
+      "line": 249,
+      "text": " * so a subagent turn reads as the subagent, never as \"I'm Hermes Agent…\". When the",
+      "matched": [
+        "Hermes Agent"
+      ],
+      "classification": "INTERNAL",
+      "note": "Compiled shipped Core artifact (tauri.conf ships core/bundle); mirrors core/src. Not rendered itself."
+    }
+  ],
+  "userVisibleHits": [
+    {
+      "classification": "USER_VISIBLE",
+      "file": "app/src/settings/main.ts",
+      "line": 131,
+      "text": "    h(\"h2\", {}, dot, h(\"span\", { text: \"KAI's worker: Hermes Agent\" })),"
+    },
+    {
+      "classification": "USER_VISIBLE",
+      "file": "app/src-tauri/tauri.conf.json",
+      "line": 81,
+      "text": "    \"longDescription\": \"KAI is a personal AI companion and control layer. It sits at the top of your screen, shows what the agents installed on your machine are doing (Hermes Agent, OpenCode, VS Code), and lets you approve, answer, chat and drop files without leaving what you are doing.\","
+    },
+    {
+      "classification": "USER_VISIBLE",
+      "file": "app/src-tauri/src/integrations.rs",
+      "line": 929,
+      "text": "                label: \"Hermes Agent online\".into(),"
+    },
+    {
+      "classification": "USER_VISIBLE",
+      "file": "app/src-tauri/src/integrations.rs",
+      "line": 951,
+      "text": "            label: \"Hermes Agent not running\".into(),"
+    }
+  ],
+  "userVisibleCount": 4,
+  "internalCount": 111,
+  "topRisk": "Highest SOURCE exposure (intentional worker-vs-product labelling, USER_VISIBLE): Settings heading \"KAI's worker: Hermes Agent\" (app/src/settings/main.ts:131); island status toasts \"Hermes Agent online\"/\"Hermes Agent not running\" (app/src-tauri/src/integrations.rs:929,951); and the Windows bundle longDescription naming \"Hermes Agent, OpenCode, VS Code\" (app/src-tauri/tauri.conf.json:81). The known WORKER-SPEAKS-AS-KAI leak no longer exists in current SOURCE: the guard is in core/src/chat/relay.ts (SELF_IDENTIFICATION 100-140; probe relayGuardIsLive:279), mirrored in the shipped bundle core/bundle/chat/relay.js, and core/bundle/server.js:1025 refuses to serve if the compiled guard is a no-op. The live leak is now RUNTIME DATA: %LOCALAPPDATA%\\KAI\\core\\kai-sessions.db table session_turns holds 22 assistant turns containing \"Hermes Agent\" (18 with \"Nous Research\"), e.g. turn_muswixjr_8nkh \"Hermes Agent, by Nous Research — running on your Windows box through the opencode-go provider.\", rendered as KAI's own chat turns. The guard is heuristic, so novel worker phrasings remain a residual source risk.",
+  "databaseCheck": {
+    "checked": [
+      {
+        "path": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\kai-sessions.db",
+        "result": "LEAK PRESENT",
+        "table": "session_turns (id, sessionId, role, text, at, agentId, rowid_seq)"
+      },
+      {
+        "path": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\kai-core.db",
+        "result": "no session-turn table; scanned events/notifications/memories/... text columns — 0 hits"
+      }
+    ],
+    "sql": "SELECT id, sessionId, role, substr(text,1,500) FROM session_turns WHERE text LIKE '%Hermes Agent%';  -- repeated for '%Nous Research%', '%opencode-go%', '%default profile%', '%Ghost%'",
+    "hitCounts": {
+      "Hermes Agent": 22,
+      "Nous Research": 18,
+      "opencode-go": 10,
+      "default profile": 3,
+      "Ghost": 0
+    }
+  }
+}

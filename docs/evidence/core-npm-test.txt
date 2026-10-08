@@ -1,0 +1,55 @@
+# core/ npm test — run 2026-10-01T19:02:24+01:00
+# API_SERVER_KEY exported from the Hermes install's .env (32 chars, never printed)
+
+
+> @kai/core@0.1.0 test
+> npm run build && node --test "dist/**/*.test.js"
+
+
+> @kai/core@0.1.0 build
+> tsc -p tsconfig.json
+
+✔ hermes: GET /health answers ok with no auth (68.3855ms)
+✔ hermes: authenticated GET /v1/models lists the hermes-agent model (9.277ms)
+✔ hermes: authenticated GET /v1/capabilities is an object (6.6448ms)
+✔ hermes: listSessions() returns sessions carrying an id (23.8274ms)
+✔ hermes: sessionMessages() on a real session returns an array (34.9696ms)
+✔ hermes: a wrong key produces the typed unauthorized error, never a crash (8.8308ms)
+✔ hermes: a closed port produces the typed unreachable error (1.352ms)
+✔ hermes: POST /api/sessions rejects an invalid id with a 400 (route verified, nothing created) (10.2725ms)
+✔ hermes: POST /api/sessions/{id}/chat on an unknown session answers 404 (route verified, no turn run) (8.7187ms)
+      -> opencode version reported live: 1.18.33
+✔ opencode: GET /global/health reports healthy with the server's real version (85.5459ms)
+✔ opencode: health().version matches a raw GET /global/health (no fabricated version) (13.905ms)
+✔ opencode: listSessions() returns an array whose entries carry an id (29.9254ms)
+✔ opencode: listPermissions() returns an array (9.9747ms)
+✔ opencode: listQuestions() returns an array (20.0772ms)
+✔ opencode: messages() on an unknown session surfaces a typed 404 (17.5351ms)
+✔ opencode: prompt() routes to POST /session/{id}/message, which answers a real JSON 404 (15.9163ms)
+✔ opencode: POST /session/{id}/prompt is NOT a route — it is the web UI SPA fallback (documented deviation) (14.0358ms)
+      -> first live SSE event type: server.connected
+✔ opencode: events() yields parsed SSE from the live GET /event stream (8.811ms)
+✔ opencode: a closed port produces the typed unreachable error (0.9564ms)
+      -> /health: hermes={"reachable":true,"authorized":true,"version":"unknown","reason":null} opencode={"reachable":true,"version":"1.18.33","reason":null}
+✔ kai core: binds and GET /health aggregates both agents (147.4572ms)
+✔ kai core: GET /integrations mirrors the aggregate (28.6898ms)
+✔ kai core: GET /agents/hermes/sessions returns sessions with ids (22.0897ms)
+✔ kai core: GET /agents/opencode/sessions proxies the live session list (31.4404ms)
+✔ kai core: GET /agents/opencode/permissions passes the array through (8.0523ms)
+✔ kai core: POST /agents/opencode/permissions/:id/reply validates the reply enum (12.0082ms)
+✔ kai core: CORS allows the Tauri dev origin and rejects every other origin (42.0005ms)
+✔ kai core: an unknown route answers 404 JSON, never HTML (6.1625ms)
+✔ kai core: an unreachable upstream answers 502 JSON with a reason and no stack trace (10.8918ms)
+✔ kai core: GET /events opens an SSE stream and emits kai.ready (13.701ms)
+✔ kai core: POST /chat rejects a body with no text (15.409ms)
+      -> /chat: session=api_1790877747_70b50e05 reply="KAI-CORE-RELAY-OK"
+      -> /chat (2nd turn, same session): "KAI-CORE-RELAY-OK"
+✔ kai core: POST /chat runs a real turn through Hermes and returns the reply (7191.1642ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7701.5235

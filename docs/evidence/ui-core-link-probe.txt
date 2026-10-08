@@ -1,0 +1,19 @@
+base url: http://127.0.0.1:8788
+
+PASS  ping
+PASS  GET /state  agents=[hermes:idle, opencode:offline] tools=4
+PASS  GET /agents  2 agent(s)
+PASS  GET /agents/hermes  idle
+PASS  GET /missions  1 mission(s)
+PASS  GET /notifications  0
+PASS  GET /approvals  0
+PASS  GET /memory
+  stream state: CONNECTING
+  stream state: ONLINE
+PASS  POST /memory (triggers memory.created)
+PASS  SSE /core/events delivered the event  saw [memory.created]
+PASS  POST /chat  agent=core from_state=true
+      reply: KAI status: 2 agent(s) — hermes (idle), opencode (offline); 0 active mission(s); 0 approval(s) pending.
+  stream state: OFFLINE
+
+frames received: 3

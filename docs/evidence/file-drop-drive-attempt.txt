@@ -1,0 +1,35 @@
+# File-drop choreography — what could and could not be driven — 2026-10-01T19:31:44+01:00
+
+# The drop arrives from Tauri as an OLE drop on the webview HWND
+# (island.rs unblock_webview_drops / RevokeDragDrop), and the island consumes it
+# through getCurrentWebview().onDragDropEvent — not through DOM drag events.
+
+## Attempt A — CDP renderer-level synthetic drag (Input.dispatchDragEvent)
+$ node cdp.mjs drag C:/Users/DELL/Desktop/kai/docs/evidence/droptest.txt 360 60
+dispatched dragEnter/dragOver/drop at 360,60 with C:\Users\DELL\Desktop\kai\docs\evidence\droptest.txt
+   -> dispatched, and the island did not change view:
+{"on":["view on"]}
+
+## Attempt B — plain DOM dragenter/dragover/drop on the island element
+$ node cdp.mjs domdrop droptest.txt 360 60
+dom drop on {"target":"stack","events":{"dragenter":true,"dragover":true,"drop":true}}
+   -> the events fired in the page and were not handled; view unchanged:
+{"on":["view on"]}
+
+   Neither attempt added a 'ui  drag …' line to kai.log. The island only ever
+   logs that from onDragDrop, so the app never saw a drop.
+
+## What *can* be driven — the ingest half, through the app's real command
+$ (CDP) __TAURI_INTERNALS__.invoke('ingest_file',{path:'…/droptest.txt'})
+   -> {"name":"droptest.txt","path":"C:\Users\DELL\AppData\Local\KAI\inbox\droptest.txt","size":20}
+$ ls -la "$LOCALAPPDATA/KAI/inbox/"
+total 1
+drwxr-xr-x 1 DELL 197121  0 oct.   1 19:31 .
+drwxr-xr-x 1 DELL 197121  0 oct.   1 19:31 ..
+-rw-r--r-- 1 DELL 197121 20 oct.   1 19:31 droptest.txt
+$ cat "$LOCALAPPDATA/KAI/inbox/droptest.txt"
+hello kai drop test
+
+## Verdict
+The drop choreography itself is NOT drivable without a human: it needs a real
+OLE drag session started by another process. The ingest half is verified.

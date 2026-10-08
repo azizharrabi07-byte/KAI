@@ -1,0 +1,79 @@
+{
+  "stream": "W — MAIN WINDOW (the acceptance test)",
+  "measuredAt": "2026-10-05T16:0x (Africa/Tunis)",
+  "instance": {
+    "app": "C:/Users/DELL/Desktop/kai/app/target/release/kai.exe",
+    "artifactMtime": "2026-10-05 16:06",
+    "buildCommand": "cd app && npx tauri build --no-bundle",
+    "buildExit": 0,
+    "coreBuildId": "41b87e8807fd5348",
+    "coreGitCommit": "fa8ce40eb3b2ef670d0333574323eaae0a85a683",
+    "gitHead": "fa8ce40",
+    "identityFreshness": "fresh",
+    "harnessHashes": {
+      "app/src-tauri/src/main_window.rs": "pre-build hash recorded in docs/evidence/kai-build-nobundle.log run",
+      "app/src/shell/presence/presence.css": "da9f856948cebea9e328c4e6306066d4ee0d9421"
+    }
+  },
+  "theAcceptanceQuestion": "Aziz: the main window measured 345x9 in the running build — that number is the acceptance test.",
+  "measuredAnswer": {
+    "what345x9ActuallyIs": "the ISLAND's collapsed/hidden OS window (STRIP_W 240 x STRIP_H 6 logical, x the webview device scale factor 1.4354 = 345x9 physical). It is the companion pill, never the application window.",
+    "mainWindowIsReal": true,
+    "mainWindowCssViewportBefore": "985 x 631",
+    "mainWindowCssViewportAfter": "1290 x 705  (window 1866 x 1051 physical)",
+    "islandStays": "345 x 9 (collapsed companion strip) — correct and unchanged",
+    "note": "width 1290 CSS is ABOVE the 1000 px threshold below which presence.css used to hide the navigation rail entirely."
+  },
+  "rootCause": {
+    "chain": [
+      "Windows display 110 % + accessibility text scale 130 % => the webview devicePixelRatio is 1.4354 while the window's own scale factor is 1.1046 (island.rs already documents this exact measurement).",
+      "tauri.conf.json declares the main window 1280x820 in LOGICAL units, and Tauri sized it with the window scale only => a 1414x906 physical client => a 985 CSS-px viewport.",
+      "app/src/shell/presence/presence.css had `@media(max-width:1000px){ ... .rail{display:none} ... }` => at 985 px the application's ONLY navigation was deleted, leaving the user with no way to reach any section, and a window that looked like a single squeezed panel."
+    ],
+    "evidenceOfChain": {
+      "railBefore": "{ hasRail: true, rect: {x:0,y:0,w:0,h:0}, display: 'none', buttons: 13 }",
+      "railAfter": "{ display: 'flex', x: 0, y: 0, w: 72, h: 670 }",
+      "source": "docs/evidence/kai-ui-truth.json, docs/evidence/kai-nav-proof.json"
+    }
+  },
+  "fixes": [
+    {
+      "file": "app/src-tauri/src/main_window.rs",
+      "what": "apply_size(): sizes the window in WEBVIEW CSS pixels (win.scale_factor() * island::win_text_scale(), i.e. the real devicePixelRatio) so the viewport is the declared 1280x820, clamped to the monitor work area minus the MEASURED frame (outer-inner) and a 24 CSS-px margin, then centres it. Called from attach() and again on the FIRST show() (a never-shown window has no final DPI).",
+      "why": "the declared size only means what it says if the webview's viewport is that size; this is the same correction island::apply_geometry already makes for the island."
+    },
+    {
+      "file": "app/src/shell/presence/presence.css",
+      "what": "the <=1000px rule no longer hides the rail: it becomes a compact icon rail (52px column, tighter padding).",
+      "why": "hiding the only navigation is a defect at ANY width."
+    },
+    {
+      "file": "app/src/shell/presence/presence.css",
+      "what": ".rail: overflow-x:hidden added (overflow-y:auto in CSS forces overflow-x to auto, which produced twin scrollbars that ate the rail's width); scrollbar-width:none. Rail tiles .rb 46x46 -> 40x40 and gap 6 -> 4px.",
+      "why": "13 route buttons + orb + label at 46px need ~816 px of rail but only 670 px exist: the rail genuinely overflowed, so its last item was clipped. At 40px/4px the column needs ~662 px and fits."
+    }
+  ],
+  "liveVerification": {
+    "method": "docs/evidence/kai-window-acceptance.mjs (launches the real release binary detached, measures every kai.exe OS window rectangle via Win32 EnumWindows+GetWindowRect, reads each webview's own geometry over CDP, invokes the island's real open_main_window command and re-measures) and docs/evidence/kai-nav-proof.mjs (clicks every rail entry by its account name).",
+    "osWindowsAfterOpenKai": [
+      "KAI 1866 x 1051 visible=true   <- the main application window",
+      "KAI 345 x 9 visible=true       <- the island companion strip",
+      "Settings - KAI 634 x 792 visible=false",
+      "tray_icon_app 1440 x 788 visible=false"
+    ],
+    "perWebviewGeometry": {
+      "main": "outer=1290x705 inner=1289x704 dpr=1.435416579246521",
+      "island": "outer=242x7",
+      "settings": "outer=432x524"
+    },
+    "openKaiCommandPath": "island header 'Open KAI' button (app/src/island/header.ts:124) -> companion actions.openKai() -> app/src/island/core-bridge.ts:152 invokeTauri(\"open_main_window\") -> Rust lib.rs:488 -> main_window::show() -> window shown, sized, focused. The harness invoked THE SAME command in the island webview; every link of the chain is the product's own code.",
+    "coreBoot": "the app's bundled Core answered GET /identity 2.5–4.1 s after launch, pid and buildId fresh; the app really supervises its own Core."
+  },
+  "visionVerification": {
+    "before": "docs/evidence/accept-main.png (985x631 CSS): 'no sidebar navigation... content centered', third status card clipped at the window edge.",
+    "after": "docs/evidence/nav-home-final.png (1290x705 CSS): 'YES there is a left navigation rail'; final pass: 'All rail icons are fully visible and fully inside the rail; nothing is cut off... No scrollbars appear on the rail — neither vertical nor horizontal.'",
+    "skillsPage": "docs/evidence/nav-skills.png: 'lists the real learned skills' — nightly-verification-routine and ph4-nightly-deploy, both read live from Core GET /skills."
+  },
+  "verdict": "END-TO-END PROVEN for the window chain: island action -> Tauri command -> real window shown at a real size -> rail visible -> rail entries switch views against real Core. The one thing not exercised is a literal mouse click on the island button (the identical command was invoked in the island's own webview); a pointer-level run remains a nice-to-have, not a missing link. Bundling (`npx tauri build` WITH the NSIS installer) exits 1: makensis references core/bundle/agent/identity-model.d.ts while `beforeBuildCommand` regenerates that directory, a race between the resource glob and the Core bundle build. The application binary itself builds green (`--no-bundle`, exit 0).",
+  "remainingRisk": "the NSIS installer cannot be produced until the core/bundle resource race is fixed (regenerate the bundle BEFORE tauri resolves the resources, or exclude the bundle from the installer resources). BLOCKED_EXTERNAL for the installer only."
+}

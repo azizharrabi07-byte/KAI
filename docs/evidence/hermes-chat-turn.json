@@ -1,0 +1,7 @@
+{
+  "session": "api_1790876616_56289fcc",
+  "prompt": "Reply with exactly this token and nothing else: KAI-CONTROL-LAYER-OK",
+  "status": 200,
+  "seconds": 11.57,
+  "body": "{\"object\": \"hermes.session.chat.completion\", \"session_id\": \"api_1790876616_56289fcc\", \"message\": {\"role\": \"assistant\", \"content\": \"KAI-CONTROL-LAYER-OK\"}, \"usage\": {\"input_tokens\": 17438, \"output_tokens\": 11, \"total_tokens\": 17449, \"runtime\": {\"provider\": \"opencode-go\", \"model\": \"deepseek-v4.1-flash\", \"route_source\": \"global\", \"requested\": {\"provider\": \"\", \"model\": \"\"}}}, \"runtime\": {\"provider\": \"opencode-go\", \"model\": \"deepseek-v4.1-flash\", \"route_source\": \"global\", \"requested\": {\"provider\": \"\", \"model\": \"\"}}}"
+}

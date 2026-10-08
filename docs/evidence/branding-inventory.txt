@@ -1,0 +1,155 @@
+./dev/upload-preview.html:5:    <title>Coucou — upload sequence preview</title>
+./dist/index.html:6:    <title>Coucou</title>
+./dist/settings.html:6:    <title>Settings — Coucou</title>
+./hook/Cargo.toml:2:name = "coucou-hook"
+./hook/Cargo.toml:3:description = "Relays Claude Code hook events to Coucou over a named pipe"
+./hook/Cargo.toml:9:name = "coucou-hook"
+./hook/src/main.rs:1://! coucou-hook — the relay Claude Code runs on every hook event.
+./hook/src/main.rs:4://! Coucou over the named pipe `\\.\pipe\coucou-<sid>`.
+./hook/src/main.rs:7://! * If the pipe does not exist — Coucou is closed — we exit 0 immediately with
+./hook/src/main.rs:14://!   asks in the terminal exactly as if Coucou were not installed.
+./hook/src/main.rs:16://! Usage: `coucou-hook <EventName>` (the name is also read from the JSON).
+./hook/src/main.rs:42:/// `\\.\pipe\coucou-<sid>`. The SID keeps two accounts on the same machine from
+./hook/src/main.rs:48:    format!(r"\\.\pipe\coucou-{key}")
+./hook/src/main.rs:108:        "deny" => r#"{"behavior":"deny","message":"Denied from Coucou"}"#.to_string(),
+./hook/src/main.rs:159:    // Which terminal the session runs in. Unlike macOS, Coucou on Windows accepts
+./hook/src/main.rs:244:            r#"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"Denied from Coucou"}}}
+./hook/src/win.rs:4://! Named pipes live in a machine-wide namespace, so `\\.\pipe\coucou-<name>` can
+./index.html:6:    <title>Coucou</title>
+./package.json:2:  "name": "coucou-windows",
+./package.json:12:    "predev": "cargo build --release -p coucou-hook",
+./package.json:13:    "prebuild": "cargo build --release -p coucou-hook",
+./scripts/gen-icons.mjs:1:// Draws Mochi into the PNG/ICO set Tauri needs. No dependencies: the icons are
+./scripts/gen-icons.mjs:14:// ── Mochi ─────────────────────────────────────────────────────────────────────
+./scripts/gen-icons.mjs:38:function renderMochi(size) {
+./scripts/gen-icons.mjs:185:const png = (size) => encodePNG(size, renderMochi(size));
+./scripts/pack.mjs:33:const versioned = join(outDir, `Coucou-Windows-${version}-setup.exe`);
+./scripts/pack.mjs:34:const rolling = join(outDir, "Coucou-Windows-setup.exe");
+./settings.html:6:    <title>Settings — Coucou</title>
+./src/core/bridge.ts:18:    console.error(`[coucou] ${cmd} failed`, err);
+./src/core/bridge.ts:60:  /** Writes to %LOCALAPPDATA%\Coucou\coucou.log, next to the Rust lines. */
+./src/core/bridge.ts:136:  if (!IS_TAURI) throw new Error("not running inside Coucou");
+./src/core/layout.ts:92:// dropped the whole sequence — Mochi included — is drawn by src/upload, which
+./src/core/state.ts:4:import type { EyeShape } from "../mochi/engine";
+./src/island/fsm.ts:4:export type FsmState = "hidden" | "petit" | "home" | "coucou";
+./src/island/fsm.ts:15:  /** coucou → petit once the greeting animation ends (no hover). */
+./src/island/fsm.ts:17:  /** coucou → petit while the mouse hovers the greeting. */
+./src/island/fsm.ts:30:    this.transition("coucou");
+./src/island/fsm.ts:45:      case "coucou":
+./src/island/fsm.ts:61:      case "coucou":
+./src/island/fsm.ts:76:    if (this.state !== "coucou") return;
+./src/island/fsm.ts:128:      if (this.state === "coucou") this.transition("petit");
+./src/island/hooks.ts:264:      // Coucou answers within 108 s or not at all; after that the terminal has
+./src/island/island.ts:1:// The island: DOM shell, sizing animation, Mochi placement, mouse handling.
+./src/island/island.ts:14:import { BotEngine, hexToRGB } from "../mochi/engine";
+./src/island/island.ts:15:import { Greeting } from "../mochi/greeting";
+./src/island/island.ts:16:import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../mochi/minibots";
+./src/island/island.ts:185:    // The drop sequence draws the card, the bar and its own Mochi. It sits under
+./src/island/island.ts:234:          if (from === "coucou") this.greeting.interrupt();
+./src/island/island.ts:237:          if (from === "coucou") State.view = State.defaultView();
+./src/island/island.ts:244:        case "coucou":
+./src/island/island.ts:383:   * Mochi eats the file. Nothing here waits on the file system: the copy into
+./src/island/island.ts:425:   * the ✓ chime when the bar completes, then `choose` once Mochi has grown back.
+./src/island/island.ts:578:      if (this.fsm.state === "coucou") this.greeting.hover();
+./src/island/island.ts:698:      // Kept running even while the drop canvas is up, so the island's own Mochi
+./src/island/island.ts:742:    // The drop canvas draws its own Mochi; two of them would overlap.
+./src/mochi/engine.ts:1:// Mochi — direct port of NotchBuddy/Sources/App/BotEngine.swift to Canvas 2D.
+./src/mochi/engine.ts:61:// ── Constants (MochiConst / PISTES.mochi) ─────────────────────────────────────
+./src/mochi/engine.ts:169:  /** Solid body colour for mini bots / integration pills (null = Mochi gradient). */
+./src/mochi/engine.ts:322:  /** Peek wave — the "coucou". Timings from BotEngine.greet(). */
+./src/mochi/greeting.ts:1:// The launch "coucou" — port of GreetingCanvasView.swift.
+./src/mochi/greeting.ts:251:function mochiPath(hw: number, hh: number): Path2D {
+./src/mochi/greeting.ts:330:function drawMochi(x: CanvasRenderingContext2D, p: Pose) {
+./src/mochi/greeting.ts:360:  const body = mochiPath(hw, hh);
+./src/mochi/greeting.ts:476:    x.fill(mochiPath(5.3, 4));
+./src/mochi/greeting.ts:564:    drawMochi(x, p);
+./src/mochi/minibots.ts:1:// Mini Mochis (pills + compact grid) — port of MiniBotCanvasView.
+./src/mochi/minibots.ts:17: * Creates a mini Mochi whose **body** is `bodySize` CSS pixels across.
+./src/settings/main.ts:70:          ? "Coucou is hooked into your Claude Code sessions. Tool calls, questions and permission requests show up in the island, and
+./src/settings/main.ts:87:        text: "coucou-hook.exe is not in place yet. Restart Coucou; if it still fails, build it with `cargo build -p coucou-hook`.",
+./src/settings/main.ts:138:          : "This removes Coucou's entries only. Your own hooks are left untouched.",
+./src/settings/main.ts:295:    note.textContent = `Pick up to ${MAX_ACTIVE} pills to show next to Mochi — ${used}/${MAX_ACTIVE} in use. Keys are stored in the W
+./src/settings/main.ts:443:    h("h1", {}, h("span", { text: "Coucou" }), h("span", { class: "version", text: version })),
+./src/style.css:1:/* Coucou for Windows — same palette, sizes and type scale as the macOS island.
+./src/style.css:168:/* A mini Mochi: the slot is the body, the canvas is larger and overflows it so
+./src/upload/canvas.ts:4:// card, dashed drop frame, drop text, progress bar, the choose card, Mochi and
+./src/upload/canvas.ts:5:// the file being sucked in. The island's own Mochi is hidden for the duration,
+./src/upload/canvas.ts:168:    this.drawMochi(ctx, f);
+./src/upload/canvas.ts:291:  // ── Mochi ─────────────────────────────────────────────────────────────────
+./src/upload/canvas.ts:293:  private drawMochi(ctx: CanvasRenderingContext2D, f: UploadFrame) {
+./src/upload/canvas.ts:324:    // Top rim, once Mochi is box-shaped enough to have one.
+./src/upload/sequence.ts:351:    // Tilt follows how fast Mochi is sliding.
+./src/views/views.ts:10:import { createMiniBot, pruneMiniBots } from "../mochi/minibots";
+./src/views/views.ts:335:      row.append(h("div", { class: "sub", text: "Answer in your terminal — Coucou can't reply for you yet." }));
+./src-tauri/capabilities/default.json:4:  "description": "What Coucou's windows are allowed to do. Everything that touches the OS goes through Coucou's own comm
+./src-tauri/Cargo.toml:2:name = "coucou"
+./src-tauri/Cargo.toml:3:description = "Coucou for Windows — Mochi lives at the top of your screen"
+./src-tauri/Cargo.toml:10:name = "coucou_lib"
+./src-tauri/gen/schemas/capabilities.json:1:{"default":{"identifier":"default","description":"What Coucou's windows are allowed to do. Everything that touches t
+./src-tauri/nsis/hooks.nsh:3:; The app stages coucou-hook.exe into %LOCALAPPDATA%\Coucou\bin at launch, so the
+./src-tauri/nsis/hooks.nsh:14:  RMDir /r "$LOCALAPPDATA\Coucou\bin"
+./src-tauri/nsis/hooks.nsh:15:  RMDir /r "$LOCALAPPDATA\Coucou\inbox"
+./src-tauri/nsis/hooks.nsh:16:  Delete "$LOCALAPPDATA\Coucou\coucou.log"
+./src-tauri/src/claude.rs:25:const SYSTEM_PROMPT: &str = "You are Mochi, a personal AI assistant living at the top of the user's screen. \
+./src-tauri/src/files.rs:1:// Dropped files are copied into %LOCALAPPDATA%\Coucou\inbox so the original is
+./src-tauri/src/files.rs:91:        let tmp = std::env::temp_dir().join(format!("coucou-test-{}", std::process::id()));
+./src-tauri/src/hooks.rs:6:// click. Uninstall removes Coucou's entries and nothing else.
+./src-tauri/src/hooks.rs:38:/// Marker that identifies a Coucou entry inside settings.json.
+./src-tauri/src/hooks.rs:39:const MARKER: &str = "coucou-hook";
+./src-tauri/src/hooks.rs:100:        Ok(_) => Err(format!("{path} isn't a JSON object — Coucou won't touch it.")),
+./src-tauri/src/hooks.rs:102:            "{path} isn't valid JSON ({err}). Fix or move it, then try again — Coucou won't overwrite it."
+./src-tauri/src/hooks.rs:134:/// Settings with Coucou's hooks added; everything else is left untouched.
+./src-tauri/src/hooks.rs:164:/// Settings with every Coucou entry removed, and nothing else changed.
+./src-tauri/src/hooks.rs:297:    let temp = path.with_extension(format!("json.coucou-{}", std::process::id()));
+./src-tauri/src/hooks.rs:306:/// Copies coucou-hook.exe into %LOCALAPPDATA%\Coucou\bin on launch.
+./src-tauri/src/hooks.rs:308:/// next to coucou.exe in the workspace target directory.
+./src-tauri/src/hooks.rs:323:    if let Ok(p) = app.path().resolve("coucou-hook.exe", tauri::path::BaseDirectory::Resource) {
+./src-tauri/src/hooks.rs:330:            candidates.push(parent.join("coucou-hook.exe"));
+./src-tauri/src/hooks.rs:331:            candidates.push(parent.join("../release/coucou-hook.exe"));
+./src-tauri/src/hooks.rs:340:            "coucou-hook.exe not found — Claude Code hooks cannot work. Looked in: {}",
+./src-tauri/src/hooks.rs:357:            crate::log::line(format!("could not install coucou-hook.exe: {err}"));
+./src-tauri/src/hooks.rs:456:        // file containing nothing but Coucou's hooks, and the write replaced
+./src-tauri/src/hooks.rs:518:        let tmp = std::env::temp_dir().join(format!("coucou-hooks-{}", std::process::id()));
+./src-tauri/src/hooks.rs:534:        assert!(plan.diff.contains("coucou-hook"), "the diff must show what changes");
+./src-tauri/src/integrations.rs:56:/// pausing Coucou has to mean pausing Coucou, not just hiding the island.
+./src-tauri/src/integrations.rs:275:        .header("User-Agent", "Coucou")
+./src-tauri/src/integrations.rs:300:        .header("User-Agent", "Coucou")
+./src-tauri/src/lib.rs:1:// Coucou for Windows — app wiring and the commands the island calls.
+./src-tauri/src/lib.rs:72:        eprintln!("[coucou] could not save settings: {err}");
+./src-tauri/src/lib.rs:78:            eprintln!("[coucou] autostart: {err}");
+./src-tauri/src/lib.rs:331:        .title("Settings — Coucou")
+./src-tauri/src/lib.rs:426:            log::line(format!("--- Coucou {} started ---", env!("CARGO_PKG_VERSION")));
+./src-tauri/src/lib.rs:433:        .expect("error while running Coucou");
+./src-tauri/src/log.rs:1:// Small append-only log at %LOCALAPPDATA%\Coucou\coucou.log — the Windows
+./src-tauri/src/log.rs:20:    let path = dir.join("coucou.log");
+./src-tauri/src/main.rs:1:// Coucou runs without a console window: Mochi is the whole UI.
+./src-tauri/src/main.rs:5:    coucou_lib::run()
+./src-tauri/src/pipe.rs:1:// Named-pipe server for coucou-hook.
+./src-tauri/src/pipe.rs:3:// `\\.\pipe\coucou-<sid>` — one instance per connection. Every hook event is
+./src-tauri/src/pipe.rs:9://   * coucou-hook gives the connection 300 ms and exits cleanly if we are closed;
+./src-tauri/src/pipe.rs:17:// documented hookSpecificOutput JSON is coucou-hook's job, so the wire format
+./src-tauri/src/pipe.rs:34:/// Slightly under coucou-hook's own 110 s wait, so we always answer first.
+./src-tauri/src/pipe.rs:59:/// `\\.\pipe\coucou-<sid>` — must match coucou-hook's `pipe_path()` exactly.
+./src-tauri/src/pipe.rs:63:    format!(r"\\.\pipe\coucou-{key}")
+./src-tauri/src/pipe.rs:148:    // No decision: say nothing at all. coucou-hook then writes nothing to stdout
+./src-tauri/src/pipe.rs:149:    // and Claude Code asks in the terminal, exactly as if Coucou were closed.
+./src-tauri/src/pipe.rs:219:/// it into Claude Code's JSON is coucou-hook's job.
+./src-tauri/src/secrets.rs:6:const SERVICE: &str = "fr.louisraille.coucou";
+./src-tauri/src/secrets.rs:8:/// Every key Coucou may store. Anything outside this list is refused.
+./src-tauri/src/settings.rs:1:// Preferences, stored as plain JSON in %APPDATA%\Coucou\settings.json.
+./src-tauri/src/settings.rs:50:/// %APPDATA%\Coucou
+./src-tauri/src/settings.rs:55:    base.join("Coucou")
+./src-tauri/src/settings.rs:58:/// %LOCALAPPDATA%\Coucou — where coucou-hook.exe and the log live.
+./src-tauri/src/settings.rs:63:    base.join("Coucou")
+./src-tauri/src/settings.rs:67:    local_dir().join("bin").join("coucou-hook.exe")
+./src-tauri/src/tray.rs:10:    let open = MenuItem::with_id(app, "open", "Open Coucou", true, None::<&str>)?;
+./src-tauri/src/tray.rs:19:    let mut builder = TrayIconBuilder::with_id("coucou")
+./src-tauri/src/tray.rs:20:        .tooltip("Coucou")
+./src-tauri/src/win_user.rs:4:// keeps two accounts on the same machine from ever meeting on `coucou-*`.
+./src-tauri/src/win_user.rs:5:// coucou-hook computes the same string (hook/src/win.rs) and additionally checks
+./src-tauri/tauri.conf.json:3:  "productName": "Coucou",
+./src-tauri/tauri.conf.json:5:  "identifier": "fr.louisraille.coucou",
+./src-tauri/tauri.conf.json:21:        "title": "Coucou",
+./src-tauri/tauri.conf.json:54:    "shortDescription": "Mochi lives at the top of your screen",
+./src-tauri/tauri.conf.json:55:    "longDescription": "Coucou puts Mochi at the top of your screen: it shows your Claude Code sessions and a few integrations, a
+./vite.config.ts:19:    name: "coucou-shared-sounds",

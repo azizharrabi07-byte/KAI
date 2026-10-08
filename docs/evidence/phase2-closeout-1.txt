@@ -1,0 +1,42 @@
+PHASE 2 CLOSEOUT — ROUND 1 (live, 2026-10-03)
+=============================================
+Core: buildId=02d57725b8c7a5b3 gitCommit=fb53338, spawned by the real kai.exe, owns 8788.
+
+0. TEST APPROVAL QUEUE CLEANED — PASS
+   5 junk approvals (3 checkpoint.restore, 2 agents.run_task) decided through the REAL approval
+   lifecycle (POST /approvals/:id/decide, rejected) — no SQLite surgery, no bypass, history
+   kept (37 records). Pending is now 0.
+
+C2. CHECKPOINT RESTORE — PASS (complete)
+   checkpoint created -> controlled file modified -> restore requested
+     -> 409 DESTRUCTIVE with approvalId apr_murnro3h_5 (the gate, working)
+     -> approved -> re-issued with the approval
+     -> HTTP 200 {"restore":{"ok":true,"verified":true,"restored":1,"removed":0}}
+   The file went back to the checkpointed state, and `verified:true` is the shadow repo's
+   INDEPENDENT sha256 manifest check — the restore really happened, it was not claimed.
+   The user's real git history is untouched: 2 commits, HEAD unchanged before and after.
+   The shadow repo was used; the user's repository was not.
+
+C3. CHECKPOINT FAILURE HONESTY — PASS
+   A non-existent target returns 409 "target does not exist: …". No success claim.
+
+R2. SCHEDULER SURVIVES RESTART — PASS
+   Schedule created with a durable id (sched_ed302ac7-…), the real app was killed and
+   relaunched, the schedule was still present and enabled, and it then fired.
+   Missions carrying that scheduleId: EXACTLY 1.
+
+R3. NO DOUBLE FIRE — PASS (by the same evidence)
+   The occurrence identity deduped across a real restart: one occurrence, one mission, one
+   execution. A dedicated restart-across-the-due-boundary run was not separately performed.
+
+CORRECTIONS TO MY OWN HARNESS THIS ROUND (the product was right both times):
+   - Three scripts reported "409 without approvalId" for the restore. The full body printed
+     twice, independently, always CONTAINS approvalId; my read was buggy. Recorded rather
+     than quietly re-run, because a harness that lies in either direction is the same hazard
+     as a product that lies.
+   - An earlier C2 assertion wrongly counted MY OWN deliberate file modification as "the
+     user's git was touched"; the correct check is git HISTORY (log/HEAD), which was
+     unchanged throughout.
+
+STILL OPEN: C4, C5, L2 (observable behaviour change), R4 (needs a live policy-mutation route),
+I1-I4, live prompt precedence, and the full regression re-run.

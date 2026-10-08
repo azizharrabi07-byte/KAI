@@ -1,0 +1,214 @@
+{
+  "at": "2026-10-05T00:09:58.988Z",
+  "claim": "KAI's MCP capability is independent of Hermes: KAI's own modules own the transport, the process, and the catalogue.",
+  "method": "One standalone node process importing ONLY core/src/mcp modules; real grep over core/src/mcp/**; real OS process-tree walk via PowerShell Get-CimInstance Win32_Process.",
+  "a_sourceIndependence": {
+    "filesScanned": [
+      "core/src/mcp/bridge.ts",
+      "core/src/mcp/capability.ts",
+      "core/src/mcp/integration.ts",
+      "core/src/mcp/manager.ts",
+      "core/src/mcp/real-client.ts",
+      "core/src/mcp/registry.ts",
+      "core/src/mcp/result.ts",
+      "core/src/mcp/routes.ts",
+      "core/src/mcp/secrets.ts",
+      "core/src/mcp/servers/echo-mcp-server.mjs",
+      "core/src/mcp/tool-adapter.ts",
+      "core/src/mcp/tool-schema.ts",
+      "core/src/mcp/types.ts",
+      "core/src/mcp/validation.ts",
+      "core/src/mcp/WIRING.md"
+    ],
+    "patterns": [
+      "/hermes/i",
+      "/\\.hermes/i",
+      "/8642/"
+    ],
+    "totalHits": 1,
+    "codeHits": 0,
+    "hits": [
+      {
+        "file": "core/src/mcp/real-client.ts",
+        "line": 175,
+        "pattern": "hermes",
+        "kind": "comment",
+        "text": "* WHY THIS EXISTS: an MCP config copied from Hermes declares `command: \"npx\"`,"
+      }
+    ],
+    "verdict": "PROVEN — zero Hermes/8642 references in executable code under core/src/mcp/**"
+  },
+  "b_runtimeIndependence": {
+    "harnessPid": 22460,
+    "discordTokenPresence": "PRESENT",
+    "targets": [
+      {
+        "name": "kai-echo-fixture",
+        "provenance": "KAI's own fixture server — requires NOTHING from Hermes",
+        "connected": true,
+        "serverInfo": {
+          "raw": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {
+              "tools": {},
+              "resources": {}
+            },
+            "serverInfo": {
+              "name": "kai-echo-fixture",
+              "version": "0.1.0"
+            },
+            "instructions": "KAI's MCP fixture. echo is read-only; write_note appends to a temp file."
+          },
+          "protocolVersion": "2025-06-18",
+          "name": "kai-echo-fixture",
+          "version": "0.1.0",
+          "capabilities": {
+            "tools": {},
+            "resources": {}
+          },
+          "instructions": "KAI's MCP fixture. echo is read-only; write_note appends to a temp file."
+        },
+        "pid": 5220,
+        "toolCount": 2,
+        "toolsError": null,
+        "toolCallName": "echo",
+        "toolCall": "EXECUTED",
+        "toolCallText": "{\"content\":[{\"type\":\"text\",\"text\":\"kai-independence\"}]}",
+        "processAncestry": [
+          {
+            "pid": 5220,
+            "name": "node.exe",
+            "ppid": 22460
+          },
+          {
+            "pid": 22460,
+            "name": "node.exe",
+            "ppid": 22972
+          },
+          {
+            "pid": 22972,
+            "name": "bash.exe",
+            "ppid": 23256
+          },
+          {
+            "pid": 23256,
+            "name": "bash.exe",
+            "ppid": 20540
+          },
+          {
+            "pid": 20540,
+            "name": "python.exe",
+            "ppid": 13760
+          },
+          {
+            "pid": 13760,
+            "name": "python.exe",
+            "ppid": 6900
+          },
+          {
+            "pid": 6900,
+            "name": "python.exe",
+            "ppid": 6376
+          },
+          {
+            "pid": 6376,
+            "name": "Hermes.exe",
+            "ppid": 13360
+          },
+          {
+            "pid": 13360,
+            "name": "explorer.exe",
+            "ppid": 10596
+          }
+        ],
+        "parentIsKaiHarness": true,
+        "hermesBetweenChildAndKai": false,
+        "hermesAboveKaiOnly": true,
+        "verdict": "PROVEN — the MCP server process is owned by KAI's own process; no Hermes process sits between them"
+      },
+      {
+        "name": "discord",
+        "provenance": "real third-party (npx -y @iqai/mcp-discord); token handed over at migration time, value in child env only",
+        "connected": true,
+        "serverInfo": {
+          "raw": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {
+              "tools": {},
+              "sampling": {}
+            },
+            "serverInfo": {
+              "name": "MCP-Discord",
+              "version": "1.0.0"
+            }
+          },
+          "protocolVersion": "2025-06-18",
+          "name": "MCP-Discord",
+          "version": "1.0.0",
+          "capabilities": {
+            "tools": {},
+            "sampling": {}
+          }
+        },
+        "pid": 7576,
+        "toolCount": 22,
+        "toolsError": null,
+        "toolCallName": "discord_login",
+        "toolCall": "EXECUTED",
+        "toolCallText": "{\"content\":[{\"type\":\"text\",\"text\":\"Successfully logged in to Discord: Kage#6011\"}]}",
+        "processAncestry": [
+          {
+            "pid": 7576,
+            "name": "node.exe",
+            "ppid": 22460
+          },
+          {
+            "pid": 22460,
+            "name": "node.exe",
+            "ppid": 22972
+          },
+          {
+            "pid": 22972,
+            "name": "bash.exe",
+            "ppid": 23256
+          },
+          {
+            "pid": 23256,
+            "name": "bash.exe",
+            "ppid": 20540
+          },
+          {
+            "pid": 20540,
+            "name": "python.exe",
+            "ppid": 13760
+          },
+          {
+            "pid": 13760,
+            "name": "python.exe",
+            "ppid": 6900
+          },
+          {
+            "pid": 6900,
+            "name": "python.exe",
+            "ppid": 6376
+          },
+          {
+            "pid": 6376,
+            "name": "Hermes.exe",
+            "ppid": 13360
+          },
+          {
+            "pid": 13360,
+            "name": "explorer.exe",
+            "ppid": 10596
+          }
+        ],
+        "parentIsKaiHarness": true,
+        "hermesBetweenChildAndKai": false,
+        "hermesAboveKaiOnly": true,
+        "verdict": "PROVEN — the MCP server process is owned by KAI's own process; no Hermes process sits between them"
+      }
+    ]
+  },
+  "verdict": "INDEPENDENCE PROVEN"
+}

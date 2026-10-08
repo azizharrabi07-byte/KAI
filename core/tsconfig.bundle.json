@@ -1,0 +1,8 @@
+{
+  "//": "The shipped Core. Same source as tsconfig.json, minus the tests: an installed app must not carry compiled test files, and a runtime directory that contains them is how app/target/release/core/*.test.js got picked up by `node --test` in app/. `npm test` in core/ still runs the TypeScript sources directly, and `npm run test:dist` still runs core/dist, which keeps its compiled tests.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "bundle"
+  },
+  "exclude": ["node_modules", "dist", "bundle", "src/**/*.test.ts", "tests/**/*.ts"]
+}

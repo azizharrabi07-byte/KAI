@@ -1,0 +1,232 @@
+KAI0.1.1
+Claude Code
+This is exactly what will change in your settings.json. Your own hooks are left untouched.
+  …
+              "type": "command"
+            }
+          ]
++       },
++       {
++         "hooks": [
++           {
++             "type": "command",
++             "command": "\"C:/Users/DELL/AppData/Local/KAI/bin/kai-hook.exe\" SessionStart",
++             "timeout": 10
++           }
++         ]
+        }
+      ],
+      "UserPromptSubmit": [
+  …
+              "timeout": 10
+            }
+          ]
++       },
++       {
++         "hooks": [
++           {
++             "type": "command",
++             "command": "\"C:/Users/DELL/AppData/Local/KAI/bin/kai-hook.exe\" UserPromptSubmit",
++             "timeout": 10
++           }
++         ]
+        }
+      ],
+      "Stop": [
+  …
+              "timeout": 10
+            }
+          ]
++       },
++       {
++         "hooks": [
++           {
++             "type": "command",
++             "command": "\"C:/Users/DELL/AppData/Local/KAI/bin/kai-hook.exe\" Stop",
++             "timeout": 10
++           }
++         ]
+        }
+      ],
+      "StopFailure": [
+  …
+              "timeout": 10
+            }
+          ]
++       },
++       {
++         "hooks": [
++           {
++             "type": "command",
++             "command": "\"C:/Users/DELL/AppData/Local/KAI/bin/kai-hook.exe\" StopFailure",
++             "timeout": 10
++           }
++         ]
+        }
+      ],
+      "SubagentStart": [
+  …
+              "timeout": 10
+            }
+          ]
++       },
++       {
++         "hooks": [
++           {
++             "type": "command",
++             "command": "\"C:/Users/DELL/AppData/Local/KAI/bin/kai-hook.exe\" SubagentStart",
++             "timeout": 10
++           }
++         ]
+        }
+      ],
+      "SubagentStop": [
+  …
+              "timeout": 10
+            }
+          ]
++       },
++       {
++         "hooks": [
++           {
++             "type": "command",
++             "command": "\"C:/Users/DELL/AppData/Local/KAI/bin/kai-hook.exe\" SubagentStop",
++             "timeout": 10
++           }
++         ]
+        }
+      ],
+      "TeammateIdle": [
+  …
+              "timeout": 10
+            }
+          ]
++       },
++       {
++         "hooks": [
++           {
++             "type": "command",
++             "command": "\"C:/Users/DELL/AppData/Local/KAI/bin/kai-hook.exe\" PreToolUse",
++             "timeout": 10
++           }
++         ]
+        }
+      ],
+      "PostToolUse": [
+  …
+              "timeout": 10
+            }
+          ]
++       },
++       {
++         "hooks": [
++           {
++             "type": "command",
++             "command": "\"C:/Users/DELL/AppData/Local/KAI/bin/kai-hook.exe\" PostToolUse",
++             "timeout": 10
++           }
++         ]
+        }
+      ],
+      "PostToolUseFailure": [
+  …
+              "timeout": 10
+            }
+          ]
++       },
++       {
++         "hooks": [
++           {
++             "type": "command",
++             "command": "\"C:/Users/DELL/AppData/Local/KAI/bin/kai-hook.exe\" PostToolUseFailure",
++             "timeout": 10
++           }
++         ]
+        }
+      ],
+      "PermissionRequest": [
+  …
+              "timeout": 10
+            }
+          ]
++       },
++       {
++         "hooks": [
++           {
++             "type": "command",
++             "command": "\"C:/Users/DELL/AppData/Local/KAI/bin/kai-hook.exe\" PermissionRequest",
++             "timeout": 120
++           }
++         ]
+        }
++     ],
++     "SessionEnd": [
++       {
++         "hooks": [
++           {
++             "type": "command",
++             "command": "\"C:/Users/DELL/AppData/Local/KAI/bin/kai-hook.exe\" SessionEnd",
++             "timeout": 10
++           }
++         ]
++       }
++     ],
++     "Notification": [
++       {
++         "hooks": [
++           {
++             "type": "command",
++             "command": "\"C:/Users/DELL/AppData/Local/KAI/bin/kai-hook.exe\" Notification",
++             "timeout": 10
++           }
++         ]
++       }
+      ]
+    },
+    "permissions": {
+  …
+Backup → C:\Users\DELL\.claude\settings.json.bak-20261001-182751
+Back up and write
+Cancel
+Claude
+No key yet — the chat needs one.
+API key
+Save key
+Model
+Claude Opus 5
+Claude Sonnet 5
+Claude Haiku 4.5
+Integrations
+Pick up to 4 pills to show next to KAI — 6/4 in use. Keys are stored in the Windows Credential Manager, never on disk.
+Stripe
+Secret key
+Save
+GitHub
+Token
+Save
+Vercel
+Token
+Save
+n8n
+Instance URL
+Save
+API key
+Save
+Resend
+API key
+Save
+Notion
+Integration token
+Save
+Cal.com
+API key
+Save
+General
+Sound
+Auto-close
+seconds after you leave the island
+Island lives on
+Main display
+Display under the cursor
+Launch at startup
+No telemetry. Network requests only go to the services you configure yourself.

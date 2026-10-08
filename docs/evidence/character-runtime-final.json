@@ -1,0 +1,211 @@
+{
+  "artifact": "character-runtime-final",
+  "generatedAt": "2026-10-04T14:52:00Z",
+  "head": "ee3ab22646bc2011f4476bc8aa299a033bd036e1",
+  "running": {
+    "buildId": "af2c5a9b3a7e83a8",
+    "corePid": 10412,
+    "identityFreshness": "fresh",
+    "islandUrl": "http://tauri.localhost/",
+    "cdpPort": 9222,
+    "webview2Profile": "scratch/wv2-fix"
+  },
+  "method": {
+    "realPath": "real Claude Code hook payload -> kai-hook.exe (the REAL relay binary) -> named pipe \\\\.\\pipe\\kai-<sid> -> app/src-tauri/src/pipe.rs -> app.emit(\"hook\") -> app/src/island/hooks.ts handleHook -> island.observeWorkerActivity(type,payload) -> KaiRuntimeMachine.applyEvent -> onTransition -> State.setRuntime -> State.notify -> island.sync -> engine.setState(faceState()) -> KaiEngine/Orb -> canvas",
+    "rendererReceipt": "The character's OWN renderer handle (window.__kaiEngine, registered inside KaiEngine.draw()) is read over CDP: .state (what engine.setState received, lower-cased) and .renderer.pose (the pose the Orb was driven to via poseForState()). This is the receipt that the RENDERER received the state, not a DOM guess.",
+    "screenshots": "Page.captureScreenshot of the running island window (1035x460, DPR 1.435); each analysed with vision_analyze on a crop of the pill. Hashes alone are not proof; the descriptions below are what the model SAW.",
+    "noTimers": "No setTimeout triggers a state. Every non-IDLE state is entered by a real hook event delivered over the real pipe. (setTimeout appears only in the IDLE reset wait, which merely WAITS for the bounded result-hold safeguard to elapse.)",
+    "tags": {
+      "UNIT PROVEN": "the pure transition is pinned by app/tests/runtime-state.test.ts",
+      "INTEGRATION PROVEN": "event -> machine -> State -> engine wiring exercised in-process",
+      "END-TO-END PROVEN": "driven through the REAL relay binary + real pipe, and the running renderer's own handle read back showing the state AND pose",
+      "MOCK ONLY": "only a stub/synthetic event was used",
+      "NOT PROVEN": "no real path reaches this state today",
+      "BLOCKED_EXTERNAL": "requires an external system not available in this session"
+    }
+  },
+  "states": [
+    {
+      "state": "IDLE",
+      "triggerEvent": "core reconnection (setConnection ONLINE) after the Core was killed and the supervisor respawned it; resting state",
+      "runtimeState": "IDLE",
+      "faceState": "idle (faceState() returns focusTask.state when runtime==IDLE)",
+      "rendererInput": "engine.setState('idle') -> poseForState('idle') = 'idle'",
+      "uiState": "engineState='idle', renderer.pose='idle', cfgBadge=null, conn='ONLINE', mode='expanded'",
+      "tag": "END-TO-END PROVEN",
+      "screenshot": "docs/evidence/char-idle.png",
+      "vision": "Expanded island, dark panel. A glowing blue gradient orb with two small white oval eyes is present at rest on the left; no activity text. Character visible and dormant-neutral."
+    },
+    {
+      "state": "THINKING",
+      "triggerEvent": "UserPromptSubmit hook -> RUNTIME_FOR_HOOK maps to 'turn.started' -> stateForEvent -> THINKING",
+      "runtimeState": "THINKING",
+      "faceState": "THINKING",
+      "rendererInput": "engine.setState('THINKING') -> poseForState('thinking') = 'thinking'; badge 'dots'",
+      "uiState": "engineState='thinking', renderer.pose='thinking', cfgBadge='dots', runtimeLabel='KAI is thinking…', mode='compact'",
+      "tag": "END-TO-END PROVEN",
+      "screenshot": "docs/evidence/char-thinking.png",
+      "vision": "Compact pill: luminous blue glossy orb with two white highlight eyes; a 2x2 dot cluster on the right of the pill. Real character, not a flat disc."
+    },
+    {
+      "state": "RESEARCHING",
+      "triggerEvent": "PreToolUse {tool_name:'WebSearch'} -> item.started -> toolStateFor('websearch') = RESEARCHING",
+      "runtimeState": "RESEARCHING",
+      "faceState": "RESEARCHING",
+      "rendererInput": "engine.setState('RESEARCHING') -> poseForState('researching') = 'scan'",
+      "uiState": "engineState='researching', renderer.pose='scan', cfgBadge=null, runtimeLabel='KAI is researching…', mode='compact'",
+      "tag": "END-TO-END PROVEN",
+      "screenshot": "docs/evidence/char-researching.png",
+      "vision": "Compact pill: vibrant gradient-blue glass orb with two white oval eyes and a soft glow. Neutral gaze."
+    },
+    {
+      "state": "BROWSING",
+      "triggerEvent": "PreToolUse {tool_name:'WebFetch'} -> item.started -> toolStateFor('webfetch') matches browser regex = BROWSING",
+      "runtimeState": "BROWSING",
+      "faceState": "BROWSING",
+      "rendererInput": "engine.setState('BROWSING') -> poseForState('browsing') = 'toolcall'",
+      "uiState": "engineState='browsing', renderer.pose='toolcall', cfgBadge=null, runtimeLabel='KAI is browsing…', mode='compact'",
+      "tag": "END-TO-END PROVEN",
+      "screenshot": "docs/evidence/char-browsing.png",
+      "vision": "Compact pill: vibrant blue circular orb, neutral friendly white-oval eyes, soft blue halo; no badge."
+    },
+    {
+      "state": "CODING",
+      "triggerEvent": "PreToolUse {tool_name:'Write'} -> item.started -> toolStateFor('write') = CODING",
+      "runtimeState": "CODING",
+      "faceState": "CODING",
+      "rendererInput": "engine.setState('CODING') -> poseForState('coding') = 'working'",
+      "uiState": "engineState='coding', renderer.pose='working', cfgBadge=null, runtimeLabel='KAI is coding…', mode='compact'",
+      "tag": "END-TO-END PROVEN",
+      "screenshot": "docs/evidence/char-coding.png",
+      "vision": "Compact pill: blue translucent orb with two white dot eyes, a white base/pedestal and a small white badge line near the top; glossy highlight. Distinct from the plain idle orb."
+    },
+    {
+      "state": "USING_CLI",
+      "triggerEvent": "PreToolUse {tool_name:'Bash'} -> item.started -> toolStateFor('bash') = USING_CLI (the control, already proven)",
+      "runtimeState": "USING_CLI",
+      "faceState": "USING_CLI",
+      "rendererInput": "engine.setState('USING_CLI') -> poseForState('using_cli') = 'executing'",
+      "uiState": "engineState='using_cli', renderer.pose='executing', cfgBadge=null, runtimeLabel='KAI is running a command…', mode='compact'",
+      "tag": "END-TO-END PROVEN",
+      "screenshot": "docs/evidence/char-using_cli.png",
+      "vision": "Compact pill: glowing blue orb with a bright core, two white dot eyes, sitting on a small white base with a faint blue motion 'tail' on the upper-left; reads as actively executing."
+    },
+    {
+      "state": "DELEGATING",
+      "triggerEvent": "SubagentStart(A) -> hooks.ts case 'SubagentStart' -> observeWorkerActivity('subagent.started') -> one live subagent",
+      "runtimeState": "DELEGATING",
+      "faceState": "DELEGATING",
+      "rendererInput": "engine.setState('DELEGATING') -> poseForState('delegating') = 'multiagent'",
+      "uiState": "engineState='delegating', renderer.pose='multiagent', runtimeLabel='KAI is working through a worker…', mode='compact'",
+      "tag": "END-TO-END PROVEN",
+      "screenshot": "docs/evidence/char-multi_agent_step1_a_start.png",
+      "vision": "Compact pill: glowing gradient-blue orb with two white vertical-oval eyes and a soft halo; single unified entity (one worker = delegation)."
+    },
+    {
+      "state": "MULTI_AGENT",
+      "triggerEvent": "SubagentStart(B) while A is still live -> two concurrent subagents -> latch enters MULTI_AGENT",
+      "runtimeState": "MULTI_AGENT",
+      "faceState": "MULTI_AGENT",
+      "rendererInput": "engine.setState('MULTI_AGENT') -> poseForState('multi_agent') = 'multiagent'",
+      "uiState": "engineState='multi_agent', renderer.pose='multiagent', runtimeLabel='KAI is running several workers…', mode='compact'",
+      "tag": "END-TO-END PROVEN",
+      "screenshot": "docs/evidence/char-multi_agent_step2_b_start.png",
+      "vision": "Compact pill: glowing gradient-blue orb with two small white vertical-oval eyes and a luminous halo; single unified entity."
+    },
+    {
+      "state": "WORKING",
+      "triggerEvent": "SubagentStop(B) — the LAST live subagent stops -> subagent set drains -> latch cleared -> WORKING",
+      "runtimeState": "WORKING",
+      "faceState": "WORKING",
+      "rendererInput": "engine.setState('WORKING') -> poseForState('working') = 'working'",
+      "uiState": "engineState='working', renderer.pose='working', cfgBadge='dots', runtimeLabel='KAI is working…', mode='compact'",
+      "tag": "END-TO-END PROVEN",
+      "screenshot": "docs/evidence/char-multi_agent_step4_b_stop.png",
+      "vision": "Compact pill: blue orb with white eyes; the dots badge returns. Exits the multi-agent behaviour."
+    },
+    {
+      "state": "SUCCESS",
+      "triggerEvent": "Stop hook -> RUNTIME_FOR_HOOK 'turn.completed' -> SUCCESS (bounded 4s hold, then the frame-loop safeguard returns to IDLE)",
+      "runtimeState": "SUCCESS",
+      "faceState": "SUCCESS",
+      "rendererInput": "engine.setState('SUCCESS') -> poseForState('success') = 'success'",
+      "uiState": "engineState='success', renderer.pose='success', cfgBadge=null, runtimeLabel='KAI finished', mode='compact'",
+      "tag": "END-TO-END PROVEN",
+      "screenshot": "docs/evidence/char-success.png",
+      "vision": "Compact pill: the orb is TEAL/SEAFOAM GREEN (not blue) with a small white SMILE and sparkle marks either side — an unmistakably distinct success pose."
+    },
+    {
+      "state": "ERROR",
+      "triggerEvent": "StopFailure hook -> RUNTIME_FOR_HOOK 'turn.failed' -> ERROR (bounded 4s hold)",
+      "runtimeState": "ERROR",
+      "faceState": "ERROR",
+      "rendererInput": "engine.setState('ERROR') -> poseForState('error') = 'error'; badge 'dot'",
+      "uiState": "engineState='error', renderer.pose='error', cfgBadge='dot', runtimeLabel='KAI hit an error', mode='compact'",
+      "tag": "END-TO-END PROVEN",
+      "screenshot": "docs/evidence/char-error.png",
+      "vision": "Compact pill: the orb is PINK/MAGENTA with RED dot/dash eyes and a deadpan expression — a distinct error pose (not the blue working orb)."
+    },
+    {
+      "state": "WAITING_APPROVAL",
+      "triggerEvent": "PermissionRequest hook -> RUNTIME_FOR_HOOK 'request.opened' -> WAITING_APPROVAL (sticky; only a decision/terminal event leaves it)",
+      "runtimeState": "WAITING_APPROVAL",
+      "faceState": "WAITING_APPROVAL",
+      "rendererInput": "engine.setState('WAITING_APPROVAL') -> poseForState('waiting_approval') = 'needsuser'",
+      "uiState": "engineState='waiting_approval', renderer.pose='needsuser', cfgBadge=null, runtimeLabel='KAI needs your approval', mode='compact'",
+      "tag": "END-TO-END PROVEN",
+      "screenshot": "docs/evidence/char-waiting_approval.png",
+      "vision": "Compact pill: blue glowing orb, wide-eyed forward gaze with small white sparkle/motion lines either side — reads as alert and prompting the user."
+    },
+    {
+      "state": "OFFLINE",
+      "triggerEvent": "the Core process (pid 10412) was killed -> the SSE stream dropped -> conn not-ONLINE armed unhealthySince -> frame-loop tick() after the 1.5s grace -> OFFLINE",
+      "runtimeState": "OFFLINE",
+      "faceState": "OFFLINE",
+      "rendererInput": "engine.setState('OFFLINE') -> poseForState('offline') = 'sleeping'",
+      "uiState": "engineState='offline', renderer.pose='sleeping', conn='OFFLINE', runtimeLabel='KAI Core is offline', mode='expanded'",
+      "tag": "END-TO-END PROVEN",
+      "observedAfterKillMs": 1569,
+      "screenshot": "docs/evidence/char-offline.png",
+      "vision": "Expanded island: blue orb with two low, neutral eyes (dormant/blank), and white text reading 'KAI Core is not running — reconnecting…'. Character fell offline and did NOT stay mid-task.",
+      "recovery": "supervisor respawned the Core (new pid 7492), the stream reconnected (ONLINE), and the machine left OFFLINE for a clean IDLE — captured in char-idle.png."
+    },
+    {
+      "state": "RECOVERING",
+      "triggerEvent": "would be Core event mission.recovery_blocked (emitted from core/src/runtime.ts:2791 via notifications.notify())",
+      "runtimeState": "RECOVERING (unreachable)",
+      "faceState": "RECOVERING",
+      "rendererInput": "engine.setState('RECOVERING') -> poseForState('recovering') = 'verifying'",
+      "uiState": "NOT REACHED — the running app never entered RECOVERING",
+      "tag": "NOT PROVEN",
+      "finding": "REAL WIRING GAP, three links missing: (1) core/src/runtime.ts calls notifications.notify({type:'mission.recovery_blocked'}), which core/src/notifications/service.ts publishes on the wire as event type 'notification.created' (the recovery type rides inside the payload as payload.type). stateForEvent() switches on event.type, so the 'mission.recovery_blocked' branch can NEVER fire. (2) app/src/core/core-state.ts:139 CoreEventRow carries only {id,type,at,text} — the payload is consumed for the text and NOT retained, so the recovery type is lost at the reducer. (3) app/src/island/core-bridge.ts:219 forwards only {type,id,timestamp} to observeCoreEvent, dropping any payload. A clean fix needs all three files; only runtime-state.ts is owned here, so this is reported, not patched."
+    }
+  ],
+  "multiAgentFourStepLive": {
+    "note": "Two subagents (A, B) driven by REAL SubagentStart/SubagentStop hook payloads through the REAL relay binary (kai-hook.exe) over the REAL pipe. No setTimeout trigger.",
+    "steps": [
+      { "step": 1, "event": "SubagentStart(A) — ONE live subagent", "runtimeState": "DELEGATING", "rendererPose": "multiagent", "expected": "DELEGATING (a lone subagent is delegation, per the unit test)" },
+      { "step": 2, "event": "SubagentStart(B) — TWO concurrent", "runtimeState": "MULTI_AGENT", "rendererPose": "multiagent", "expected": "MULTI_AGENT" },
+      { "step": 3, "event": "SubagentStop(A) while B still runs — THE CRITICAL STEP", "runtimeState": "MULTI_AGENT", "rendererPose": "multiagent", "expected": "REMAINS MULTI_AGENT (a naive counter would drop to DELEGATING here)" },
+      { "step": 4, "event": "SubagentStop(B) — the last live subagent stops", "runtimeState": "WORKING", "rendererPose": "working", "expected": "EXITS MULTI_AGENT (set drained, latch cleared)" }
+    ],
+    "verdict": "END-TO-END PROVEN. Step 3 (A stops while B runs) held MULTI_AGENT live — the exact case the naive per-event counter failed. The machine treats a lone subagent (step 1) as DELEGATING, not MULTI_AGENT; that is the shipped, unit-pinned behaviour ('A starts -> MULTI_AGENT' would itself be the naive-counter bug)."
+  },
+  "offlineVerdict": {
+    "result": "END-TO-END PROVEN",
+    "detail": "Killed the Core (pid 10412). OFFLINE observed 1569ms later (inside the 1.5s grace + poll interval), conn='OFFLINE', pose='sleeping', with the visible note 'KAI Core is not running — reconnecting…'. The character fell offline and did NOT remain in a mid-task pose. The Core supervisor respawned it (pid 7492); the stream reconnected and the machine recovered to IDLE (char-idle.png)."
+  },
+  "recoveringVerdict": {
+    "result": "NOT PROVEN",
+    "detail": "Genuinely unreachable from the real stream today — see the RECOVERING state record. The Core's recovery signal is published as 'notification.created', for which stateForEvent has no case; and the payload carrying the recovery type is dropped by core-state.ts (CoreEventRow has no payload field) and again by core-bridge.ts (forwards only type/id/timestamp). Reported as a real finding."
+  },
+  "rendererReceiptSummary": {
+    "control_USING_CLI": "sent PreToolUse {tool_name:'Bash'} over the real pipe -> __kaiProbe().runtime='USING_CLI', label 'KAI is running a command…', window.__kaiEngine.state='using_cli', .renderer.pose='executing' — the renderer RECEIVED it.",
+    "allStates": "For every state above the renderer's own handle (window.__kaiEngine.state + .renderer.pose) matched the expected pose, read live over CDP from the running app."
+  },
+  "regression": {
+    "appTsc": "clean (exit 0)",
+    "appTests": "111/111 pass",
+    "coreTests": "731/718/0/13 (unchanged; not re-run in this session)"
+  }
+}

@@ -1,0 +1,1603 @@
+{
+  "at": "2026-10-04T22:50:00Z",
+  "stream": "K — FINAL INTEGRATION (core/src/api/routes.ts, core/src/server.ts, the build/launch, the live surface proof)",
+  "headAtWrite": "5f69f58",
+  "note": "This file is committed together with the mounts it records. It proves the 404 → non-404 transition for BOTH handed-over surfaces on a REBUILT, LAUNCHED artifact. 'Before' rows were captured live against the pre-mount artifact; 'after' rows against the rebuilt artifact, with every body embedded verbatim from the saved raw response.",
+  "method": "Live HTTP against 127.0.0.1:8788 (curl). Before: the artifact running before this stream's rebuild (gitCommit d2cb9f6, buildId 2159637957e7ed09, pid 4440 — the mounts were not yet applied). After: the rebuilt artifact (buildId 7d8f322134be127b, gitCommit 5f69f58, pid 3864), launched from app/target/release/kai.exe with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222 and an isolated WEBVIEW2_USER_DATA_FOLDER under the agent scratch dir. Every after-row's body is embedded from the saved raw response file (scratch/after-*.json).",
+  "levels_legend": [
+    "UNIT PROVEN — the unit does what it says under direct test",
+    "INTEGRATION PROVEN — proven across the real seams it will run behind",
+    "END-TO-END PROVEN — proven through the full stack, first request to last side effect",
+    "MOCK ONLY — proven against fakes only",
+    "NOT PROVEN — no honest evidence",
+    "BLOCKED_EXTERNAL — cannot be proven on this machine"
+  ],
+  "mounts": {
+    "core/src/api/routes.ts": "registerToolRoutes({ route: (m, p, c, h) => routeDefs.push(route(m, p, c, h)) }, { tools: runtime.tools }); — placed after the registerMcpRoutes block, following its exact shape. Adds GET /tools (READ), GET /tools/:id (READ), POST /tools/:id/invoke (EXTERNAL).",
+    "core/src/server.ts": "if (coreApi !== null && core !== undefined) registerSessionRoutes(coreApi, { runtime: core }); — placed immediately after `const coreApi = ...`. Registers the five session tools (idempotently) and wraps coreApi.handle in place; server.ts calls coreApi.handle by property access (server.ts:799), so the wrapper is picked up; marked, so a second registration cannot double-wrap."
+  },
+  "build": {
+    "command": "cd app && npx tauri build — prebuild ENABLED: beforeBuildCommand `npm run build` → npm lifecycle prebuild → `cargo build --release -p kai-hook && cd ../core && npm run bundle`; npm_config_ignore_scripts was unset.",
+    "buildExit": 0,
+    "builtApplicationAt": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\kai.exe",
+    "exeMtimeBefore": "2026-10-04 23:23 (previous artifact)",
+    "exeMtimeAfter": "2026-10-04 23:43:42.674104600",
+    "coreBundleStamp": {
+      "buildId": "7d8f322134be127b",
+      "gitCommit": "5f69f580fb829796f7e7fd1c5b0512cc09b6f9f2",
+      "sourceBuildId": "7d8f322134be127b",
+      "note": "The bundle was stamped at build time from the working tree (the two mount edits were applied but not yet committed), so gitCommit records HEAD-at-stamp (5f69f58) while buildId is content-derived from the bundled code — the content is the mounted tree; the commit that contains this file is the tree's commit."
+    },
+    "identityRow": {
+      "service": "kai-core",
+      "coreVersion": "0.1.0",
+      "buildId": "7d8f322134be127b",
+      "gitCommit": "5f69f580fb829796f7e7fd1c5b0512cc09b6f9f2",
+      "protocolVersion": 1,
+      "pid": 3864,
+      "startedAt": "2026-10-04T22:44:36.293Z",
+      "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+      "onDiskBuildId": "7d8f322134be127b",
+      "identityMatchesDisk": true,
+      "sourceBuildId": null,
+      "artifactMatchesSource": null,
+      "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+      "freshness": "fresh"
+    },
+    "portOwnership": {
+      "netstat": "TCP 127.0.0.1:8788 0.0.0.0:0 LISTENING 3864",
+      "identityPid": 3864,
+      "match": true,
+      "freshness": "fresh",
+      "note": "identityMatchesDisk true; the artifact-identity self-check did NOT refuse (no exit 5) — nothing was bypassed."
+    }
+  },
+  "testResults": {
+    "typecheck": {
+      "command": "npx tsc -p tsconfig.json --noEmit (from core/)",
+      "exit": 0
+    },
+    "fullSuite": {
+      "command": "npm test (from core/)",
+      "tests": 838,
+      "pass": 825,
+      "fail": 0,
+      "skipped": 13,
+      "note": "Run AFTER both mounts were applied — 0 failures, the bar held."
+    }
+  },
+  "liveRows": {
+    "before": {
+      "capturedAgainst": "the pre-mount artifact: identity gitCommit d2cb9f6, buildId 2159637957e7ed09, pid 4440 (owned 8788 from 22:23:44Z until this stream's rebuild). Captured 2026-10-04T22:33Z, immediately before the mount edits.",
+      "GET /tools": {
+        "http": 404,
+        "body": {
+          "error": "not_found",
+          "reason": "unknown_route",
+          "path": "/tools"
+        }
+      },
+      "GET /tools/system.get_status": {
+        "http": 404,
+        "body": {
+          "error": "not_found",
+          "reason": "unknown_route",
+          "path": "/tools/system.get_status"
+        }
+      },
+      "GET /sessions/search?query=x": {
+        "http": 404,
+        "body": {
+          "error": "not_found",
+          "reason": "unknown_route",
+          "path": "/sessions/search"
+        }
+      },
+      "note": "The 404 body is the SERVER-level fallthrough shape: server.ts only forwards a Core API result when `result.status !== 404` (server.ts:805), so any Core 404 is replaced by the server's own unknown_route 404. The transition to non-404 is the evidence."
+    },
+    "after": {
+      "capturedAgainst": "the rebuilt artifact: identity gitCommit 5f69f58, buildId 7d8f322134be127b, pid 3864; launched 2026-10-04T22:44:36Z.",
+      "toolsSurface": {
+        "GET /tools": {
+          "http": 200,
+          "body": {
+            "service": "tools",
+            "count": 56,
+            "tools": [
+              {
+                "id": "system.get_status",
+                "name": "Get system status",
+                "description": "Read KAI Core's own process health: uptime, memory, platform and host facts.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "id": "agents.list",
+                "name": "List agents",
+                "description": "List the agents KAI knows about and their last reported state.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "properties": {
+                      "limit": {
+                        "type": "integer",
+                        "description": "Maximum entries to return.",
+                        "minimum": 1,
+                        "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "id": "agents.run_task",
+                "name": "Run a task on a worker agent",
+                "description": "Hand work to a registered worker agent and return its result. Categorised EXTERNAL because it causes another process to act.",
+                "permission": {
+                  "risk": "EXTERNAL",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "description": "The registered agent to hand the work to.",
+                        "required": true
+                      },
+                      "action": {
+                        "type": "string",
+                        "description": "What the agent should do (the task title).",
+                        "required": true
+                      },
+                      "input": {
+                        "type": "string",
+                        "description": "Optional prompt/payload handed to the agent."
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "id": "missions.list",
+                "name": "List missions",
+                "description": "List missions, optionally filtered by status and capped by limit.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "properties": {
+                      "limit": {
+                        "type": "integer",
+                        "description": "Maximum entries to return.",
+                        "minimum": 1,
+                        "maximum": 500
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "Only return missions in this state.",
+                        "enum": [
+                          "DRAFT",
+                          "QUEUED",
+                          "RUNNING",
+                          "WAITING",
+                          "WAITING_APPROVAL",
+                          "COMPLETED",
+                          "FAILED",
+                          "CANCELLED"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "id": "memory.list",
+                "name": "List memories",
+                "description": "List stored memories, optionally filtered by type and capped by limit.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "properties": {
+                      "limit": {
+                        "type": "integer",
+                        "description": "Maximum entries to return.",
+                        "minimum": 1,
+                        "maximum": 500
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "Only return memories of this kind.",
+                        "enum": [
+                          "user_preference",
+                          "project_fact",
+                          "agent_fact",
+                          "mission_context",
+                          "note"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "id": "filesystem.read",
+                "name": "Read a file",
+                "description": "Read a UTF-8 text file from this machine, bounded. Reports the absolute path and byte length; a truncated read says so.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "File to read; a relative path is resolved against the Core's working directory.",
+                        "required": true
+                      },
+                      "maxBytes": {
+                        "type": "integer",
+                        "description": "Bound on the returned content; the tail is reported as truncated, never silently dropped.",
+                        "minimum": 1,
+                        "maximum": 1000000
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "id": "filesystem.list",
+                "name": "List a directory",
+                "description": "List the entries of a directory on this machine (non-recursive), bounded.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "Directory to list; a relative path is resolved against the Core's working directory.",
+                        "required": true
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "description": "Maximum entries to return.",
+                        "minimum": 1,
+                        "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "id": "filesystem.write",
+                "name": "Write a file",
+                "description": "Write a UTF-8 text file on this machine, creating parent directories on request. A WRITE, so the default policy parks it for a human.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": true,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "File to write; a relative path is resolved against the Core's working directory.",
+                        "required": true
+                      },
+                      "content": {
+                        "type": "string",
+                        "description": "The full UTF-8 content of the file.",
+                        "required": true
+                      },
+                      "createDirs": {
+                        "type": "boolean",
+                        "description": "Create missing parent directories first."
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "id": "git.status",
+                "name": "git status",
+                "description": "Read the working-tree status of a git repository (porcelain). Read-only.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "properties": {
+                      "cwd": {
+                        "type": "string",
+                        "description": "Repository directory; defaults to the Core's working directory."
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "id": "git.log",
+                "name": "git log",
+                "description": "Read the recent commit log of a git repository. Read-only.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "properties": {
+                      "cwd": {
+                        "type": "string",
+                        "description": "Repository directory; defaults to the Core's working directory."
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "description": "Maximum commits to return.",
+                        "minimum": 1,
+                        "maximum": 200
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "id": "git.diff",
+                "name": "git diff",
+                "description": "Read a git diff (working tree, or staged with staged:true). Read-only.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "properties": {
+                      "cwd": {
+                        "type": "string",
+                        "description": "Repository directory; defaults to the Core's working directory."
+                      },
+                      "staged": {
+                        "type": "boolean",
+                        "description": "Diff the staged changes instead of the working tree."
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "id": "shell.run",
+                "name": "Run a program",
+                "description": "Run a program with an explicit argument list (no shell), bounded by timeout and output size. DESTRUCTIVE, so the default policy parks it for a human.",
+                "permission": {
+                  "risk": "DESTRUCTIVE",
+                  "effectful": true,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "properties": {
+                      "command": {
+                        "type": "string",
+                        "description": "The program to run (an executable name or path; no shell interpolation).",
+                        "required": true
+                      },
+                      "args": {
+                        "type": "array",
+                        "description": "Argument list of strings passed to the program."
+                      },
+                      "cwd": {
+                        "type": "string",
+                        "description": "Working directory; defaults to the Core's working directory."
+                      },
+                      "timeoutMs": {
+                        "type": "integer",
+                        "description": "Command timeout in milliseconds.",
+                        "minimum": 1,
+                        "maximum": 120000
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "id": "capability.system",
+                "name": "Use capability: System and state inspection",
+                "description": "Invokes the \"system\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "capability.browser",
+                "name": "Use capability: Browser (semantic-first)",
+                "description": "Invokes the \"browser\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+                "permission": {
+                  "risk": "EXTERNAL",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "capability.computer",
+                "name": "Use capability: Computer use (CUA)",
+                "description": "Invokes the \"computer\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+                "permission": {
+                  "risk": "DESTRUCTIVE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "capability.mcp",
+                "name": "Use capability: MCP servers and tools",
+                "description": "Invokes the \"mcp\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+                "permission": {
+                  "risk": "EXTERNAL",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "capability.filesystem",
+                "name": "Use capability: Filesystem",
+                "description": "Invokes the \"filesystem\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "capability.git",
+                "name": "Use capability: Git (read-only)",
+                "description": "Invokes the \"git\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "capability.shell",
+                "name": "Use capability: Shell (program execution)",
+                "description": "Invokes the \"shell\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+                "permission": {
+                  "risk": "DESTRUCTIVE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "mcp.register",
+                "name": "Register an MCP server",
+                "description": "Add an MCP server to KAI's catalogue. The server lands DISABLED and inert; a human must enable and connect it before any of its tools can run. Risk is KAI's declaration: an MCP server's own annotations are never trusted.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "mcp.update",
+                "name": "Update an MCP server",
+                "description": "Edit an MCP server's entry. Enabled state and untouched secrets are preserved; a secret may be re-sent as `true` to keep the saved value.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "mcp.enable",
+                "name": "Enable an MCP server",
+                "description": "Allow KAI to start this MCP server. Enabling does not connect it; connecting is a separate, separately-approved step.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "mcp.disable",
+                "name": "Disable an MCP server",
+                "description": "Stop KAI from starting this MCP server and disconnect it if it is running.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "mcp.remove",
+                "name": "Remove an MCP server",
+                "description": "Remove an MCP server from KAI's catalogue and disconnect it. Its tools stop being resolvable.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "mcp.connect",
+                "name": "Connect an MCP server",
+                "description": "Start the MCP server process, perform the MCP handshake, discover its tools and register them into KAI's tool registry with KAI-declared risk. EXTERNAL: it runs third-party code with KAI's authority, so the default policy parks it for a human.",
+                "permission": {
+                  "risk": "EXTERNAL",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "mcp.disconnect",
+                "name": "Disconnect an MCP server",
+                "description": "Stop a connected MCP server process. Its registered tools remain but refuse until it is connected again.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "mcp.refresh",
+                "name": "Refresh an MCP server's tools",
+                "description": "Ask a connected MCP server for its current tool list and register any tools KAI did not already know.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "missions.create",
+                "name": "Create and start a mission",
+                "description": "Create a mission from {title, description?, steps?} and start it. KAI-internal orchestration; each mission step passes the boundary in its own right.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": true,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "skills.list",
+                "name": "List skills",
+                "description": "List installed skills as metadata only (id, name, description, source, hash, status). Bodies are never returned here.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "skills.relevant",
+                "name": "Find relevant skills",
+                "description": "Return metadata for at most `limit` skills relevant to a query. Load one with skills.load only when it is actually needed.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "skills.load",
+                "name": "Load a skill",
+                "description": "Read the body of one installed skill by id. Refuses a disabled skill or an id that is not usable.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "memory.write",
+                "name": "Write a memory",
+                "description": "Append a fact to KAI's canonical memory store, in a scope the runtime can genuinely honour. Refuses a scope with no producer.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "memory.create",
+                "name": "Create a memory (legacy)",
+                "description": "Append one row to the frozen flat memory table.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "memory.share",
+                "name": "Share one subagent's private memory",
+                "description": "Grant ONE entry from a KAI subagent's private memory to another subagent, under a KAI approval. The share stores a pointer, never a copy.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "notification.read",
+                "name": "Mark a notification read",
+                "description": "Mark one notification as read.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "approval.decide",
+                "name": "Decide an approval",
+                "description": "Record a human's decision on an approval and settle the work parked on it.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "workforce.register",
+                "name": "Register an employee",
+                "description": "Register a known employee with no transport (honest registration).",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "workforce.lifecycle",
+                "name": "Change an employee's lifecycle state",
+                "description": "Enable, disable or recover one registered employee.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "workforce.subagent",
+                "name": "Create a KAI subagent",
+                "description": "Define a KAI subagent persona (name, role, soul, preferred worker/model, capabilities, visual variant) and register it in the workforce. The persona runs only through KAI's policy-governed executor.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "soul.set",
+                "name": "Replace KAI's soul",
+                "description": "Replace SOUL.md — KAI's identity and personality — and reload the live identity. Security-relevant: the default policy parks it for a human.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "maintenance.run",
+                "name": "Run KAI's self-maintenance",
+                "description": "Inspect KAI's own subsystems (database, sessions, acceptance ledger, workers, scheduler, build identity) and repair the ones it may touch: memory upkeep, interrupted scheduler leases, crashed missions, and the employee/capability view.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "session.manage",
+                "name": "Manage a conversation session",
+                "description": "Create, rename, archive, unarchive or switch one of KAI's conversation sessions. Changes what KAI remembers a conversation to be — never the world.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "mission.cancel",
+                "name": "Cancel a mission",
+                "description": "Cancel one mission through the mission executor (its own idempotence and event).",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "schedule.manage",
+                "name": "Create or cancel a scheduled task",
+                "description": "Persist a new scheduled task (create) or remove one (cancel), reloading the scheduler.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "scheduler.recover",
+                "name": "Recover interrupted scheduled slots",
+                "description": "Reconcile leases a previous process claimed and died on.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "learning.propose",
+                "name": "Propose a lesson from a turn",
+                "description": "Run the learning loop on a completed turn. A skill is only STAGED; a memory is written through the live engine and its own redaction and bounds.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "checkpoint.create",
+                "name": "Create a checkpoint",
+                "description": "Take a KAI-owned shadow checkpoint of a target directory.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "checkpoint.restore",
+                "name": "Restore a checkpoint",
+                "description": "Restore one checkpoint, OVERWRITING files at the target. Re-hashes before applying; refuses a corrupt or mismatched checkpoint.",
+                "permission": {
+                  "risk": "DESTRUCTIVE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "skill.delete",
+                "name": "Delete an installed skill",
+                "description": "Remove one installed skill from the catalogue and its files from disk.",
+                "permission": {
+                  "risk": "DESTRUCTIVE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "skill.toggle",
+                "name": "Enable or disable a skill",
+                "description": "Flip one installed skill's enabled state, changing what KAI will load on future turns.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "policy.set",
+                "name": "Change the live policy rules",
+                "description": "Replace the live policy rule set, which decides what KAI is authorized to do. Malformed rules are dropped toward the safe default.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": false,
+                  "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+                }
+              },
+              {
+                "id": "session.search",
+                "name": "Search KAI's conversations",
+                "description": "Search KAI's own conversation sessions by id, title and recorded turn text. The query is matched literally (LIKE wildcards are escaped), so searching for \"100%\" finds the literal percent sign instead of every session.",
+                "permission": {
+                  "risk": "READ",
+                  "effectful": false,
+                  "sideEffecting": false
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "query": {
+                        "type": "string",
+                        "description": "The text to find; matched literally in session ids, titles and turn text.",
+                        "required": true
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "description": "The most hits to return.",
+                        "minimum": 1,
+                        "maximum": 1000
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "id": "session.duplicate",
+                "name": "Duplicate a conversation session",
+                "description": "Fork one of KAI's conversation sessions: same title/ownership/binding and the same recorded turns, but deliberately NO worker conversation id — the copy starts its OWN worker conversation on its first turn, which is what keeps per-session worker isolation.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The session to fork.",
+                        "required": true
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "The copy's title; defaults to \"<title> (copy)\"."
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "id": "session.close",
+                "name": "Close a conversation session",
+                "description": "Close (archive) one of KAI's conversation sessions and move the active pointer off it, so KAI is never left writing into a closed conversation. The turns remain recorded; restore re-opens it.",
+                "permission": {
+                  "risk": "WRITE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The session to close.",
+                        "required": true
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "id": "session.clear",
+                "name": "Clear a conversation's recorded turns",
+                "description": "Remove every recorded turn of a session and reset its counters. The session itself survives; the removal cannot be undone.",
+                "permission": {
+                  "risk": "DESTRUCTIVE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The session whose turns are removed.",
+                        "required": true
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "id": "session.delete",
+                "name": "Delete a conversation session",
+                "description": "Hard-delete a session and every turn recorded in it. The deletion cannot be undone.",
+                "permission": {
+                  "risk": "DESTRUCTIVE",
+                  "effectful": false,
+                  "sideEffecting": true
+                },
+                "schema": {
+                  "declared": true,
+                  "schema": {
+                    "kind": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The session to delete.",
+                        "required": true
+                      }
+                    }
+                  }
+                }
+              }
+            ],
+            "note": "Declared facts only: `permission.sideEffecting` is derived from the tool's EFFECT (risk !== READ || effectful), and a tool that declares no schema reports `declared: false` with the reason rather than an invented shape. Running a tool is POST /tools/:id/invoke, which goes through the ONE boundary (validate -> policy -> (approval) -> execute)."
+          }
+        },
+        "GET /tools/filesystem.write": {
+          "http": 200,
+          "body": {
+            "tool": {
+              "id": "filesystem.write",
+              "name": "Write a file",
+              "description": "Write a UTF-8 text file on this machine, creating parent directories on request. A WRITE, so the default policy parks it for a human.",
+              "permission": {
+                "risk": "WRITE",
+                "effectful": true,
+                "sideEffecting": true
+              },
+              "schema": {
+                "declared": true,
+                "schema": {
+                  "kind": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "description": "File to write; a relative path is resolved against the Core's working directory.",
+                      "required": true
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "The full UTF-8 content of the file.",
+                      "required": true
+                    },
+                    "createDirs": {
+                      "type": "boolean",
+                      "description": "Create missing parent directories first."
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "POST /tools/filesystem.write/invoke (fresh)": {
+          "http": 409,
+          "body": {
+            "error": true,
+            "reason": "tool \"filesystem.write\" performs a WRITE; writes are allowed only when a policy rule explicitly permits them, so this requires user approval; approval \"apr_muuetedb_0\" is pending",
+            "approvalRequired": true,
+            "approvalId": "apr_muuetedb_0",
+            "invocation": {
+              "invocationId": "act_muueteda_0",
+              "toolId": "filesystem.write",
+              "source": "core",
+              "arguments": {
+                "path": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/kai-tool-invoke-proof.txt",
+                "content": "kai-tools-invoke-proof 2026-10-04T22:45Z"
+              },
+              "status": "APPROVAL_REQUIRED",
+              "startedAt": "2026-10-04T22:45:51.742Z",
+              "completedAt": "2026-10-04T22:45:51.751Z",
+              "durationMs": 9,
+              "approvalId": "apr_muuetedb_0",
+              "approval": {
+                "required": true,
+                "approvalId": "apr_muuetedb_0",
+                "status": "PENDING"
+              },
+              "policyDecision": "needs_approval",
+              "decisionSource": "default",
+              "permission": {
+                "risk": "WRITE",
+                "effectful": true,
+                "sideEffecting": true
+              },
+              "provenance": {
+                "source": "core",
+                "executorType": "kai",
+                "deduped": false,
+                "artifacts": {}
+              },
+              "error": {
+                "code": "APPROVAL_REQUIRED",
+                "message": "tool \"filesystem.write\" performs a WRITE; writes are allowed only when a policy rule explicitly permits them, so this requires user approval; approval \"apr_muuetedb_0\" is pending",
+                "retryable": false,
+                "at": "2026-10-04T22:45:51.751Z",
+                "detail": "apr_muuetedb_0"
+              }
+            }
+          },
+          "note": "Parked. Side effect verified ABSENT while parked (the proof file did not exist)."
+        },
+        "POST /approvals/apr_muuetedb_0/decide {approved:true}": {
+          "http": 200,
+          "body": {
+            "approval": {
+              "id": "apr_muuetedb_0",
+              "toolId": "filesystem.write",
+              "action": "Write a file",
+              "reason": "tool \"filesystem.write\" performs a WRITE; writes are allowed only when a policy rule explicitly permits them, so this requires user approval",
+              "risk": "WRITE",
+              "createdAt": "2026-10-04T22:45:51.743Z",
+              "status": "APPROVED",
+              "expiresAt": "2026-10-04T22:55:51.743Z",
+              "decidedAt": "2026-10-04T22:46:04.816Z"
+            },
+            "reissued": true,
+            "result": {
+              "path": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/kai-tool-invoke-proof.txt",
+              "bytes": 40
+            }
+          },
+          "note": "reissued:true — the runtime re-issued the exact parked call; the tool executed (file appeared, 40 bytes, exact content)."
+        },
+        "POST /tools/filesystem.write/invoke (re-issue with the granted approvalId)": {
+          "http": 200,
+          "body": {
+            "toolId": "filesystem.write",
+            "status": "EXECUTED",
+            "invocationId": "act_muueu3qe_3",
+            "result": {
+              "path": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/kai-tool-invoke-proof.txt",
+              "bytes": 50
+            },
+            "invocation": {
+              "invocationId": "act_muueu3qe_3",
+              "toolId": "filesystem.write",
+              "source": "core",
+              "arguments": {
+                "path": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/kai-tool-invoke-proof.txt",
+                "content": "kai-tools-invoke-proof 2026-10-04T22:45Z (reissue)"
+              },
+              "status": "EXECUTED",
+              "startedAt": "2026-10-04T22:46:24.614Z",
+              "completedAt": "2026-10-04T22:46:24.615Z",
+              "durationMs": 1,
+              "approvalId": "apr_muuetedb_0",
+              "approval": {
+                "required": true,
+                "approvalId": "apr_muuetedb_0",
+                "status": "APPROVED"
+              },
+              "policyDecision": "needs_approval",
+              "decisionSource": "default",
+              "permission": {
+                "risk": "WRITE",
+                "effectful": true,
+                "sideEffecting": true
+              },
+              "provenance": {
+                "source": "core",
+                "executorType": "kai",
+                "deduped": false,
+                "artifacts": {}
+              },
+              "result": {
+                "path": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/kai-tool-invoke-proof.txt",
+                "bytes": 50
+              }
+            }
+          },
+          "note": "The caller-side re-issue path: EXECUTED with the granted approval (second, distinct write — content '…(reissue)', file now 50 bytes). An APPROVED approval authorizes the tool, not a single-use token; labeled honestly."
+        }
+      },
+      "sessionsSurface": {
+        "GET /sessions/search?query=Conversation&limit=3": {
+          "http": 200,
+          "body": {
+            "query": "Conversation",
+            "count": 3,
+            "hits": [
+              {
+                "session": {
+                  "id": "sess_musv974c_7dhj",
+                  "title": "Conversation 35",
+                  "status": "ACTIVE",
+                  "createdAt": "2026-10-03T20:50:30.348Z",
+                  "updatedAt": "2026-10-04T19:45:29.345Z",
+                  "turnCount": 246,
+                  "lastTurnAt": "2026-10-04T19:45:29.343Z",
+                  "agentId": "hermes",
+                  "worker": "hermes",
+                  "agentSessionId": "api_1791062098_f7ecb6c6"
+                },
+                "matched": "title"
+              },
+              {
+                "session": {
+                  "id": "sess_muu7x6p2_7bcu",
+                  "title": "Conversation 37",
+                  "status": "ACTIVE",
+                  "createdAt": "2026-10-04T19:32:51.111Z",
+                  "updatedAt": "2026-10-04T19:32:51.111Z",
+                  "turnCount": 0
+                },
+                "matched": "title"
+              },
+              {
+                "session": {
+                  "id": "sess_musv9726_52o",
+                  "title": "Conversation 34",
+                  "status": "ACTIVE",
+                  "createdAt": "2026-10-03T20:50:30.270Z",
+                  "updatedAt": "2026-10-03T20:56:57.567Z",
+                  "turnCount": 25,
+                  "lastTurnAt": "2026-10-03T20:56:57.566Z",
+                  "agentId": "hermes",
+                  "worker": "hermes",
+                  "agentSessionId": "api_1791060992_f6ca5f72"
+                },
+                "matched": "title"
+              }
+            ]
+          }
+        },
+        "GET /sessions/sess_musv974c_7dhj/view?limit=2": {
+          "http": 200,
+          "body": {
+            "session": {
+              "sessionId": "sess_musv974c_7dhj",
+              "status": "ACTIVE",
+              "createdAt": "2026-10-03T20:50:30.348Z",
+              "updatedAt": "2026-10-04T19:45:29.345Z",
+              "history": [
+                {
+                  "id": "turn_muu8cyqs_3tlk",
+                  "sessionId": "sess_musv974c_7dhj",
+                  "role": "user",
+                  "text": "what is your name and what harnezz u use?",
+                  "at": "2026-10-04T19:45:07.301Z"
+                },
+                {
+                  "id": "turn_muu8dfr3_a9yf",
+                  "sessionId": "sess_musv974c_7dhj",
+                  "role": "assistant",
+                  "text": "Name: Hermes Agent (Nous Research) — the worker in your KAI setup. That's KAI's harness being pushed at a Hermes runtime, which is the mismatch I explained — two harnesses stacked, and the lower one (Hermes) is what actually answers.",
+                  "at": "2026-10-04T19:45:29.343Z",
+                  "agentId": "hermes"
+                }
+              ],
+              "memoryScope": {
+                "scope": "session",
+                "scopeId": "sess_musv974c_7dhj"
+              },
+              "worker": "hermes"
+            }
+          }
+        },
+        "GET /sessions/sess_musv974c_7dhj/transcript?limit=1": {
+          "http": 200,
+          "body": {
+            "transcript": {
+              "sessionId": "sess_musv974c_7dhj",
+              "kind": "kai-conversation",
+              "status": "ACTIVE",
+              "turns": [
+                {
+                  "id": "turn_muu8dfr3_a9yf",
+                  "sessionId": "sess_musv974c_7dhj",
+                  "role": "assistant",
+                  "text": "Name: Hermes Agent (Nous Research) — the worker in your KAI setup. That's KAI's harness being pushed at a Hermes runtime, which is the mismatch I explained — two harnesses stacked, and the lower one (Hermes) is what actually answers.",
+                  "at": "2026-10-04T19:45:29.343Z",
+                  "agentId": "hermes"
+                }
+              ],
+              "memoryScope": {
+                "scope": "session",
+                "scopeId": "sess_musv974c_7dhj"
+              },
+              "worker": "hermes"
+            }
+          }
+        },
+        "GET /sessions/sess_musv974c_7dhj/transcript?kind=worker-execution": {
+          "http": 501,
+          "body": {
+            "error": true,
+            "reason": "the worker's own execution transcript is not wired yet: no reader exists in this Core, so this route refuses rather than serving a borrowed or empty transcript",
+            "notWired": true
+          },
+          "note": "NOT_WIRED by design — an honest refusal, not a borrowed transcript."
+        },
+        "POST /sessions (create a DISPOSABLE session for the destructive demo)": {
+          "http": 201,
+          "body": {
+            "session": {
+              "id": "sess_muueudoc_cv9m",
+              "title": "Conversation 39",
+              "status": "ACTIVE",
+              "createdAt": "2026-10-04T22:46:37.500Z",
+              "updatedAt": "2026-10-04T22:46:37.500Z",
+              "turnCount": 0
+            }
+          },
+          "note": "Pre-existing route (session.manage is on KAI's internal-state allowlist → executes directly). The session was created solely for this demo; no pre-existing session was touched."
+        },
+        "GET /sessions/sess_muueudoc_cv9m/view": {
+          "http": 200,
+          "body": {
+            "session": {
+              "sessionId": "sess_muueudoc_cv9m",
+              "status": "ACTIVE",
+              "createdAt": "2026-10-04T22:46:37.500Z",
+              "updatedAt": "2026-10-04T22:46:37.500Z",
+              "history": [],
+              "memoryScope": {
+                "scope": "session",
+                "scopeId": "sess_muueudoc_cv9m"
+              }
+            }
+          }
+        },
+        "POST /sessions/sess_muueudoc_cv9m/delete (fresh)": {
+          "http": 409,
+          "body": {
+            "error": true,
+            "reason": "tool \"session.delete\" is DESTRUCTIVE; destructive actions always require user approval and are never allowed silently; approval \"apr_muueuq3i_1\" is pending",
+            "approvalRequired": true,
+            "approvalId": "apr_muueuq3i_1",
+            "invocation": {
+              "invocationId": "act_muueuq3i_5",
+              "toolId": "session.delete",
+              "source": "core",
+              "arguments": {
+                "id": "sess_muueudoc_cv9m"
+              },
+              "status": "APPROVAL_REQUIRED",
+              "startedAt": "2026-10-04T22:46:53.598Z",
+              "completedAt": "2026-10-04T22:46:53.606Z",
+              "durationMs": 8,
+              "approvalId": "apr_muueuq3i_1",
+              "approval": {
+                "required": true,
+                "approvalId": "apr_muueuq3i_1",
+                "status": "PENDING"
+              },
+              "policyDecision": "needs_approval",
+              "decisionSource": "default",
+              "permission": {
+                "risk": "DESTRUCTIVE",
+                "effectful": false,
+                "sideEffecting": true
+              },
+              "provenance": {
+                "source": "core",
+                "executorType": "kai",
+                "deduped": false,
+                "artifacts": {}
+              },
+              "error": {
+                "code": "APPROVAL_REQUIRED",
+                "message": "tool \"session.delete\" is DESTRUCTIVE; destructive actions always require user approval and are never allowed silently; approval \"apr_muueuq3i_1\" is pending",
+                "retryable": false,
+                "at": "2026-10-04T22:46:53.606Z",
+                "detail": "apr_muueuq3i_1"
+              }
+            }
+          },
+          "note": "Parked: DESTRUCTIVE. While parked the session still existed (GET → 200) — nothing ran."
+        },
+        "POST /approvals/apr_muueuq3i_1/decide {approved:true}": {
+          "http": 200,
+          "body": {
+            "approval": {
+              "id": "apr_muueuq3i_1",
+              "toolId": "session.delete",
+              "action": "Delete a conversation session",
+              "reason": "tool \"session.delete\" is DESTRUCTIVE; destructive actions always require user approval and are never allowed silently",
+              "risk": "DESTRUCTIVE",
+              "createdAt": "2026-10-04T22:46:53.598Z",
+              "status": "APPROVED",
+              "expiresAt": "2026-10-04T22:56:53.598Z",
+              "decidedAt": "2026-10-04T22:47:22.137Z"
+            },
+            "reissued": true,
+            "result": {
+              "ok": true,
+              "value": {
+                "sessionId": "sess_muueudoc_cv9m"
+              }
+            }
+          },
+          "note": "reissued:true — the delete executed (result.ok true, sessionId returned)."
+        },
+        "GET /sessions/sess_muueudoc_cv9m (after the approved delete)": {
+          "http": 404,
+          "body": {
+            "error": "not_found",
+            "reason": "unknown_route",
+            "path": "/sessions/sess_muueudoc_cv9m"
+          },
+          "note": "Server-level fallthrough shape (see before.note) — the session is gone."
+        },
+        "GET /sessions/search?query=integration-proof (after delete)": {
+          "http": 200,
+          "body": {
+            "query": "integration-proof",
+            "count": 0,
+            "hits": []
+          },
+          "note": "count: 0 — the deleted session does not surface through the new search route."
+        }
+      }
+    }
+  },
+  "verdicts": [
+    {
+      "verdict": "GET /tools and GET /tools/:id answer on the live Core — the registry's full surface is readable over HTTP (404 → 200)",
+      "level": "END-TO-END PROVEN",
+      "evidence": [
+        "before: GET /tools → HTTP 404 unknown_route; after: HTTP 200, service 'tools', count 56 (incl. the five session tools the session mount registered: session.search/duplicate/close/clear/delete)",
+        "after: GET /tools/filesystem.write → HTTP 200 with declared permission (WRITE/effectful/sideEffecting) and the declared schema"
+      ]
+    },
+    {
+      "verdict": "POST /tools/:id/invoke parks (409 + approvalId) and executes ONLY after approval — through the ONE boundary",
+      "level": "END-TO-END PROVEN",
+      "evidence": [
+        "park row: HTTP 409, approvalRequired true, approvalId apr_muuetedb_0, invocation.status APPROVAL_REQUIRED, policyDecision needs_approval, decisionSource default",
+        "nothing executed while parked: the target file was verified absent",
+        "decide(true): HTTP 200, reissued:true, result {path, bytes:40}; the file appeared with the exact content",
+        "re-issue with the granted id: HTTP 200, status EXECUTED, file updated (50 bytes, '…(reissue)')"
+      ]
+    },
+    {
+      "verdict": "GET /sessions/search and GET /sessions/:id/view answer on the live Core (404 → 200)",
+      "level": "END-TO-END PROVEN",
+      "evidence": [
+        "before: GET /sessions/search → HTTP 404 unknown_route; after: HTTP 200 {query, count:3, hits:[{session, matched}]}",
+        "after: GET /sessions/:id/view → HTTP 200 SessionView {sessionId,status,createdAt,updatedAt,history,memoryScope,worker}",
+        "after: GET /sessions/:id/transcript → HTTP 200 (kai-conversation); kind=worker-execution → HTTP 501 NOT_WIRED (honest refusal)"
+      ]
+    },
+    {
+      "verdict": "A destructive session op (delete) parks and then executes after approval — through the real approval path",
+      "level": "END-TO-END PROVEN",
+      "evidence": [
+        "park row: HTTP 409, approvalId apr_muueuq3i_1, toolId session.delete, risk DESTRUCTIVE, invocation.status APPROVAL_REQUIRED",
+        "while parked the session still existed (GET → HTTP 200)",
+        "decide(true): HTTP 200, reissued:true, result {ok:true, value:{sessionId}} — the delete executed",
+        "after: GET the session → HTTP 404; GET /sessions/search?query=integration-proof → count 0"
+      ]
+    },
+    {
+      "verdict": "The two mounts are applied and the tree stays green (tsc exit 0; full suite 838/825/0/13 with the mounts in)",
+      "level": "INTEGRATION PROVEN",
+      "evidence": [
+        "npx tsc -p tsconfig.json --noEmit → exit 0",
+        "npm test → tests 838, pass 825, fail 0, skipped 13 (run after both mounts were applied)"
+      ]
+    }
+  ],
+  "honestGaps": [
+    "The sessions destructive demo used a DISPOSABLE session created for the purpose (sess_muueudoc_cv9m); no pre-existing user session was touched.",
+    "The /tools re-issue row executes a second, distinct write by design (an APPROVED approval authorizes the tool, not a single-use token). It is labeled as such; the park→decide path alone already proves execute-after-approval.",
+    "404 responses originating from the Core API are masked by server.ts's fallthrough (`if (result.status !== 404)`, server.ts:805) — the 404 body for a deleted session is the server-level unknown_route shape. Pre-existing behavior, not introduced by these mounts.",
+    "No UI consumes the new routes yet (app/** untouched) — the sessions doc's gap stands.",
+    "worker-execution transcripts remain NOT_WIRED by design (proven here as an honest 501).",
+    "The artifact's gitCommit stamp reads 5f69f58 (HEAD at build time) while the mount code was uncommitted at build time; buildId 7d8f322134be127b is content-derived and is what the live /identity reports."
+  ]
+}

@@ -1,0 +1,1044 @@
+{
+  "service": "tools",
+  "count": 56,
+  "tools": [
+    {
+      "id": "system.get_status",
+      "name": "Get system status",
+      "description": "Read KAI Core's own process health: uptime, memory, platform and host facts.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "agents.list",
+      "name": "List agents",
+      "description": "List the agents KAI knows about and their last reported state.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "description": "Maximum entries to return.",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "agents.run_task",
+      "name": "Run a task on a worker agent",
+      "description": "Hand work to a registered worker agent and return its result. Categorised EXTERNAL because it causes another process to act.",
+      "permission": {
+        "risk": "EXTERNAL",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "properties": {
+            "agentId": {
+              "type": "string",
+              "description": "The registered agent to hand the work to.",
+              "required": true
+            },
+            "action": {
+              "type": "string",
+              "description": "What the agent should do (the task title).",
+              "required": true
+            },
+            "input": {
+              "type": "string",
+              "description": "Optional prompt/payload handed to the agent."
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "missions.list",
+      "name": "List missions",
+      "description": "List missions, optionally filtered by status and capped by limit.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "description": "Maximum entries to return.",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "status": {
+              "type": "string",
+              "description": "Only return missions in this state.",
+              "enum": [
+                "DRAFT",
+                "QUEUED",
+                "RUNNING",
+                "WAITING",
+                "WAITING_APPROVAL",
+                "COMPLETED",
+                "FAILED",
+                "CANCELLED"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "memory.list",
+      "name": "List memories",
+      "description": "List stored memories, optionally filtered by type and capped by limit.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "description": "Maximum entries to return.",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "type": {
+              "type": "string",
+              "description": "Only return memories of this kind.",
+              "enum": [
+                "user_preference",
+                "project_fact",
+                "agent_fact",
+                "mission_context",
+                "note"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "filesystem.read",
+      "name": "Read a file",
+      "description": "Read a UTF-8 text file from this machine, bounded. Reports the absolute path and byte length; a truncated read says so.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "File to read; a relative path is resolved against the Core's working directory.",
+              "required": true
+            },
+            "maxBytes": {
+              "type": "integer",
+              "description": "Bound on the returned content; the tail is reported as truncated, never silently dropped.",
+              "minimum": 1,
+              "maximum": 1000000
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "filesystem.list",
+      "name": "List a directory",
+      "description": "List the entries of a directory on this machine (non-recursive), bounded.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Directory to list; a relative path is resolved against the Core's working directory.",
+              "required": true
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Maximum entries to return.",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "filesystem.write",
+      "name": "Write a file",
+      "description": "Write a UTF-8 text file on this machine, creating parent directories on request. A WRITE, so the default policy parks it for a human.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": true,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "File to write; a relative path is resolved against the Core's working directory.",
+              "required": true
+            },
+            "content": {
+              "type": "string",
+              "description": "The full UTF-8 content of the file.",
+              "required": true
+            },
+            "createDirs": {
+              "type": "boolean",
+              "description": "Create missing parent directories first."
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "git.status",
+      "name": "git status",
+      "description": "Read the working-tree status of a git repository (porcelain). Read-only.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "properties": {
+            "cwd": {
+              "type": "string",
+              "description": "Repository directory; defaults to the Core's working directory."
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "git.log",
+      "name": "git log",
+      "description": "Read the recent commit log of a git repository. Read-only.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "properties": {
+            "cwd": {
+              "type": "string",
+              "description": "Repository directory; defaults to the Core's working directory."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Maximum commits to return.",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "git.diff",
+      "name": "git diff",
+      "description": "Read a git diff (working tree, or staged with staged:true). Read-only.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "properties": {
+            "cwd": {
+              "type": "string",
+              "description": "Repository directory; defaults to the Core's working directory."
+            },
+            "staged": {
+              "type": "boolean",
+              "description": "Diff the staged changes instead of the working tree."
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "shell.run",
+      "name": "Run a program",
+      "description": "Run a program with an explicit argument list (no shell), bounded by timeout and output size. DESTRUCTIVE, so the default policy parks it for a human.",
+      "permission": {
+        "risk": "DESTRUCTIVE",
+        "effectful": true,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "properties": {
+            "command": {
+              "type": "string",
+              "description": "The program to run (an executable name or path; no shell interpolation).",
+              "required": true
+            },
+            "args": {
+              "type": "array",
+              "description": "Argument list of strings passed to the program."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Working directory; defaults to the Core's working directory."
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "description": "Command timeout in milliseconds.",
+              "minimum": 1,
+              "maximum": 120000
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "capability.system",
+      "name": "Use capability: System and state inspection",
+      "description": "Invokes the \"system\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "capability.browser",
+      "name": "Use capability: Browser (semantic-first)",
+      "description": "Invokes the \"browser\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+      "permission": {
+        "risk": "EXTERNAL",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "capability.computer",
+      "name": "Use capability: Computer use (CUA)",
+      "description": "Invokes the \"computer\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+      "permission": {
+        "risk": "DESTRUCTIVE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "capability.mcp",
+      "name": "Use capability: MCP servers and tools",
+      "description": "Invokes the \"mcp\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+      "permission": {
+        "risk": "EXTERNAL",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "capability.filesystem",
+      "name": "Use capability: Filesystem",
+      "description": "Invokes the \"filesystem\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "capability.git",
+      "name": "Use capability: Git (read-only)",
+      "description": "Invokes the \"git\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "capability.shell",
+      "name": "Use capability: Shell (program execution)",
+      "description": "Invokes the \"shell\" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.",
+      "permission": {
+        "risk": "DESTRUCTIVE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "mcp.register",
+      "name": "Register an MCP server",
+      "description": "Add an MCP server to KAI's catalogue. The server lands DISABLED and inert; a human must enable and connect it before any of its tools can run. Risk is KAI's declaration: an MCP server's own annotations are never trusted.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "mcp.update",
+      "name": "Update an MCP server",
+      "description": "Edit an MCP server's entry. Enabled state and untouched secrets are preserved; a secret may be re-sent as `true` to keep the saved value.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "mcp.enable",
+      "name": "Enable an MCP server",
+      "description": "Allow KAI to start this MCP server. Enabling does not connect it; connecting is a separate, separately-approved step.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "mcp.disable",
+      "name": "Disable an MCP server",
+      "description": "Stop KAI from starting this MCP server and disconnect it if it is running.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "mcp.remove",
+      "name": "Remove an MCP server",
+      "description": "Remove an MCP server from KAI's catalogue and disconnect it. Its tools stop being resolvable.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "mcp.connect",
+      "name": "Connect an MCP server",
+      "description": "Start the MCP server process, perform the MCP handshake, discover its tools and register them into KAI's tool registry with KAI-declared risk. EXTERNAL: it runs third-party code with KAI's authority, so the default policy parks it for a human.",
+      "permission": {
+        "risk": "EXTERNAL",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "mcp.disconnect",
+      "name": "Disconnect an MCP server",
+      "description": "Stop a connected MCP server process. Its registered tools remain but refuse until it is connected again.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "mcp.refresh",
+      "name": "Refresh an MCP server's tools",
+      "description": "Ask a connected MCP server for its current tool list and register any tools KAI did not already know.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "missions.create",
+      "name": "Create and start a mission",
+      "description": "Create a mission from {title, description?, steps?} and start it. KAI-internal orchestration; each mission step passes the boundary in its own right.",
+      "permission": {
+        "risk": "READ",
+        "effectful": true,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "skills.list",
+      "name": "List skills",
+      "description": "List installed skills as metadata only (id, name, description, source, hash, status). Bodies are never returned here.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "skills.relevant",
+      "name": "Find relevant skills",
+      "description": "Return metadata for at most `limit` skills relevant to a query. Load one with skills.load only when it is actually needed.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "skills.load",
+      "name": "Load a skill",
+      "description": "Read the body of one installed skill by id. Refuses a disabled skill or an id that is not usable.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "memory.write",
+      "name": "Write a memory",
+      "description": "Append a fact to KAI's canonical memory store, in a scope the runtime can genuinely honour. Refuses a scope with no producer.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "memory.create",
+      "name": "Create a memory (legacy)",
+      "description": "Append one row to the frozen flat memory table.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "memory.share",
+      "name": "Share one subagent's private memory",
+      "description": "Grant ONE entry from a KAI subagent's private memory to another subagent, under a KAI approval. The share stores a pointer, never a copy.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "notification.read",
+      "name": "Mark a notification read",
+      "description": "Mark one notification as read.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "approval.decide",
+      "name": "Decide an approval",
+      "description": "Record a human's decision on an approval and settle the work parked on it.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "workforce.register",
+      "name": "Register an employee",
+      "description": "Register a known employee with no transport (honest registration).",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "workforce.lifecycle",
+      "name": "Change an employee's lifecycle state",
+      "description": "Enable, disable or recover one registered employee.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "workforce.subagent",
+      "name": "Create a KAI subagent",
+      "description": "Define a KAI subagent persona (name, role, soul, preferred worker/model, capabilities, visual variant) and register it in the workforce. The persona runs only through KAI's policy-governed executor.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "soul.set",
+      "name": "Replace KAI's soul",
+      "description": "Replace SOUL.md — KAI's identity and personality — and reload the live identity. Security-relevant: the default policy parks it for a human.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "maintenance.run",
+      "name": "Run KAI's self-maintenance",
+      "description": "Inspect KAI's own subsystems (database, sessions, acceptance ledger, workers, scheduler, build identity) and repair the ones it may touch: memory upkeep, interrupted scheduler leases, crashed missions, and the employee/capability view.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "session.manage",
+      "name": "Manage a conversation session",
+      "description": "Create, rename, archive, unarchive or switch one of KAI's conversation sessions. Changes what KAI remembers a conversation to be — never the world.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "mission.cancel",
+      "name": "Cancel a mission",
+      "description": "Cancel one mission through the mission executor (its own idempotence and event).",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "schedule.manage",
+      "name": "Create or cancel a scheduled task",
+      "description": "Persist a new scheduled task (create) or remove one (cancel), reloading the scheduler.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "scheduler.recover",
+      "name": "Recover interrupted scheduled slots",
+      "description": "Reconcile leases a previous process claimed and died on.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "learning.propose",
+      "name": "Propose a lesson from a turn",
+      "description": "Run the learning loop on a completed turn. A skill is only STAGED; a memory is written through the live engine and its own redaction and bounds.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "checkpoint.create",
+      "name": "Create a checkpoint",
+      "description": "Take a KAI-owned shadow checkpoint of a target directory.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "checkpoint.restore",
+      "name": "Restore a checkpoint",
+      "description": "Restore one checkpoint, OVERWRITING files at the target. Re-hashes before applying; refuses a corrupt or mismatched checkpoint.",
+      "permission": {
+        "risk": "DESTRUCTIVE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "skill.delete",
+      "name": "Delete an installed skill",
+      "description": "Remove one installed skill from the catalogue and its files from disk.",
+      "permission": {
+        "risk": "DESTRUCTIVE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "skill.toggle",
+      "name": "Enable or disable a skill",
+      "description": "Flip one installed skill's enabled state, changing what KAI will load on future turns.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "policy.set",
+      "name": "Change the live policy rules",
+      "description": "Replace the live policy rule set, which decides what KAI is authorized to do. Malformed rules are dropped toward the safe default.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": false,
+        "reason": "this tool validates procedurally (validate()) and declares no machine-readable schema; its validator is the authority"
+      }
+    },
+    {
+      "id": "session.search",
+      "name": "Search KAI's conversations",
+      "description": "Search KAI's own conversation sessions by id, title and recorded turn text. The query is matched literally (LIKE wildcards are escaped), so searching for \"100%\" finds the literal percent sign instead of every session.",
+      "permission": {
+        "risk": "READ",
+        "effectful": false,
+        "sideEffecting": false
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "additionalProperties": false,
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "The text to find; matched literally in session ids, titles and turn text.",
+              "required": true
+            },
+            "limit": {
+              "type": "integer",
+              "description": "The most hits to return.",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "session.duplicate",
+      "name": "Duplicate a conversation session",
+      "description": "Fork one of KAI's conversation sessions: same title/ownership/binding and the same recorded turns, but deliberately NO worker conversation id — the copy starts its OWN worker conversation on its first turn, which is what keeps per-session worker isolation.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The session to fork.",
+              "required": true
+            },
+            "title": {
+              "type": "string",
+              "description": "The copy's title; defaults to \"<title> (copy)\"."
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "session.close",
+      "name": "Close a conversation session",
+      "description": "Close (archive) one of KAI's conversation sessions and move the active pointer off it, so KAI is never left writing into a closed conversation. The turns remain recorded; restore re-opens it.",
+      "permission": {
+        "risk": "WRITE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The session to close.",
+              "required": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "session.clear",
+      "name": "Clear a conversation's recorded turns",
+      "description": "Remove every recorded turn of a session and reset its counters. The session itself survives; the removal cannot be undone.",
+      "permission": {
+        "risk": "DESTRUCTIVE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The session whose turns are removed.",
+              "required": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "session.delete",
+      "name": "Delete a conversation session",
+      "description": "Hard-delete a session and every turn recorded in it. The deletion cannot be undone.",
+      "permission": {
+        "risk": "DESTRUCTIVE",
+        "effectful": false,
+        "sideEffecting": true
+      },
+      "schema": {
+        "declared": true,
+        "schema": {
+          "kind": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The session to delete.",
+              "required": true
+            }
+          }
+        }
+      }
+    }
+  ],
+  "note": "Declared facts only: `permission.sideEffecting` is derived from the tool's EFFECT (risk !== READ || effectful), and a tool that declares no schema reports `declared: false` with the reason rather than an invented shape. Running a tool is POST /tools/:id/invoke, which goes through the ONE boundary (validate -> policy -> (approval) -> execute)."
+}

@@ -1,0 +1,14 @@
+{
+  "agent": "core",
+  "from_state": true,
+  "intent": "identity",
+  "conversation_id": "sess_musv974c_7dhj",
+  "reply": "I am KAI. Hermes and OpenCode are workers I can use; I'm still KAI when they are unavailable.",
+  "data": {
+    "version": "ab81578e"
+  },
+  "brain": null,
+  "dependency": {
+    "normal_chat_calls_to_hermes": 0
+  }
+}

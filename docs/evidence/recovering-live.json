@@ -1,0 +1,525 @@
+{
+  "generatedAt": "2026-10-04T17:33:44.589Z",
+  "identity": {
+    "service": "kai-core",
+    "coreVersion": "0.1.0",
+    "buildId": "b0f49fd850ddca78",
+    "gitCommit": "5839f96ee678956287212154988e0b4427212652",
+    "protocolVersion": 1,
+    "pid": 14928,
+    "startedAt": "2026-10-04T17:32:59.152Z",
+    "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+    "onDiskBuildId": "b0f49fd850ddca78",
+    "identityMatchesDisk": true,
+    "sourceBuildId": null,
+    "artifactMatchesSource": null,
+    "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+    "freshness": "fresh"
+  },
+  "missionId": "mission_muu3hf2l_0",
+  "points": {
+    "p2_wire_event": {
+      "raw": "{\"id\":\"evt_muu3n1h7_e\",\"type\":\"notification.created\",\"timestamp\":\"2026-10-04T17:32:59.323Z\",\"source\":\"core\",\"payload\":{\"id\":\"ntf_muu3n1h3_0\",\"type\":\"mission.recovery_blocked\",\"title\":\"1 mission(s) need a decision\",\"priority\":\"HIGH\",\"createdAt\":\"2026-10-04T17:32:59.319Z\",\"read\":false,\"message\":\"These were interrupted with a step that changes something outside KAI, so they were not resumed automatically.\"}}",
+      "type": "notification.created",
+      "payload": {
+        "id": "ntf_muu3n1h3_0",
+        "type": "mission.recovery_blocked",
+        "title": "1 mission(s) need a decision",
+        "priority": "HIGH",
+        "createdAt": "2026-10-04T17:32:59.319Z",
+        "read": false,
+        "message": "These were interrupted with a step that changes something outside KAI, so they were not resumed automatically."
+      }
+    },
+    "p3_bridge_preserved": {
+      "wireType": "notification.created",
+      "nestedType": "mission.recovery_blocked"
+    },
+    "p4_p7_renderer_before": {
+      "engineState": "recovering",
+      "rendererPose": "verifying",
+      "probe": {
+        "mode": "expanded",
+        "view": "overview",
+        "runtime": "RECOVERING",
+        "runtimeLabel": "KAI is recovering…",
+        "conn": "ONLINE",
+        "connError": null,
+        "note": "1 mission(s) need a decision",
+        "turnError": null,
+        "activeSessionId": null,
+        "sessionIds": [],
+        "historyLength": 0,
+        "historyLast": null
+      },
+      "canvas": {
+        "w": 139,
+        "h": 197
+      }
+    },
+    "p9_cancel": {
+      "status": 200,
+      "body": {
+        "mission": {
+          "id": "mission_muu3hf2l_0",
+          "title": "recovery-proof: blocked side effect",
+          "status": "CANCELLED",
+          "priority": 0,
+          "createdAt": "2026-10-04T17:28:37.005Z",
+          "updatedAt": "2026-10-04T17:33:44.349Z",
+          "steps": [
+            {
+              "id": "step_mission_muu3hf2l_0_0",
+              "missionId": "mission_muu3hf2l_0",
+              "index": 0,
+              "title": "send the irreversible thing",
+              "kind": "tool",
+              "status": "RUNNING",
+              "sideEffecting": true,
+              "target": "fs.write",
+              "startedAt": "2026-10-04T17:28:37.005Z"
+            }
+          ],
+          "error": {
+            "code": "AGENT_RUN_ABANDONED",
+            "message": "crash recovery: remaining step step_mission_muu3hf2l_0_0 (\"send the irreversible thing\") is side-effecting; refusing to re-run it automatically (spec §29)",
+            "retryable": false,
+            "at": "2026-10-04T17:32:59.317Z"
+          },
+          "metadata": {
+            "recoveryBlocked": true,
+            "recoveryReason": "crash recovery: remaining step step_mission_muu3hf2l_0_0 (\"send the irreversible thing\") is side-effecting; refusing to re-run it automatically (spec §29)"
+          },
+          "completedAt": "2026-10-04T17:33:44.349Z"
+        }
+      },
+      "missionCancelledEvent": "{\"id\":\"evt_muu3o086_h\",\"type\":\"mission.cancelled\",\"timestamp\":\"2026-10-04T17:33:44.358Z\",\"source\":\"mission:mission_muu3hf2l_0\",\"payload\":{\"missionId\":\"mission_muu3hf2l_0\"},\"missionId\":\"mission_muu3hf2l_0\"}",
+      "renderer_after": {
+        "engineState": "using_tool",
+        "rendererPose": "toolcall",
+        "probe": {
+          "mode": "expanded",
+          "view": "note",
+          "runtime": "USING_TOOL",
+          "runtimeLabel": "KAI is using a tool…",
+          "conn": "ONLINE",
+          "connError": null,
+          "note": "Mission cancelled",
+          "turnError": null,
+          "activeSessionId": null,
+          "sessionIds": [],
+          "historyLength": 0,
+          "historyLast": null
+        },
+        "canvas": {
+          "w": 122,
+          "h": 179
+        }
+      }
+    }
+  },
+  "wireTypes": [
+    "stream.ready",
+    "agent.registered",
+    "core.status_changed",
+    "core.started",
+    "agent.connected",
+    "agent.error",
+    "notification.created",
+    "scheduler.started",
+    "mission.cancelled",
+    "action.executed"
+  ],
+  "wire": [
+    {
+      "raw": "{\"type\":\"stream.ready\"}",
+      "event": {
+        "type": "stream.ready"
+      },
+      "at": "2026-10-04T17:33:42.124Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1ei_0\",\"type\":\"agent.registered\",\"timestamp\":\"2026-10-04T17:32:59.226Z\",\"source\":\"core\",\"payload\":{\"id\":\"hermes\",\"name\":\"Hermes Agent\"}}",
+      "event": {
+        "id": "evt_muu3n1ei_0",
+        "type": "agent.registered",
+        "timestamp": "2026-10-04T17:32:59.226Z",
+        "source": "core",
+        "payload": {
+          "id": "hermes",
+          "name": "Hermes Agent"
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1ei_1\",\"type\":\"agent.registered\",\"timestamp\":\"2026-10-04T17:32:59.226Z\",\"source\":\"core\",\"payload\":{\"id\":\"opencode\",\"name\":\"OpenCode\"}}",
+      "event": {
+        "id": "evt_muu3n1ei_1",
+        "type": "agent.registered",
+        "timestamp": "2026-10-04T17:32:59.226Z",
+        "source": "core",
+        "payload": {
+          "id": "opencode",
+          "name": "OpenCode"
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1ej_2\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.227Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.registered\",\"employeeId\":\"hermes\",\"name\":\"Hermes\",\"placeholder\":false}}",
+      "event": {
+        "id": "evt_muu3n1ej_2",
+        "type": "core.status_changed",
+        "timestamp": "2026-10-04T17:32:59.227Z",
+        "source": "workforce",
+        "payload": {
+          "workforce": "workforce.registered",
+          "employeeId": "hermes",
+          "name": "Hermes",
+          "placeholder": false
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1en_3\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.231Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.registered\",\"employeeId\":\"opencode\",\"name\":\"OpenCode\",\"placeholder\":false}}",
+      "event": {
+        "id": "evt_muu3n1en_3",
+        "type": "core.status_changed",
+        "timestamp": "2026-10-04T17:32:59.231Z",
+        "source": "workforce",
+        "payload": {
+          "workforce": "workforce.registered",
+          "employeeId": "opencode",
+          "name": "OpenCode",
+          "placeholder": false
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1ep_4\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.233Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.registered\",\"employeeId\":\"codex\",\"name\":\"Codex\",\"placeholder\":false}}",
+      "event": {
+        "id": "evt_muu3n1ep_4",
+        "type": "core.status_changed",
+        "timestamp": "2026-10-04T17:32:59.233Z",
+        "source": "workforce",
+        "payload": {
+          "workforce": "workforce.registered",
+          "employeeId": "codex",
+          "name": "Codex",
+          "placeholder": false
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1fo_5\",\"type\":\"core.started\",\"timestamp\":\"2026-10-04T17:32:59.268Z\",\"source\":\"core\",\"payload\":{\"dbPath\":\"C:/Users/DELL/.hermes/profiles/kai/cache/scratch/recovering-proof/kai-core.db\",\"pid\":14928}}",
+      "event": {
+        "id": "evt_muu3n1fo_5",
+        "type": "core.started",
+        "timestamp": "2026-10-04T17:32:59.268Z",
+        "source": "core",
+        "payload": {
+          "dbPath": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/recovering-proof/kai-core.db",
+          "pid": 14928
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1ga_6\",\"type\":\"agent.connected\",\"timestamp\":\"2026-10-04T17:32:59.290Z\",\"source\":\"core\",\"payload\":{\"id\":\"hermes\"}}",
+      "event": {
+        "id": "evt_muu3n1ga_6",
+        "type": "agent.connected",
+        "timestamp": "2026-10-04T17:32:59.290Z",
+        "source": "core",
+        "payload": {
+          "id": "hermes"
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1gi_7\",\"type\":\"agent.error\",\"timestamp\":\"2026-10-04T17:32:59.298Z\",\"source\":\"core\",\"payload\":{\"id\":\"opencode\",\"phase\":\"connect\",\"detail\":\"INTERNAL: INTERNAL: transport failure talking to http://127.0.0.1:4096\"}}",
+      "event": {
+        "id": "evt_muu3n1gi_7",
+        "type": "agent.error",
+        "timestamp": "2026-10-04T17:32:59.298Z",
+        "source": "core",
+        "payload": {
+          "id": "opencode",
+          "phase": "connect",
+          "detail": "INTERNAL: INTERNAL: transport failure talking to http://127.0.0.1:4096"
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1gi_8\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.298Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.state_changed\",\"employeeId\":\"hermes\",\"from\":\"DISCOVERED\",\"to\":\"READY\",\"via\":[\"INSTALLED\",\"READY\"]}}",
+      "event": {
+        "id": "evt_muu3n1gi_8",
+        "type": "core.status_changed",
+        "timestamp": "2026-10-04T17:32:59.298Z",
+        "source": "workforce",
+        "payload": {
+          "workforce": "workforce.state_changed",
+          "employeeId": "hermes",
+          "from": "DISCOVERED",
+          "to": "READY",
+          "via": [
+            "INSTALLED",
+            "READY"
+          ]
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1gl_9\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.301Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.health_checked\",\"employeeId\":\"hermes\",\"state\":\"READY\",\"snapshot\":{\"state\":\"READY\",\"at\":\"2026-10-04T17:32:59.298Z\",\"reachable\":true,\"authenticated\":true}}}",
+      "event": {
+        "id": "evt_muu3n1gl_9",
+        "type": "core.status_changed",
+        "timestamp": "2026-10-04T17:32:59.301Z",
+        "source": "workforce",
+        "payload": {
+          "workforce": "workforce.health_checked",
+          "employeeId": "hermes",
+          "state": "READY",
+          "snapshot": {
+            "state": "READY",
+            "at": "2026-10-04T17:32:59.298Z",
+            "reachable": true,
+            "authenticated": true
+          }
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1go_a\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.304Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.state_changed\",\"employeeId\":\"opencode\",\"from\":\"DISCOVERED\",\"to\":\"READY\",\"via\":[\"INSTALLED\",\"READY\"]}}",
+      "event": {
+        "id": "evt_muu3n1go_a",
+        "type": "core.status_changed",
+        "timestamp": "2026-10-04T17:32:59.304Z",
+        "source": "workforce",
+        "payload": {
+          "workforce": "workforce.state_changed",
+          "employeeId": "opencode",
+          "from": "DISCOVERED",
+          "to": "READY",
+          "via": [
+            "INSTALLED",
+            "READY"
+          ]
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1gr_b\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.307Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.health_checked\",\"employeeId\":\"opencode\",\"state\":\"READY\",\"snapshot\":{\"state\":\"READY\",\"at\":\"2026-10-04T17:32:59.304Z\",\"reachable\":true,\"authenticated\":true}}}",
+      "event": {
+        "id": "evt_muu3n1gr_b",
+        "type": "core.status_changed",
+        "timestamp": "2026-10-04T17:32:59.307Z",
+        "source": "workforce",
+        "payload": {
+          "workforce": "workforce.health_checked",
+          "employeeId": "opencode",
+          "state": "READY",
+          "snapshot": {
+            "state": "READY",
+            "at": "2026-10-04T17:32:59.304Z",
+            "reachable": true,
+            "authenticated": true
+          }
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1gu_c\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.310Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.state_changed\",\"employeeId\":\"codex\",\"from\":\"DISCOVERED\",\"to\":\"UNAVAILABLE\",\"via\":[\"UNAVAILABLE\"]}}",
+      "event": {
+        "id": "evt_muu3n1gu_c",
+        "type": "core.status_changed",
+        "timestamp": "2026-10-04T17:32:59.310Z",
+        "source": "workforce",
+        "payload": {
+          "workforce": "workforce.state_changed",
+          "employeeId": "codex",
+          "from": "DISCOVERED",
+          "to": "UNAVAILABLE",
+          "via": [
+            "UNAVAILABLE"
+          ]
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1gw_d\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.313Z\",\"source\":\"workforce\",\"payload\":{\"workforce\":\"workforce.health_checked\",\"employeeId\":\"codex\",\"state\":\"UNAVAILABLE\",\"snapshot\":{\"state\":\"UNAVAILABLE\",\"at\":\"2026-10-04T17:32:59.309Z\",\"reachable\":false,\"authenticated\":false,\"problems\":[\"the codex CLI is not installed on this machine\"]}}}",
+      "event": {
+        "id": "evt_muu3n1gw_d",
+        "type": "core.status_changed",
+        "timestamp": "2026-10-04T17:32:59.313Z",
+        "source": "workforce",
+        "payload": {
+          "workforce": "workforce.health_checked",
+          "employeeId": "codex",
+          "state": "UNAVAILABLE",
+          "snapshot": {
+            "state": "UNAVAILABLE",
+            "at": "2026-10-04T17:32:59.309Z",
+            "reachable": false,
+            "authenticated": false,
+            "problems": [
+              "the codex CLI is not installed on this machine"
+            ]
+          }
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1h7_e\",\"type\":\"notification.created\",\"timestamp\":\"2026-10-04T17:32:59.323Z\",\"source\":\"core\",\"payload\":{\"id\":\"ntf_muu3n1h3_0\",\"type\":\"mission.recovery_blocked\",\"title\":\"1 mission(s) need a decision\",\"priority\":\"HIGH\",\"createdAt\":\"2026-10-04T17:32:59.319Z\",\"read\":false,\"message\":\"These were interrupted with a step that changes something outside KAI, so they were not resumed automatically.\"}}",
+      "event": {
+        "id": "evt_muu3n1h7_e",
+        "type": "notification.created",
+        "timestamp": "2026-10-04T17:32:59.323Z",
+        "source": "core",
+        "payload": {
+          "id": "ntf_muu3n1h3_0",
+          "type": "mission.recovery_blocked",
+          "title": "1 mission(s) need a decision",
+          "priority": "HIGH",
+          "createdAt": "2026-10-04T17:32:59.319Z",
+          "read": false,
+          "message": "These were interrupted with a step that changes something outside KAI, so they were not resumed automatically."
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1h9_f\",\"type\":\"scheduler.started\",\"timestamp\":\"2026-10-04T17:32:59.325Z\",\"source\":\"scheduler\",\"payload\":{\"tickMs\":30000}}",
+      "event": {
+        "id": "evt_muu3n1h9_f",
+        "type": "scheduler.started",
+        "timestamp": "2026-10-04T17:32:59.325Z",
+        "source": "scheduler",
+        "payload": {
+          "tickMs": 30000
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3n1hl_g\",\"type\":\"core.status_changed\",\"timestamp\":\"2026-10-04T17:32:59.337Z\",\"source\":\"memory\",\"payload\":{\"upkeep\":\"cycle\",\"reason\":\"startup\",\"summary\":\"cycle(startup): capture=0, organize=0, tidy=0, expire=0, journal=1\"}}",
+      "event": {
+        "id": "evt_muu3n1hl_g",
+        "type": "core.status_changed",
+        "timestamp": "2026-10-04T17:32:59.337Z",
+        "source": "memory",
+        "payload": {
+          "upkeep": "cycle",
+          "reason": "startup",
+          "summary": "cycle(startup): capture=0, organize=0, tidy=0, expire=0, journal=1"
+        }
+      },
+      "at": "2026-10-04T17:33:42.125Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3o086_h\",\"type\":\"mission.cancelled\",\"timestamp\":\"2026-10-04T17:33:44.358Z\",\"source\":\"mission:mission_muu3hf2l_0\",\"payload\":{\"missionId\":\"mission_muu3hf2l_0\"},\"missionId\":\"mission_muu3hf2l_0\"}",
+      "event": {
+        "id": "evt_muu3o086_h",
+        "type": "mission.cancelled",
+        "timestamp": "2026-10-04T17:33:44.358Z",
+        "source": "mission:mission_muu3hf2l_0",
+        "payload": {
+          "missionId": "mission_muu3hf2l_0"
+        },
+        "missionId": "mission_muu3hf2l_0"
+      },
+      "at": "2026-10-04T17:33:44.368Z"
+    },
+    {
+      "raw": "{\"id\":\"evt_muu3o08b_i\",\"type\":\"action.executed\",\"timestamp\":\"2026-10-04T17:33:44.363Z\",\"source\":\"core\",\"payload\":{\"coreBuildId\":\"b0f49fd850ddca78\",\"actionId\":\"act_muu3o08a_0\",\"executorType\":\"kai\",\"toolId\":\"mission.cancel\",\"policyDecision\":\"allow\",\"decisionSource\":\"rule:kai-internal-state\",\"startedAt\":\"2026-10-04T17:33:44.349Z\",\"completedAt\":\"2026-10-04T17:33:44.362Z\",\"resultState\":\"EXECUTED\",\"missionId\":\"mission_muu3hf2l_0\"},\"missionId\":\"mission_muu3hf2l_0\"}",
+      "event": {
+        "id": "evt_muu3o08b_i",
+        "type": "action.executed",
+        "timestamp": "2026-10-04T17:33:44.363Z",
+        "source": "core",
+        "payload": {
+          "coreBuildId": "b0f49fd850ddca78",
+          "actionId": "act_muu3o08a_0",
+          "executorType": "kai",
+          "toolId": "mission.cancel",
+          "policyDecision": "allow",
+          "decisionSource": "rule:kai-internal-state",
+          "startedAt": "2026-10-04T17:33:44.349Z",
+          "completedAt": "2026-10-04T17:33:44.362Z",
+          "resultState": "EXECUTED",
+          "missionId": "mission_muu3hf2l_0"
+        },
+        "missionId": "mission_muu3hf2l_0"
+      },
+      "at": "2026-10-04T17:33:44.368Z"
+    }
+  ],
+  "recoveryStatus": {
+    "status": 200,
+    "body": {
+      "ledger": "C:\\Users\\DELL\\.hermes\\profiles\\kai\\cache\\scratch\\recovering-proof\\recovery-ledger.db",
+      "open": [
+        {
+          "executionId": "exec_mission_muu3hf2l_0_step_mission_muu3hf2l_0_0",
+          "kind": "mission_step",
+          "sideEffecting": true,
+          "phase": "AFTER_ACCEPT",
+          "status": "RUNNING",
+          "ownerId": "owner_22084_muu3hf2d_fn54t",
+          "sideEffectCount": 1,
+          "startedAt": "2026-10-04T17:28:37.008Z",
+          "refId": "mission_muu3hf2l_0",
+          "stepId": "step_mission_muu3hf2l_0_0",
+          "acceptedAt": "2026-10-04T17:28:37.008Z",
+          "detail": "seed: effect crossed the boundary, process died before completion"
+        }
+      ],
+      "total": 1
+    }
+  },
+  "memoryScopeBogus": {
+    "status": 400,
+    "body": {
+      "error": true,
+      "reason": "\"scope\" must be one of global, session, mission, employee, project, subagent; got \"bogus\""
+    }
+  },
+  "log": [
+    "core /identity: {\"service\":\"kai-core\",\"coreVersion\":\"0.1.0\",\"buildId\":\"b0f49fd850ddca78\",\"gitCommit\":\"5839f96ee678956287212154988e0b4427212652\",\"protocolVersion\":1,\"pid\":14928,\"startedAt\":\"2026-10-04T17:32:59.152Z\",\"identitySource\":\"C:\\\\Users\\\\DELL\\\\Desktop\\\\kai\\\\app\\\\target\\\\release\\\\core\\\\build-info.json\",\"onDiskBuildId\":\"b0f49fd850ddca78\",\"identityMatchesDisk\":true,\"sourceBuildId\":null,\"artifactMatchesSource\":null,\"sourceCheckReason\":\"no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here\",\"freshness\":\"fresh\"}",
+    "\n=== [POINT 2] the actual Core event on the wire (18 events received) ===",
+    "  raw frame: {\"id\":\"evt_muu3n1h7_e\",\"type\":\"notification.created\",\"timestamp\":\"2026-10-04T17:32:59.323Z\",\"source\":\"core\",\"payload\":{\"id\":\"ntf_muu3n1h3_0\",\"type\":\"mission.recovery_blocked\",\"title\":\"1 mission(s) need a decision\",\"priority\":\"HIGH\",\"createdAt\":\"2026-10-04T17:32:59.319Z\",\"read\":false,\"message\":\"These were interrupted with a step that changes something outside KAI, so they were not resumed automatically.\"}}",
+    "  wire type : notification.created",
+    "  payload   : {\"id\":\"ntf_muu3n1h3_0\",\"type\":\"mission.recovery_blocked\",\"title\":\"1 mission(s) need a decision\",\"priority\":\"HIGH\",\"createdAt\":\"2026-10-04T17:32:59.319Z\",\"read\":false,\"message\":\"These were interrupted with a step that changes something outside KAI, so they were not resumed automatically.\"}",
+    "  nested    : mission.recovery_blocked",
+    "\n=== [POINTS 4-7] the renderer receipt (RECOVERING, before the resolution event) ===",
+    "  engineState  : \"recovering\"",
+    "  rendererPose : \"verifying\"",
+    "  probe.runtime: \"RECOVERING\"",
+    "  probe.label  : \"KAI is recovering…\"",
+    "  probe.conn   : \"ONLINE\"",
+    "  canvas       : {\"w\":139,\"h\":197}",
+    "  orb png      : recovering-orb.png",
+    "  island png   : recovering-island.png",
+    "\n=== [POINT 9] the exit: POST /missions/:id/cancel on the blocked mission ===",
+    "  POST /missions/mission_muu3hf2l_0/cancel -> 200 {\"mission\":{\"id\":\"mission_muu3hf2l_0\",\"title\":\"recovery-proof: blocked side effect\",\"status\":\"CANCELLED\",\"priority\":0,\"createdAt\":\"2026-10-04T17:28:37.005Z\",\"updatedAt\":\"2026-10-04T17:33:44.349Z\",\"steps\":[{\"id\":\"step_mission_muu3hf2l_0_0\",\"missionId\":\"mission_muu3hf2l_0\",\"index\":0,\"title\":\"send the irreversible thing\",\"kind\":\"tool\",\"status\":\"RUNNING\",\"sideEffecting\":true,\"target\":\"fs.write\",\"startedAt\":\"2026-10-04T17:28:37.005Z\"}],\"error\":{\"code\":\"AGENT_RUN_ABANDONED\",\"message\":\"crash recovery: remaining step step_mission_muu3hf2l_0_0 (\\\"send the irreversible thing\\\") is side-effecting; refusing to re-run it automatically (spec §29)\",\"retryable\":false,\"at\":\"2026-10-04T17:32:59.317Z\"},\"metadata\":{\"recoveryBlocked\":true,\"recoveryReason\":\"crash recovery: remaining step step_mission_muu3hf2l_0_0 (\\\"send the irreversible thing\\\") is side-effecting; refusing to re-run it automatically (spec §29)\"},\"completedAt\":\"2026-10-04T17:33:44.349Z\"}}",
+    "  mission.cancelled on the wire: {\"id\":\"evt_muu3o086_h\",\"type\":\"mission.cancelled\",\"timestamp\":\"2026-10-04T17:33:44.358Z\",\"source\":\"mission:mission_muu3hf2l_0\",\"payload\":{\"missionId\":\"mission_muu3hf2l_0\"},\"missionId\":\"mission_muu3hf2l_0\"}",
+    "  after engineState  : \"using_tool\"",
+    "  after rendererPose : \"toolcall\"",
+    "  after probe.runtime: \"USING_TOOL\"",
+    "  after probe.label  : \"KAI is using a tool…\"",
+    "\nGET /recovery/status -> 200 {\"ledger\":\"C:\\\\Users\\\\DELL\\\\.hermes\\\\profiles\\\\kai\\\\cache\\\\scratch\\\\recovering-proof\\\\recovery-ledger.db\",\"open\":[{\"executionId\":\"exec_mission_muu3hf2l_0_step_mission_muu3hf2l_0_0\",\"kind\":\"mission_step\",\"sideEffecting\":true,\"phase\":\"AFTER_ACCEPT\",\"status\":\"RUNNING\",\"ownerId\":\"owner_22084_muu3hf2d_fn54t\",\"sideEffectCount\":1,\"startedAt\":\"2026-10-04T17:28:37.008Z\",\"refId\":\"mission_muu3hf2l_0\",\"stepId",
+    "\nGET /memory/search?scope=bogus -> 400 {\n  \"error\": true,\n  \"reason\": \"\\\"scope\\\" must be one of global, session, mission, employee, project, subagent; got \\\"bogus\\\"\"\n}"
+  ]
+}

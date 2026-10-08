@@ -1,0 +1,203 @@
+{
+  "harness": "kai-nav-proof",
+  "at": "2026-10-05T15:06:23.879Z",
+  "steps": [
+    "launched pid=25356",
+    "Core answered=true after 5781ms 41b87e8807fd5348",
+    "viewport 1289x704 @dpr 1.435416579246521; rail {\"display\":\"flex\",\"x\":0,\"y\":0,\"w\":72,\"h\":670}",
+    "rail entries: [\"Home\",\"Chat\",\"Sessions\",\"Missions\",\"Agents\",\"Workers\",\"Tools\",\"MCP\",\"Activity\",\"Memory\",\"Skills\",\"Settings\",\"Feelings\"]",
+    "Home: clicked=true views=[\"kp-v-home\"] heading=\"Home\"",
+    "Chat: clicked=true views=[\"kp-v-chat\"] heading=\"Home\"",
+    "Sessions: clicked=true views=[\"kp-v-sessions\"] heading=\"Home\"",
+    "Missions: clicked=true views=[\"kp-v-missions\"] heading=\"Home\"",
+    "Agents: clicked=true views=[\"kp-v-agents\"] heading=\"Home\"",
+    "Workers: clicked=true views=[\"kp-v-workers\"] heading=\"Home\"",
+    "Tools: clicked=true views=[\"kp-v-tools\"] heading=\"Home\"",
+    "MCP: clicked=true views=[\"kp-v-mcp\"] heading=\"Home\"",
+    "Activity: clicked=true views=[\"kp-v-activity\"] heading=\"Home\"",
+    "Memory: clicked=true views=[\"kp-v-memory\"] heading=\"Home\"",
+    "Skills: clicked=true views=[\"kp-v-skills\"] heading=\"Home\"",
+    "Settings: clicked=true views=[\"kp-v-settings\"] heading=\"Home\"",
+    "Feelings: clicked=true views=[\"kp-v-chat\"] heading=\"Home\""
+  ],
+  "core": {
+    "answered": true,
+    "afterMs": 5781,
+    "identity": {
+      "service": "kai-core",
+      "coreVersion": "0.1.0",
+      "buildId": "41b87e8807fd5348",
+      "gitCommit": "fa8ce40eb3b2ef670d0333574323eaae0a85a683",
+      "protocolVersion": 1,
+      "pid": 2792,
+      "startedAt": "2026-10-05T15:06:29.534Z",
+      "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+      "onDiskBuildId": "41b87e8807fd5348",
+      "identityMatchesDisk": true,
+      "sourceBuildId": null,
+      "artifactMatchesSource": null,
+      "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+      "freshness": "fresh"
+    }
+  },
+  "viewport": {
+    "w": 1289,
+    "h": 704,
+    "dpr": 1.435416579246521
+  },
+  "railGeometry": {
+    "display": "flex",
+    "x": 0,
+    "y": 0,
+    "w": 72,
+    "h": 670
+  },
+  "railLabels": [
+    "Home",
+    "Chat",
+    "Sessions",
+    "Missions",
+    "Agents",
+    "Workers",
+    "Tools",
+    "MCP",
+    "Activity",
+    "Memory",
+    "Skills",
+    "Settings",
+    "Feelings"
+  ],
+  "routes": [
+    {
+      "label": "Home",
+      "clicked": true,
+      "visibleViews": [
+        "kp-v-home"
+      ],
+      "heading": "Home",
+      "text": "0 Home Where KAI is, right now — read from Core. Core online 56 tools 4 agents 0 MCP servers 0 active missions 0 pending approvals build 41b87e8807fd5348 Activity Agents Core core.status_changed core.",
+      "screenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/nav-home.png"
+    },
+    {
+      "label": "Chat",
+      "clicked": true,
+      "visibleViews": [
+        "kp-v-chat"
+      ],
+      "heading": "Home",
+      "text": "0 KAI Who is speaking · 292 turns KAI Ready Feelings Commands Ctrl K Details 0 who is speaking? Hermes Agent (Nous Research), running on your Windows machine — not the \"KAI\" the injected identity bloc",
+      "screenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/nav-chat.png"
+    },
+    {
+      "label": "Sessions",
+      "clicked": true,
+      "visibleViews": [
+        "kp-v-sessions"
+      ],
+      "heading": "Home",
+      "text": "0 Sessions Your conversations with KAI — real, on Core. Conversation 35 active · 292 turns · hermes Active Bob — own session active · 3 turns · kai:bob Open Alice — own session active · 3 turns · kai:",
+      "screenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/nav-sessions.png"
+    },
+    {
+      "label": "Missions",
+      "clicked": true,
+      "visibleViews": [
+        "kp-v-missions"
+      ],
+      "heading": "Home",
+      "text": "0 Missions Work KAI is carrying out — from Core. island-live-1791160142193 completed · 0 steps Define KAI subagents: Alice, Bob completed · 2 steps Define KAI subagents: Alice, Bob completed · 2 steps",
+      "screenshot": null
+    },
+    {
+      "label": "Agents",
+      "clicked": true,
+      "visibleViews": [
+        "kp-v-agents"
+      ],
+      "heading": "Home",
+      "text": "0 Agents KAI leads. Agents take focused jobs and work in parallel. New agent 4 active 0 working now 0 turned off Alice researcher — KAI's research persona. I read carefully and cite what I find. files",
+      "screenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/nav-agents.png"
+    },
+    {
+      "label": "Workers",
+      "clicked": true,
+      "visibleViews": [
+        "kp-v-workers"
+      ],
+      "heading": "Home",
+      "text": "0 Workforce The engines KAI drives — from Core. hermes idle opencode offline Activity Agents Core core.status_changed core.status_changed, just now scheduler.started scheduler.started, just now KAI is",
+      "screenshot": null
+    },
+    {
+      "label": "Tools",
+      "clicked": true,
+      "visibleViews": [
+        "kp-v-tools"
+      ],
+      "heading": "Home",
+      "text": "0 Tools and MCP Everything KAI can use, as Core declares it. Re-read from Core 56 tools registered 41 park for approval MCP unavailable 0 MCP servers Built-in tools Get system status Read KAI Core's o",
+      "screenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/nav-tools.png"
+    },
+    {
+      "label": "MCP",
+      "clicked": true,
+      "visibleViews": [
+        "kp-v-mcp"
+      ],
+      "heading": "Home",
+      "text": "0 MCP servers Everything KAI can use, as Core declares it. Re-read from Core 56 tools registered 41 park for approval MCP unavailable 0 MCP servers MCP servers No MCP server is registered. Core: \"no M",
+      "screenshot": null
+    },
+    {
+      "label": "Activity",
+      "clicked": true,
+      "visibleViews": [
+        "kp-v-activity"
+      ],
+      "heading": "Home",
+      "text": "0 Activity Everything KAI has really done, from the Core event stream. All Missions Approvals Sessions Workforce Tools Core Nothing yet. Every real tool call, approval and agent hand-off shows up here",
+      "screenshot": null
+    },
+    {
+      "label": "Memory",
+      "clicked": true,
+      "visibleViews": [
+        "kp-v-memory"
+      ],
+      "heading": "Home",
+      "text": "0 Memory What KAI remembers — from Core. note probe marker mem-probe-musjz339 note verify marker mem-musjyo97 note falsify-probe-12345 is my favourite colour note advprov1791010282 is my favourite col",
+      "screenshot": null
+    },
+    {
+      "label": "Skills",
+      "clicked": true,
+      "visibleViews": [
+        "kp-v-skills"
+      ],
+      "heading": "Home",
+      "text": "0 Skills Procedures KAI has learned. nightly-verification-routine 1 · learned ph4-nightly-deploy 1 · learned Activity Agents Core core.status_changed core.status_changed, just now scheduler.started sc",
+      "screenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/nav-skills.png"
+    },
+    {
+      "label": "Settings",
+      "clicked": true,
+      "visibleViews": [
+        "kp-v-settings"
+      ],
+      "heading": "Home",
+      "text": "0 Settings How KAI behaves. Core build 41b87e8807fd5348 Database C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\kai-core.db Scheduler running · 0/11 enabled Activity Agents Core core.status_changed core.status_",
+      "screenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/nav-settings.png"
+    },
+    {
+      "label": "Feelings",
+      "clicked": true,
+      "visibleViews": [
+        "kp-v-chat"
+      ],
+      "heading": "Home",
+      "text": "0 KAI Who is speaking · 292 turns KAI Ready Feelings Commands Ctrl K Details 0 who is speaking? Hermes Agent (Nous Research), running on your Windows machine — not the \"KAI\" the injected identity bloc",
+      "screenshot": null
+    }
+  ],
+  "homeScreenshot": "C:/Users/DELL/Desktop/kai/docs/evidence/nav-home-final.png"
+}

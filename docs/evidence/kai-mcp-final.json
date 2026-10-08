@@ -1,0 +1,35 @@
+{
+  "artifact": "kai-mcp-final",
+  "at": "2026-10-05T14:56:11.216Z",
+  "status": 200,
+  "capability": {
+    "id": "mcp",
+    "availability": "UNAVAILABLE",
+    "detail": "no MCP server is registered; register one (POST /mcp/servers) to give KAI MCP tools"
+  },
+  "counts": {
+    "servers": 0,
+    "enabled": 0,
+    "connected": 0,
+    "tools": 0,
+    "resources": 0
+  },
+  "servers": [],
+  "managementTools": {
+    "registered": [
+      "mcp.register",
+      "mcp.update",
+      "mcp.enable",
+      "mcp.disable",
+      "mcp.remove",
+      "mcp.connect",
+      "mcp.disconnect",
+      "mcp.refresh"
+    ],
+    "refused": []
+  },
+  "runtimeWiring": {
+    "truth": "MCP is a registered capability with management tools, but ZERO servers are registered: availability UNAVAILABLE. The UI reports exactly this (MCP unavailable / 0 MCP servers).",
+    "checkedBy": "GET /mcp on the running Core"
+  }
+}

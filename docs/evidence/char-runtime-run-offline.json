@@ -1,0 +1,45 @@
+{
+  "phase": "offline",
+  "at": "2026-10-04T13:41:00.223Z",
+  "record": [
+    {
+      "state": "OFFLINE",
+      "note": "Core killed → SSE drop → 1.5s grace → tick → OFFLINE",
+      "engineState": "offline",
+      "orbPose": "sleeping",
+      "runtime": "OFFLINE",
+      "runtimeLabel": "KAI Core is offline",
+      "mode": "expanded",
+      "conn": "OFFLINE",
+      "seenAfterMs": 1569,
+      "shotBytes": 37298
+    },
+    {
+      "recovery": {
+        "respawnedPid": 7492,
+        "stateAfter": "OFFLINE",
+        "connAfter": "OFFLINE"
+      }
+    },
+    {
+      "state": "IDLE",
+      "note": "Core killed→OFFLINE→supervisor respawned→reconnect ONLINE→IDLE",
+      "engineState": "idle",
+      "orbPose": "idle",
+      "cfgBadge": null,
+      "canvasOpacity": "1",
+      "runtime": "IDLE",
+      "runtimeLabel": "KAI is idle",
+      "mode": "expanded",
+      "view": "note",
+      "conn": "ONLINE",
+      "rect": {
+        "x": 41,
+        "y": 0,
+        "w": 640,
+        "h": 160
+      },
+      "shotBytes": 26911
+    }
+  ]
+}

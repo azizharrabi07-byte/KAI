@@ -1,0 +1,46 @@
+################ 1. there is no command that can read a secret back ################
+$ grep -n 'fn secret_' app/src-tauri/src/lib.rs
+278:fn secret_present(key: String) -> bool {
+283:fn secret_set(key: String, value: String) -> Result<(), String> {
+288:fn secret_clear(key: String) -> Result<(), String> {
+
+$ grep -n 'KNOWN_KEYS' -A 12 app/src-tauri/src/secrets.rs
+pub const KNOWN_KEYS: &[&str] = &[
+    // ── KAI control layer ────────────────────────────────────────────────────
+    // Hermes Agent api-server key (Bearer for the authenticated /v1 and
+    // /api/sessions routes on 127.0.0.1:8642). Optional: /health needs none.
+    "hermes-api-key",
+    // ── Third-party integrations ─────────────────────────────────────────────
+    "anthropic-api-key",
+    "n8n-url",
+    "n8n-api-key",
+    "vercel-token",
+    "github-token",
+    "stripe-api-key",
+    "resend-api-key",
+    "notion-api-key",
+    "calcom-api-key",
+];
+
+################ 2. the settings window's KAI control layer section ################
+$ node docs/evidence/cdp.mjs eval "invoke('open_settings_window')" --target island
+settings window asked for
+
+$ node docs/evidence/cdp.mjs eval --target settings    # the section, as the page renders it
+{"heading":"KAI control layer","text":"KAI control layer | api-server key saved in the Windows Credential Manager. | Hermes api-server key | Save key","inputType":"password","placeholder":"••••••••••••  (stored)","buttons":["Save key","Remove"]}
+
+################ 3. the driver of that field: the real credential store ################
+$ cdp eval "invoke('secret_present', { key: 'hermes-api-key' })"
+hermes-api-key is stored: true
+$ cdp eval "invoke('secret_present', { key: 'no-such-key' })"       # a value outside KNOWN_KEYS
+no-such-key is stored: false
+
+################ 4. the island's Hermes card, as rendered ################
+$ cdp eval  # focus the Hermes pill, then read the card's own text
+Hermes pill not among: OpenCode,VS Code,Resend,n8n
+$ cdp eval  # the card
+Hermes | Agent | Control layer connected | what is happening? | 12m | KAI chat 2026-10-02T09:33:03.109Z | 17m | Monitor Kai and send output when finished | 17h | status ok | api unknown | 3 sessions | Refresh | Settings…
+
+-- and what the poller's own data says, so the card can be checked against it --
+2026-10-02 10:33:35 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-02 10:33:35 control layer: Hermes key accepted — 1 model(s), 3 session(s)

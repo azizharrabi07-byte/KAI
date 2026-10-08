@@ -1,0 +1,329 @@
+{
+  "evidence": "mcp-integration",
+  "title": "MCP on the rebuilt artifact: GET /mcp serves 200 (the unknown_route 404 is dead); the mcp capability health is probe-backed",
+  "stream": "K — integration completion",
+  "capturedAtUtc": "2026-10-04T22:34:44.322Z",
+  "capturedBy": "stream K subagent (Hermes, kai profile), host DELL, Windows 11, MSYS bash",
+  "method": "curl -i captures against the live Core on 127.0.0.1:8788, raw responses embedded below; BEFORE row is the prior stream's capture (reused per instruction, raw files preserved); AFTER row captured on the rebuilt, launched artifact.",
+  "artifactUnderTest": {
+    "exe": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\kai.exe",
+    "exeMtimeBefore": "2026-10-04 21:13:41.206 +0100",
+    "exeMtimeAfter": "2026-10-04 23:23:02.004 +0100",
+    "installer": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\bundle\\nsis\\KAI_0.1.1_x64-setup.exe (2.40 MiB, mtime 2026-10-04 23:23:01.969 +0100)",
+    "launchedPid": 4440,
+    "buildId": "2159637957e7ed09",
+    "sourceBuildId": "2159637957e7ed09",
+    "stampGitCommit": "d2cb9f667856a274835a096493369c9ff338770e",
+    "protocolVersion": 1,
+    "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+    "identityMatchesDisk": true,
+    "freshness": "fresh"
+  },
+  "rebuild": {
+    "command": "cd app && npx tauri build",
+    "buildExit": 0,
+    "builtLine": "Built application at: C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\kai.exe",
+    "bundleStampLine": "[kai-core] stamped build 2159637957e7ed09 commit d2cb9f66 protocol 1 -> bundle",
+    "prebuild": "ran (cargo build -p kai-hook + core `npm run bundle`); app `npm run build` (tsc --noEmit + vite) ran after",
+    "log": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/build-after.log",
+    "lockNote": "no kai.exe was running before the build (port 8788 free); no 'failed to remove file kai.exe' error occurred"
+  },
+  "identityRecomputation": {
+    "claim": "The rebuilt artifact's compiled core source equals the repository's core source as of the recompute below.",
+    "method": "read-only recompute of the source hash using the SAME shared implementation the stamp uses (core/src/source-hash.ts computeSourceBuildId; covers every file under core/src plus core/package.json and core/tsconfig.json)",
+    "stampedAtBuild": "2159637957e7ed09",
+    "recomputedAtCapture": "2159637957e7ed09",
+    "recomputeWallClockUtc": "2026-10-04T22:31Z (before 22:31:53Z)",
+    "headAtCapture": "4c536074456a2f5dfd0ace2529fe60efa6a2881b",
+    "note": "HEAD moved d2cb9f6 -> 4c53607 (session surface, committed 23:27 +0100) AFTER the build; the session sources were already on disk during the build and 4c53607 committed those same bytes — the recomputed hash proves core/src is byte-identical to what the artifact compiled. The stamp's gitCommit field records HEAD at stamp time, by design. (app/src/settings/main.ts and core/tests/subagent.test.ts are still uncommitted; both mtimes predate the build.)",
+    "postRecomputeDrift": "Sibling edits landed AFTER the recompute: core/src/api/routes.ts (mtime 23:31:53 +0100) and core/src/server.ts (mtime 23:32:39 +0100); as of 22:36Z the tree recomputes to 7d8f322134be127b. The artifact matches the tree as of the recompute; the tree moving again is normal mid-stream, and any later source needs a rebuild (new stamp) to be comparable."
+  },
+  "tsc": {
+    "command": "cd core && npx tsc -p tsconfig.json --noEmit",
+    "exit": 0,
+    "observedBy": "stream K, this session, on the capture tree"
+  },
+  "tests": {
+    "command": "cd core && npm test",
+    "tests": 838,
+    "pass": 825,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 13,
+    "todo": 0,
+    "exit": 0,
+    "durationMs": 43154.9664,
+    "log": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/test-after.log",
+    "note": "The integration lead's earlier run on the pre-sibling tree was 833 tests / 820 pass / 0 fail / 13 skipped; commit 4c53607 (session surface, +5 net tests) landed between the two runs. Both runs: 0 failures."
+  },
+  "launch": {
+    "env": {
+      "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS": "--remote-debugging-port=9222",
+      "WEBVIEW2_USER_DATA_FOLDER": "C:\\Users\\DELL\\.hermes\\profiles\\kai\\cache\\scratch\\mcp-int\\webview2-profile"
+    },
+    "script": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/launch-after.ps1",
+    "pidEqualsPortOwner": "pid 4440 == netstat ':8788.*LISTENING' owner 4440",
+    "cdp": "http://127.0.0.1:9222/json/version -> Edg/154.0.4258.53",
+    "stillRunningAtCapture": true
+  },
+  "before": {
+    "artifact": "previous build 7028f6cba503e3ef, pid 4572, gitCommit c75fc5f6bc041c6ed3080547a1026a71d958e560 (captured 2026-10-04T21:42:03Z by the prior stream)",
+    "getMcp": {
+      "statusLine": "HTTP/1.1 404 Not Found",
+      "headers": "content-type: application/json; charset=utf-8\ncontent-length: 73\ncache-control: no-store\nDate: Sun, 04 Oct 2026 21:42:03 GMT\nConnection: keep-alive\nKeep-Alive: timeout=5",
+      "bodyRaw": "{\n  \"error\": \"not_found\",\n  \"reason\": \"unknown_route\",\n  \"path\": \"/mcp\"\n}",
+      "body": {
+        "error": "not_found",
+        "reason": "unknown_route",
+        "path": "/mcp"
+      }
+    },
+    "capabilityMcp": {
+      "statusLine": null,
+      "note": "BEFORE capture was body-only; status line not preserved",
+      "bodyRaw": "{\n  \"capability\": {\n    \"id\": \"mcp\",\n    \"name\": \"MCP servers and tools\",\n    \"availability\": \"UNAVAILABLE\",\n    \"risk\": \"EXTERNAL\",\n    \"provider\": \"kai\",\n    \"supportedActions\": [\n      \"call\"\n    ],\n    \"requirements\": [\n      \"no MCP server is configured or connected\"\n    ]\n  },\n  \"status\": {\n    \"id\": \"mcp\",\n    \"availability\": \"UNAVAILABLE\",\n    \"healthy\": false,\n    \"disabled\": false,\n    \"detail\": \"no MCP server is configured or connected\",\n    \"checkedAt\": \"2026-10-04T21:42:03.583Z\"\n  }\n}",
+      "body": {
+        "capability": {
+          "id": "mcp",
+          "name": "MCP servers and tools",
+          "availability": "UNAVAILABLE",
+          "risk": "EXTERNAL",
+          "provider": "kai",
+          "supportedActions": [
+            "call"
+          ],
+          "requirements": [
+            "no MCP server is configured or connected"
+          ]
+        },
+        "status": {
+          "id": "mcp",
+          "availability": "UNAVAILABLE",
+          "healthy": false,
+          "disabled": false,
+          "detail": "no MCP server is configured or connected",
+          "checkedAt": "2026-10-04T21:42:03.583Z"
+        }
+      }
+    },
+    "provenance": {
+      "statusLine": null,
+      "note": "not captured — the route did not exist on the pre-integration build"
+    },
+    "identity": {
+      "bodyRaw": "{\n  \"service\": \"kai-core\",\n  \"coreVersion\": \"0.1.0\",\n  \"buildId\": \"7028f6cba503e3ef\",\n  \"gitCommit\": \"c75fc5f6bc041c6ed3080547a1026a71d958e560\",\n  \"protocolVersion\": 1,\n  \"pid\": 4572,\n  \"startedAt\": \"2026-10-04T20:52:19.608Z\",\n  \"identitySource\": \"C:\\\\Users\\\\DELL\\\\Desktop\\\\kai\\\\app\\\\target\\\\release\\\\core\\\\build-info.json\",\n  \"onDiskBuildId\": \"7028f6cba503e3ef\",\n  \"identityMatchesDisk\": true,\n  \"sourceBuildId\": null,\n  \"artifactMatchesSource\": null,\n  \"sourceCheckReason\": \"no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here\",\n  \"freshness\": \"fresh\"\n}",
+      "body": {
+        "service": "kai-core",
+        "coreVersion": "0.1.0",
+        "buildId": "7028f6cba503e3ef",
+        "gitCommit": "c75fc5f6bc041c6ed3080547a1026a71d958e560",
+        "protocolVersion": 1,
+        "pid": 4572,
+        "startedAt": "2026-10-04T20:52:19.608Z",
+        "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+        "onDiskBuildId": "7028f6cba503e3ef",
+        "identityMatchesDisk": true,
+        "sourceBuildId": null,
+        "artifactMatchesSource": null,
+        "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+        "freshness": "fresh"
+      }
+    }
+  },
+  "after": {
+    "artifact": "rebuilt build 2159637957e7ed09, pid 4440 (captured 2026-10-04T22:24:00Z)",
+    "getMcp": {
+      "statusLine": "HTTP/1.1 200 OK",
+      "headers": "content-type: application/json; charset=utf-8\ncontent-length: 999\ncache-control: no-store\nDate: Sun, 04 Oct 2026 22:24:00 GMT\nConnection: keep-alive\nKeep-Alive: timeout=5",
+      "bodyRaw": "{\n  \"service\": \"mcp\",\n  \"capability\": {\n    \"id\": \"mcp\",\n    \"availability\": \"UNAVAILABLE\",\n    \"detail\": \"no MCP server is registered; register one (POST /mcp/servers) to give KAI MCP tools\"\n  },\n  \"counts\": {\n    \"servers\": 0,\n    \"enabled\": 0,\n    \"connected\": 0,\n    \"tools\": 0,\n    \"resources\": 0\n  },\n  \"servers\": [],\n  \"managementTools\": {\n    \"registered\": [\n      \"mcp.register\",\n      \"mcp.update\",\n      \"mcp.enable\",\n      \"mcp.disable\",\n      \"mcp.remove\",\n      \"mcp.connect\",\n      \"mcp.disconnect\",\n      \"mcp.refresh\"\n    ],\n    \"refused\": []\n  },\n  \"persistence\": {\n    \"path\": null,\n    \"problem\": null\n  },\n  \"provenance\": {\n    \"recorded\": 0\n  },\n  \"note\": \"MCP servers are KAI-owned capabilities. Every MCP tool is registered into KAI's one tool registry (validate -> policy -> (approval) -> execute); every invocation is recorded in the MCP provenance ledger. A management call that parks answers 409 with an approvalId; retry the same request with it once a human decides.\"\n}",
+      "body": {
+        "service": "mcp",
+        "capability": {
+          "id": "mcp",
+          "availability": "UNAVAILABLE",
+          "detail": "no MCP server is registered; register one (POST /mcp/servers) to give KAI MCP tools"
+        },
+        "counts": {
+          "servers": 0,
+          "enabled": 0,
+          "connected": 0,
+          "tools": 0,
+          "resources": 0
+        },
+        "servers": [],
+        "managementTools": {
+          "registered": [
+            "mcp.register",
+            "mcp.update",
+            "mcp.enable",
+            "mcp.disable",
+            "mcp.remove",
+            "mcp.connect",
+            "mcp.disconnect",
+            "mcp.refresh"
+          ],
+          "refused": []
+        },
+        "persistence": {
+          "path": null,
+          "problem": null
+        },
+        "provenance": {
+          "recorded": 0
+        },
+        "note": "MCP servers are KAI-owned capabilities. Every MCP tool is registered into KAI's one tool registry (validate -> policy -> (approval) -> execute); every invocation is recorded in the MCP provenance ledger. A management call that parks answers 409 with an approvalId; retry the same request with it once a human decides."
+      }
+    },
+    "capabilityMcp": {
+      "statusLine": "HTTP/1.1 200 OK",
+      "headers": "content-type: application/json; charset=utf-8\ncontent-length: 545\ncache-control: no-store\nDate: Sun, 04 Oct 2026 22:24:00 GMT\nConnection: keep-alive\nKeep-Alive: timeout=5",
+      "bodyRaw": "{\n  \"capability\": {\n    \"id\": \"mcp\",\n    \"name\": \"MCP servers and tools\",\n    \"availability\": \"UNAVAILABLE\",\n    \"risk\": \"EXTERNAL\",\n    \"provider\": \"kai\",\n    \"supportedActions\": [\n      \"call\"\n    ],\n    \"requirements\": [\n      \"no MCP server is configured or connected\"\n    ]\n  },\n  \"status\": {\n    \"id\": \"mcp\",\n    \"availability\": \"UNAVAILABLE\",\n    \"healthy\": false,\n    \"disabled\": false,\n    \"detail\": \"no MCP server is registered; register one (POST /mcp/servers) to give KAI MCP tools\",\n    \"checkedAt\": \"2026-10-04T22:24:00.635Z\"\n  }\n}",
+      "body": {
+        "capability": {
+          "id": "mcp",
+          "name": "MCP servers and tools",
+          "availability": "UNAVAILABLE",
+          "risk": "EXTERNAL",
+          "provider": "kai",
+          "supportedActions": [
+            "call"
+          ],
+          "requirements": [
+            "no MCP server is configured or connected"
+          ]
+        },
+        "status": {
+          "id": "mcp",
+          "availability": "UNAVAILABLE",
+          "healthy": false,
+          "disabled": false,
+          "detail": "no MCP server is registered; register one (POST /mcp/servers) to give KAI MCP tools",
+          "checkedAt": "2026-10-04T22:24:00.635Z"
+        }
+      },
+      "secondCallBodyRaw": "{\n  \"capability\": {\n    \"id\": \"mcp\",\n    \"name\": \"MCP servers and tools\",\n    \"availability\": \"UNAVAILABLE\",\n    \"risk\": \"EXTERNAL\",\n    \"provider\": \"kai\",\n    \"supportedActions\": [\n      \"call\"\n    ],\n    \"requirements\": [\n      \"no MCP server is configured or connected\"\n    ]\n  },\n  \"status\": {\n    \"id\": \"mcp\",\n    \"availability\": \"UNAVAILABLE\",\n    \"healthy\": false,\n    \"disabled\": false,\n    \"detail\": \"no MCP server is registered; register one (POST /mcp/servers) to give KAI MCP tools\",\n    \"checkedAt\": \"2026-10-04T22:27:31.417Z\"\n  }\n}",
+      "secondCallNote": "a second call at 22:27:31Z returned the same measured detail with a fresh checkedAt — the status block is recomputed per call"
+    },
+    "provenance": {
+      "statusLine": "HTTP/1.1 200 OK",
+      "headers": "content-type: application/json; charset=utf-8\ncontent-length: 19\ncache-control: no-store\nDate: Sun, 04 Oct 2026 22:24:00 GMT\nConnection: keep-alive\nKeep-Alive: timeout=5",
+      "bodyRaw": "{\n  \"records\": []\n}",
+      "body": {
+        "records": []
+      }
+    },
+    "identity": {
+      "bodyRaw": "{\n  \"service\": \"kai-core\",\n  \"coreVersion\": \"0.1.0\",\n  \"buildId\": \"2159637957e7ed09\",\n  \"gitCommit\": \"d2cb9f667856a274835a096493369c9ff338770e\",\n  \"protocolVersion\": 1,\n  \"pid\": 4440,\n  \"startedAt\": \"2026-10-04T22:23:44.164Z\",\n  \"identitySource\": \"C:\\\\Users\\\\DELL\\\\Desktop\\\\kai\\\\app\\\\target\\\\release\\\\core\\\\build-info.json\",\n  \"onDiskBuildId\": \"2159637957e7ed09\",\n  \"identityMatchesDisk\": true,\n  \"sourceBuildId\": null,\n  \"artifactMatchesSource\": null,\n  \"sourceCheckReason\": \"no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here\",\n  \"freshness\": \"fresh\"\n}",
+      "body": {
+        "service": "kai-core",
+        "coreVersion": "0.1.0",
+        "buildId": "2159637957e7ed09",
+        "gitCommit": "d2cb9f667856a274835a096493369c9ff338770e",
+        "protocolVersion": 1,
+        "pid": 4440,
+        "startedAt": "2026-10-04T22:23:44.164Z",
+        "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+        "onDiskBuildId": "2159637957e7ed09",
+        "identityMatchesDisk": true,
+        "sourceBuildId": null,
+        "artifactMatchesSource": null,
+        "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+        "freshness": "fresh"
+      }
+    }
+  },
+  "claims": [
+    {
+      "id": "C1",
+      "claim": "The rebuilt kai.exe (mtime 2026-10-04 23:23:02 +0100) carries the MCP integration, and its compiled core source matches the repository tree.",
+      "tag": "END-TO-END PROVEN",
+      "basis": "npx tauri build exited 0 and printed 'Built application at: ...kai.exe'; the bundle was stamped 2159637957e7ed09; a read-only recompute of the source hash (same shared implementation) returns 2159637957e7ed09 against the current tree; the shipped app/target/release/core/mcp/capability.js contains the measured probe branch and runtime.js contains installMcpCapability/dispatchMcpCapability; live GET /identity reports identityMatchesDisk true, freshness fresh."
+    },
+    {
+      "id": "C2",
+      "claim": "GET /mcp is mounted on the live rebuilt app and returns 200 with the MCP summary. The 404 unknown_route symptom is dead.",
+      "tag": "END-TO-END PROVEN",
+      "basis": "raw live capture 2026-10-04T22:24:00Z against pid 4440 (embedded): HTTP/1.1 200 OK; body carries service 'mcp', the measured capability detail, counts, the 8 management tool ids, persistence and provenance summary. BEFORE was HTTP/1.1 404 Not Found {\"error\":\"not_found\",\"reason\":\"unknown_route\",\"path\":\"/mcp\"}."
+    },
+    {
+      "id": "C3",
+      "claim": "The mcp capability health is probe-backed: with zero servers registered it measures UNAVAILABLE with the probe's branch-1 detail, not the old declared string; the status block is recomputed per call.",
+      "tag": "END-TO-END PROVEN",
+      "basis": "BEFORE status.detail was the declared string 'no MCP server is configured or connected' (equal to the registration-time requirements[0]); AFTER status.detail is 'no MCP server is registered; register one (POST /mcp/servers) to give KAI MCP tools', which is verbatim branch 1 of mcpCapabilityHealth (core/src/mcp/capability.ts:61-65; shipped in app/target/release/core/mcp/capability.js); checkedAt advanced 22:24:00.635Z -> 22:27:31.417Z across two calls. The requirements[] array still carries the static registration string by design — the STATUS is the measured value."
+    },
+    {
+      "id": "C4",
+      "claim": "The probe is state-driven: it walks UNAVAILABLE -> DEGRADED -> AVAILABLE as a server is registered, enabled and connected.",
+      "tag": "INTEGRATION PROVEN",
+      "basis": "core/tests/mcp-runtime-e2e.test.ts on this tree: real tool registry, policy engine, approval service, manager and the real fixture child process over stdio; asserts UNAVAILABLE ('registered but not enabled'), DEGRADED ('enabled but not connected'), AVAILABLE ('1 MCP server(s) connected; ... tools'). Not walked live in this row (see N1)."
+    },
+    {
+      "id": "C5",
+      "claim": "The MCP management surface is live on the one tool registry: 8 mcp.* tools registered, none refused; a management call parks 409 for approval under the default policy — no bypass path.",
+      "tag": "END-TO-END PROVEN (observation) + INTEGRATION PROVEN (gating)",
+      "basis": "live GET /mcp shows managementTools.registered = [mcp.register, mcp.update, mcp.enable, mcp.disable, mcp.remove, mcp.connect, mcp.disconnect, mcp.refresh], refused []; the e2e test drives register/enable/connect to 409 {approvalRequired, approvalId} and executes only after a decision; policies/gate.ts maps WRITE/EXTERNAL/DESTRUCTIVE to needs_approval and no mcp.* id is in KAI_INTERNAL_STATE_TOOLS (runtime.ts)."
+    },
+    {
+      "id": "C6",
+      "claim": "GET /mcp/provenance serves the invocation ledger; with zero invocations it is empty.",
+      "tag": "END-TO-END PROVEN (route) + INTEGRATION PROVEN (records)",
+      "basis": "live capture: HTTP/1.1 200 OK, {\"records\": []}. The e2e test asserts recorded rows (toolId, caller source, approvalId correlation) after real invocations."
+    }
+  ],
+  "notProven": [
+    {
+      "id": "N1",
+      "claim": "Live fixture end-to-end on the launched app: register -> enable -> connect -> call echo -> AVAILABLE -> ledger rows.",
+      "tag": "NOT PROVEN",
+      "basis": "Not attempted in this capture. Every management mutation parks 409 for a HUMAN approval under the default policy; stream K deliberately left the live state unmutated rather than self-deciding approvals. The identical ladder is INTEGRATION PROVEN in-process on this tree (C4)."
+    },
+    {
+      "id": "N2",
+      "claim": "Live MCP tool invocation (POST /mcp/servers/:name/call) on the launched app.",
+      "tag": "NOT PROVEN",
+      "basis": "Requires an approved, connected server first; same reason as N1. In-process: INTEGRATION PROVEN (the e2e test calls echo and write_note through the real boundary)."
+    },
+    {
+      "id": "N3",
+      "claim": "The provenance EVENT-BUS sink (mcp.* events on the KaiEvent bus).",
+      "tag": "NOT PROVEN",
+      "basis": "Deliberately unwired: the frozen KaiEventType has no mcp.* member, so the manager's record sink was left unwired in runtime.ts rather than emitting a mis-typed event; the ledger is served at GET /mcp/provenance instead, and the registry's own action.executed record already covers the bus for registry-mediated calls."
+    },
+    {
+      "id": "N4",
+      "claim": "The NSIS installer payload (KAI_0.1.1_x64-setup.exe) contents.",
+      "tag": "NOT PROVEN",
+      "basis": "Produced by the same build run (23:23:01 +0100); not opened or inspected in this row."
+    }
+  ],
+  "blockedExternal": [
+    {
+      "id": "B1",
+      "claim": "Third-party MCP server connectivity (a real third-party server over stdio/network).",
+      "tag": "BLOCKED_EXTERNAL",
+      "basis": "No third-party MCP server is installed or configured on this machine; there is nothing to connect to. The only real peer anywhere in this evidence is KAI's own fixture (core/src/mcp/servers/echo-mcp-server.mjs — a real child process speaking real newline-delimited JSON-RPC 2.0 over stdio), exercised in-process by the suite, not live."
+    }
+  ],
+  "mockOnly": {
+    "claims": [],
+    "note": "No MOCK ONLY claims in this row: the live captures are live; the in-process suite uses real components and a real child process (the fixture), not mocks."
+  },
+  "rawCaptures": {
+    "before": [
+      "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/before-get-mcp.txt",
+      "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/before-capability.json",
+      "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/before-identity.json"
+    ],
+    "after": [
+      "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/after-get-mcp.txt",
+      "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/after-capability.txt",
+      "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/after-capability-2.json",
+      "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/after-provenance.txt",
+      "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/after-identity.json"
+    ],
+    "buildLog": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/build-after.log",
+    "testLog": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/test-after.log",
+    "gitStateAtTest": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/mcp-int/git-state-at-test.txt"
+  },
+  "verdict": "The rebuild succeeded on the fixed tree (BUILD_EXIT=0, exe mtime 23:23:02 +0100, stamp 2159637957e7ed09 == recomputed source hash). GET /mcp serves 200 on the launched app — the 404 is dead. The mcp capability is probe-backed and honestly measures UNAVAILABLE with zero servers registered (a measured detail, not the old declared string). GET /mcp/provenance serves the ledger (empty, zero invocations). Third-party MCP connectivity remains BLOCKED_EXTERNAL; the live fixture end-to-end was not attempted (management mutations are approval-gated for a human) — the full ladder is INTEGRATION PROVEN in-process on this tree."
+}

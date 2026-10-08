@@ -1,0 +1,258 @@
+{
+  "artifact": "kai-identity-final",
+  "at": "2026-10-05T14:56:11.182Z",
+  "verifiedAgainst": "the RUNNING Core (pid in /identity must equal the port owner)",
+  "identity": {
+    "service": "kai-core",
+    "coreVersion": "0.1.0",
+    "buildId": "41b87e8807fd5348",
+    "gitCommit": "fa8ce40eb3b2ef670d0333574323eaae0a85a683",
+    "protocolVersion": 1,
+    "pid": 11140,
+    "startedAt": "2026-10-05T14:55:12.616Z",
+    "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+    "onDiskBuildId": "41b87e8807fd5348",
+    "identityMatchesDisk": true,
+    "sourceBuildId": null,
+    "artifactMatchesSource": null,
+    "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+    "freshness": "fresh"
+  },
+  "identityModel": {
+    "status": 200,
+    "body": {
+      "service": "identity",
+      "model": {
+        "agentId": "kai",
+        "displayName": "KAI",
+        "version": "ab81578e",
+        "buildId": "41b87e8807fd5348",
+        "freshness": "fresh",
+        "soulChars": 2779,
+        "identityChars": 1240,
+        "userContextChars": 322,
+        "capabilities": [
+          "system",
+          "filesystem",
+          "git",
+          "shell",
+          "browser",
+          "computer",
+          "mcp"
+        ],
+        "limits": 4,
+        "authority": {
+          "memory": {
+            "subsystem": "MemoryEngine",
+            "methods": [
+              "write",
+              "search",
+              "get",
+              "digest",
+              "journal"
+            ]
+          },
+          "workforce": {
+            "subsystem": "WorkforceManager",
+            "methods": [
+              "register",
+              "list",
+              "delegate",
+              "select",
+              "available"
+            ]
+          },
+          "sessions": {
+            "subsystem": "SessionService",
+            "methods": [
+              "ensureActive",
+              "active",
+              "list",
+              "recordTurn"
+            ]
+          },
+          "policy": {
+            "subsystem": "PolicyEngine",
+            "methods": [
+              "check",
+              "mode",
+              "rules"
+            ]
+          },
+          "approvals": {
+            "subsystem": "ApprovalService",
+            "methods": [
+              "request",
+              "decide",
+              "list"
+            ]
+          },
+          "memoryShares": {
+            "subsystem": "SubagentMemoryShares (not wired)",
+            "methods": []
+          }
+        },
+        "binding": [
+          {
+            "field": "agentId",
+            "backedBy": "kai (the single Core agent id; subagents carry subagent:<id>)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "displayName",
+            "backedBy": "KAI (a real constant, and the label every renderer uses)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "identity",
+            "backedBy": "identity/IDENTITY.md via KaiIdentity.identity",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "soul",
+            "backedBy": "identity/SOUL.md via KaiIdentity.soul",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "capabilities",
+            "backedBy": "KAI_DIRECT_CAPABILITIES (agent/kai-capabilities.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "limits",
+            "backedBy": "KAI_LIMITS (agent/kai-capabilities.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "userContext",
+            "backedBy": "user/USER.md via KaiIdentity.user",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "memoryAuthority",
+            "backedBy": "the live MemoryEngine (memory/engine.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "workforceAuthority",
+            "backedBy": "the live WorkforceManager (workforce/manager.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "sessionAuthority",
+            "backedBy": "the live SessionService (sessions/service.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "policyAuthority",
+            "backedBy": "the live PolicyEngine (policies/gate.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "approvalAuthority",
+            "backedBy": "the live ApprovalService (approvals/service.ts)",
+            "status": "UNIT PROVEN"
+          },
+          {
+            "field": "memoryAuthority.shares",
+            "backedBy": "subagent memory-share governance (memory/shares.ts)",
+            "status": "NOT PROVEN",
+            "reason": "the runtime did not hand the model the share registry; cross-subagent sharing governance is carried beside the memory engine and is wired by the runtime stream"
+          }
+        ]
+      },
+      "harness": "Yes — I have my own harness, and it isn't Hermes's. I run as KAI Core, my own Node/TypeScript runtime on this machine, served over loopback to the KAI desktop app. My identity, user context, memory and rules are loaded from my own KAI_HOME resources, not from a worker; my authorities are real running subsystems — my own memory engine, workforce, session service, policy engine and approval service. When a task needs a model or a tool I don't hold, I delegate to a worker — Hermes, OpenCode, Codex. A worker provides information; a worker does not become the speaker. Internal provenance may still say worker = Hermes; that is correct and stays.",
+      "note": "The canonical identity model: the twelve owner fields resolved over the running Core's REAL subsystems. Each non-document authority names the live method set read off the object, so a field is the running subsystem, not a description of one. `binding[]` tags every field."
+    }
+  },
+  "health": {
+    "status": "degraded",
+    "service": "kai-core",
+    "version": "0.1.0",
+    "hermes": {
+      "reachable": true,
+      "authorized": true,
+      "version": "unknown",
+      "reason": null
+    },
+    "opencode": {
+      "reachable": false,
+      "version": null,
+      "reason": "upstream_unreachable"
+    },
+    "checked_at": "2026-10-05T14:56:11.153Z"
+  },
+  "independence": {
+    "architecture": "KAI UI -> KAI Core -> KAI ModelProvider -> model -> KAI",
+    "inference": {
+      "owner": "kai",
+      "provider": "kai-model",
+      "model": "deepseek-v4.1-flash",
+      "configured": false,
+      "reachable": false,
+      "baseUrl": "https://opencode.ai/zen/go/v1",
+      "reason": "no API key configured",
+      "capabilities": {
+        "chat": false,
+        "stream": false,
+        "structured": false,
+        "embeddings": false,
+        "tools": false,
+        "models": [],
+        "defaultModel": "deepseek-v4.1-flash"
+      }
+    },
+    "workers": {
+      "hermes": {
+        "optional": true,
+        "role": "worker",
+        "reachable": true,
+        "authorized": true
+      }
+    },
+    "dependency": {
+      "normal_chat_turns": 0,
+      "delegated_turns": 0,
+      "normal_chat_calls_to_hermes": 0,
+      "delegated_calls_to_hermes": 0
+    }
+  },
+  "chatIdentityProbes": [
+    {
+      "q": "Who are you? Introduce yourself.",
+      "status": 200,
+      "body": {
+        "agent": "core",
+        "from_state": true,
+        "intent": "identity",
+        "conversation_id": "sess_musv974c_7dhj",
+        "reply": "I am KAI. Hermes and OpenCode are workers I can use; I'm still KAI when they are unavailable.",
+        "data": {
+          "version": "ab81578e"
+        },
+        "brain": null,
+        "dependency": {
+          "normal_chat_calls_to_hermes": 0
+        }
+      }
+    },
+    {
+      "q": "Are you Hermes?",
+      "status": 200,
+      "body": {
+        "agent": "core",
+        "from_state": true,
+        "intent": "identity",
+        "conversation_id": "sess_musv974c_7dhj",
+        "reply": "No — Hermes is a worker I can use, not what I am. I am KAI.",
+        "data": {
+          "version": "ab81578e"
+        },
+        "brain": null,
+        "dependency": {
+          "normal_chat_calls_to_hermes": 0
+        }
+      }
+    }
+  ]
+}

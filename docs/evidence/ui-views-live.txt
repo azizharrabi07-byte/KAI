@@ -1,0 +1,18 @@
+launched C:\Users\DELL\Desktop\kai\app\target\release\kai.exe with the debug port on 9222
+island target: http://tauri.localhost/ (761281F546B8D229F0C9EA44AD5CCB1C)
+greeting       *** NOT CAUGHT (the animation had already finished) ***
+core identity: build=47b9a22556dd3604 commit=05bda1f9e0c3475bbc746451f08d75c3bf558708 pid=17104 protocol=1
+core maintenance: {"maintenance":{"ok":true,"checkedAt":"2026-10-03T14:14:03.711Z","identity":{"buildId":"47b9a22556dd3604","gitCommit":"05bda1f9e0c3475bbc746451f08d75c3bf558708","protocolVersion":1,"pid":17104,"onDiskBuildId":"47b9a22556dd3604","current":true,"detail":"running build 47b9a22556dd3604 IS the build sta
+port 8788 owner: 17104 (matches identity)
+view order (from buildViews): overview, empty, approval, question, error, finished, confused, note, settings, sessions, prompt, upload, uploading, choose
+cleared 21 unread notification(s) left by earlier runs
+overview       view=overview css=640x210 contentVisible=true OK
+               text: "KAI your agent KAI is idle Using: Hermes idle OpenCode idle VS Code idle KAI Core offline My Sessions… Settings… Hermes OpenCode VS Code Resend"
+               shot: ui-view-overview.png (56713 bytes)   [tray → Open KAI]
+ticker         view=overview css=640x210 contentVisible=true *** NOT THE EXPECTED STATE ***
+               text: "OpenCode Agent Control layer connected No approvals waiting server 1.18.33 3 recent sessions Refresh Settings… KAI Hermes VS Code Resend"
+               shot: ui-view-ticker.png (51990 bytes)   [hook SessionStart + PreToolUse on the focused VS Code pill]
+overview-card  view=overview css=640x210 contentVisible=true *** NOT THE EXPECTED STATE ***
+               text: "KAI your agent KAI is using a tool… Using: Hermes idle OpenCode idle VS Code working 10 of my sessions active: Conversation 1 My Sessions… Settings… Hermes OpenCode VS Code Resend"
+               shot: ui-view-overview-card.png (54337 bytes)   [integration card after focusing another pill]
+FAILED: never reached view "prompt"; last was {"index":0,"onClass":"view overview on","greetingShown":false,"cssWidth":640,"cssHeight":210,"contentVisible":true,"text":"OpenCode Agent Control layer connected No approvals waiting server 1.18.33 3 recent sessions Refresh Settings… KAI Hermes VS Code Resend","pills":["KAI","Hermes","VS Code","Resend"],"view":"overview"}

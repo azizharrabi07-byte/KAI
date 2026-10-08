@@ -1,0 +1,82 @@
+[
+  {
+    "nav": "chat",
+    "via": "rail",
+    "sectionOn": true,
+    "reported": "chat",
+    "snippet": "KAIAlpha semaphore message · 4 turns · alpha semaphore messageKAI// AUTONOMOUS OPERATORDone, happyRUNTIME ACTIVE0 APPROVALSFeelingsThemeComm",
+    "hash": "#/chat"
+  },
+  {
+    "nav": "sessions",
+    "via": "rail",
+    "sectionOn": true,
+    "reported": "sessions",
+    "snippet": "SessionsYour conversations with KAI — real, on Core.Alpha semaphore messageactive · 4 turns · no worker yet · alpha semaphore messageActiveD",
+    "hash": "#/sessions"
+  },
+  {
+    "nav": "agents",
+    "via": "rail",
+    "sectionOn": true,
+    "reported": "agents",
+    "snippet": "AgentsKAI leads. Agents take focused jobs and work in parallel.New agent1 active0 working now0 turned offScoutresearcher — READYGive it a jo",
+    "hash": "#/agents"
+  },
+  {
+    "nav": "settings",
+    "via": "rail",
+    "sectionOn": true,
+    "reported": "settings",
+    "snippet": "SettingsHow KAI behaves.Soulidentity vab81578eView soulEdit soulModeldeepseek-v4.1-flash · https://opencode.ai/zen/go/v1 · 120000ms · key se",
+    "hash": "#/settings"
+  },
+  {
+    "nav": "home",
+    "via": "hash",
+    "sectionOn": true,
+    "reported": "home"
+  },
+  {
+    "nav": "missions",
+    "via": "hash",
+    "sectionOn": true,
+    "reported": "missions"
+  },
+  {
+    "nav": "workers",
+    "via": "hash",
+    "sectionOn": true,
+    "reported": "workers"
+  },
+  {
+    "nav": "tools",
+    "via": "hash",
+    "sectionOn": true,
+    "reported": "tools"
+  },
+  {
+    "nav": "mcp",
+    "via": "hash",
+    "sectionOn": true,
+    "reported": "mcp"
+  },
+  {
+    "nav": "activity",
+    "via": "hash",
+    "sectionOn": true,
+    "reported": "activity"
+  },
+  {
+    "nav": "memory",
+    "via": "hash",
+    "sectionOn": true,
+    "reported": "memory"
+  },
+  {
+    "nav": "skills",
+    "via": "hash",
+    "sectionOn": true,
+    "reported": "skills"
+  }
+]

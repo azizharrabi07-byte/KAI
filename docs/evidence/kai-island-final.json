@@ -1,0 +1,62 @@
+{
+  "artifact": "kai-island-final",
+  "at": "2026-10-05T14:57:32.009Z",
+  "note": "The island companion: OS geometry + live webview state. It must stay a companion (status/progress/approval/open), never host sessions/tools/MCP.",
+  "osWindows": [
+    "hwnd=1049548 class=Tauri Window visible=True title='KAI' size=1034x459 pos=(159,0)\r",
+    "hwnd=1509028 class=Tauri Window visible=True title='KAI' size=1866x1051 pos=(35,35)\r",
+    "hwnd=1181020 class=Tauri Window visible=False title='Settings - KAI' size=634x792 pos=(643,148)\r",
+    "hwnd=1049594 class=tray_icon_app visible=False title='' size=1440x788 pos=(168,168)\r",
+    "hwnd=1115098 class=com.aziz.kai-sic visible=True title='com.aziz.kai-siw' size=16x16 pos=(0,0)\r",
+    "hwnd=919156 class=Tao Thread Event Target visible=True title='' size=16x16 pos=(0,0)\r",
+    "hwnd=1706086 class=MSCTFIME UI visible=False title='MSCTFIME UI' size=0x0 pos=(0,0)\r",
+    "hwnd=1311388 class=IME visible=False title='Default IME' size=0x0 pos=(0,0)"
+  ],
+  "webview": {
+    "target": "http://tauri.localhost/",
+    "title": "KAI",
+    "url": "http://tauri.localhost/",
+    "viewport": "721x320",
+    "dpr": 1.435416579246521,
+    "visibleViews": [],
+    "navLabels": [],
+    "probe": null,
+    "islandProbe": {
+      "mode": "expanded",
+      "view": "approval",
+      "runtime": "IDLE",
+      "runtimeLabel": "KAI is idle",
+      "conn": "ONLINE",
+      "connError": null,
+      "note": "Approved action failed: mcp.register",
+      "turnError": null,
+      "activeSessionId": "sess_musv974c_7dhj",
+      "sessionIds": [
+        "sess_musv974c_7dhj",
+        "sess_muuk9l8g_2r5r",
+        "sess_muuk8dm6_ia0i",
+        "sess_muuawu27_2kq1",
+        "sess_muu7x6p2_7bcu",
+        "sess_musv9726_52o",
+        "sess_musv9766_cg9l",
+        "sess_mussji00_8hqi",
+        "sess_mussji2c_a5rn",
+        "sess_mussjhx4_8rc4",
+        "sess_musr69rd_g97",
+        "sess_musr7gng_mtt",
+        "sess_musp9wri_593n",
+        "sess_muspa1te_7zv0",
+        "sess_muspa7xy_fi5x",
+        "sess_musp67oh_f427",
+        "sess_musp67mq_ei9q",
+        "sess_musp67kt_fwnd",
+        "sess_musmgc27_cg1q",
+        "sess_musdvo4q_aybg"
+      ],
+      "historyLength": 100,
+      "historyLast": "No — Hermes is a worker I can use, not what I am. I am KAI.",
+      "workspaceOpen": true
+    },
+    "bodyText": "KAI is idle / Open KAI / ⠿ / – / ✕ / KAI / your agent / KAI is idle / Using: / Hermes / idle / OpenCode / idle / VS Code / idle / 20 of my sessions / active: Conversation 35 / My Sessions… / Settings… / KAI’S SUBAGENTS / 0 active · 4 / Alice / researcher / ready / Bob / engineer / ready / Probe / identity probe / ready / +1 more / Nothing running right now. / Drop a file or window, or ask me anyth"
+  }
+}

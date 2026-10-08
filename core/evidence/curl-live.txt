@@ -1,0 +1,115 @@
+# live curl of KAI Core 2026-10-01T16:47:50+01:00  (server pid 1846, node v26.7.0)
+
+$ curl -s -i http://127.0.0.1:8788/health
+HTTP/1.1 200 OK
+content-type: application/json; charset=utf-8
+content-length: 311
+cache-control: no-store
+Date: Thu, 01 Oct 2026 15:47:50 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{
+  "status": "ok",
+  "service": "kai-core",
+  "version": "0.1.0",
+  "hermes": {
+    "reachable": true,
+    "authorized": true,
+    "version": "unknown",
+    "reason": null
+  },
+  "opencode": {
+    "reachable": true,
+    "version": "1.18.33",
+    "reason": null
+  },
+  "checked_at": "2026-10-01T15:47:50.280Z"
+}
+$ curl -s -i http://127.0.0.1:8788/integrations
+HTTP/1.1 200 OK
+content-type: application/json; charset=utf-8
+content-length: 311
+cache-control: no-store
+Date: Thu, 01 Oct 2026 15:47:50 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{
+  "status": "ok",
+  "service": "kai-core",
+  "version": "0.1.0",
+  "hermes": {
+    "reachable": true,
+    "authorized": true,
+    "version": "unknown",
+    "reason": null
+  },
+  "opencode": {
+    "reachable": true,
+    "version": "1.18.33",
+    "reason": null
+  },
+  "checked_at": "2026-10-01T15:47:50.328Z"
+}
+$ curl -s -i -H 'Origin: http://localhost:1420' http://127.0.0.1:8788/health   # allowed origin
+HTTP/1.1 200 OK
+access-control-allow-origin: http://localhost:1420
+access-control-allow-methods: GET, POST, OPTIONS
+access-control-allow-headers: content-type
+access-control-max-age: 600
+vary: Origin
+content-type: application/json; charset=utf-8
+content-length: 311
+cache-control: no-store
+Date: Thu, 01 Oct 2026 15:47:50 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{
+  "status": "ok",
+  "service": "kai-core",
+  "version": "0.1.0",
+  "hermes": {
+    "reachable": true,
+    "authorized": true,
+    "version": "unknown",
+    "reason": null
+  },
+  "opencode": {
+    "reachable": true,
+    "version": "1.18.33",
+    "reason": null
+  },
+  "checked_at": "2026-10-01T15:47:50.376Z"
+}
+$ curl -s -i -H 'Origin: http://evil.example.com' http://127.0.0.1:8788/health   # rejected origin
+HTTP/1.1 403 Forbidden
+content-type: application/json; charset=utf-8
+content-length: 60
+cache-control: no-store
+Date: Thu, 01 Oct 2026 15:47:50 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{
+  "error": "forbidden",
+  "reason": "origin_not_allowed"
+}
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8788/agents/opencode/sessions
+200
+
+$ curl -s -i http://127.0.0.1:8788/does-not-exist
+HTTP/1.1 404 Not Found
+content-type: application/json; charset=utf-8
+content-length: 84
+cache-control: no-store
+Date: Thu, 01 Oct 2026 15:47:50 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{
+  "error": "not_found",
+  "reason": "unknown_route",
+  "path": "/does-not-exist"
+}

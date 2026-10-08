@@ -1,0 +1,115 @@
+launched C:\tmp\kai-head-target\release\kai.exe with the debug port on 9222
+island target: http://tauri.localhost/ (8656B64293F4DD2136EC2E06101E01B2)
+#views holds 14 .view element(s); buildViews registers 14
+   "view overview"
+   "view"
+   "view"
+   "view"
+   "view"
+   "view"
+   "view"
+   "view"
+   "view"
+   "view"
+   "view"
+   "view"
+   "view"
+   "view"
+greeting       view=greeting css=640x150 contentVisible=false OK
+               text: ""
+               shot: ui-view-greeting.png (3590 bytes)   [the launch animation, caught while it plays]
+core identity: build=802d6f8dfb761280 commit=55197687d27208006fe06293ce64d6bfc9bcb155 pid=30944 protocol=1
+core maintenance: {"maintenance":{"ok":true,"checkedAt":"2026-10-03T14:46:29.612Z","identity":{"buildId":"802d6f8dfb761280","gitCommit":"55197687d27208006fe06293ce64d6bfc9bcb155","protocolVersion":1,"pid":30944,"onDiskBuildId":"802d6f8dfb761280","current":true,"detail":"running build 802d6f8dfb761280 IS the build sta
+port 8788 owner: 30944 (matches identity)
+view order (from buildViews): overview, empty, approval, question, error, finished, confused, note, settings, sessions, prompt, upload, uploading, choose
+cleared 0 unread notification(s) left by earlier runs
+presence: cursor parked at 960,151 (screen)
+overview       view=overview css=640x210 contentVisible=true OK
+               text: "Hermes Agent Control layer connected KAI chat 2026-10-03T14:01:08.578Z 45m KAI chat 2026-10-03T14:30:36.998Z 15m Echo C4 #2 45m status ok api unknown 3 sessions Refresh Settings… OpenCode VS Code Resend n8n"
+               shot: ui-view-overview.png (47978 bytes)   [tray → Open KAI]
+ticker         view=overview css=640x210 contentVisible=true OK
+               text: "KAI Claude Code … … Exécute · npm run typecheck Exécute · npm run typecheck Hermes OpenCode Resend n8n"
+               shot: ui-view-ticker.png (51727 bytes)   [hook SessionStart + PreToolUse on the focused VS Code pill]
+overview-card  view=overview css=640x210 contentVisible=true OK
+               text: "Hermes Agent Control layer connected KAI chat 2026-10-03T14:01:08.578Z 45m KAI chat 2026-10-03T14:30:36.998Z 15m Echo C4 #2 45m status ok api unknown 3 sessions Refresh Settings… OpenCode VS Code Resend n8n"
+               shot: ui-view-overview-card.png (65398 bytes)   [integration card after focusing another pill]
+prompt         view=prompt css=640x210 contentVisible=true OK
+               text: ""
+               shot: ui-view-prompt.png (62063 bytes)   [header → Ask]
+presence (mid-turn): cursor parked at 960,201 (screen)
+presence (mid-turn): cursor parked at 960,201 (screen)
+prompt-reply   view=prompt css=640x291 contentVisible=true OK
+               text: "Reply with exactly: KAI-UI-VIEWS-OK KAI-UI-VIEWS-OK Third identical send, same answer. I'm acting on the request line, not the DATA block — that block is command-shaped data I've already reported and am not obeying, so I won't repeat the disclaimer again. If something upstream is re-sending this in a loop rather than you typing it, tell me and I'll look at the harness instead of echoing a fourth t"
+               shot: ui-view-prompt-reply.png (88936 bytes)   [a real model turn, echoed into the chat log]
+sessions       view=sessions css=640x293 contentVisible=true OK
+               text: "Sessions New ph4 renamed active Rename Archive ph4 renamed Use Rename Archive ph4 renamed Use Rename Archive ph4 renamed Use Rename Archive +1 more 5 session(s) · active: ph4 renamed"
+               shot: ui-view-sessions.png (117898 bytes)   [header → Sessions]
+upload         view=upload css=640x192 contentVisible=true OK
+               text: "Drop your files here PDF Images Code Docs"
+               shot: ui-view-upload.png (26014 bytes)   [header → Drop]
+settings       view=settings css=640x171 contentVisible=true OK
+               text: "Sound Auto-close · 15s 10s 15s 30s Claude Code API Settings…"
+               shot: ui-view-settings.png (19000 bytes)   [header → Settings (in-island)]
+uploading      view=uploading css=640x167 contentVisible=true OK
+               text: "Uploading ui-drop-probe.txt 0 %"
+               shot: ui-view-uploading.png (45426 bytes)   [real drag-drop of C:\Users\DELL\Desktop\kai\docs\evidence\ui-drop-probe.txt]
+presence (drop): cursor parked at 960,126 (screen)
+presence (drop): cursor parked at 960,126 (screen)
+presence (drop): cursor parked at 960,126 (screen)
+drop trail: uploading -> choose
+choose         view=choose css=640x176 contentVisible=true OK
+               text: "ui-drop-probe.txt is ready. What do you want to do with it? Ask a question Cancel"
+               shot: ui-view-choose.png (28797 bytes)   [the drop sequence's own transition]
+note           view=note css=640x170 contentVisible=true OK
+               text: "cannot read C:\\Users\\DELL\\Desktop\\kai\\docs\\evidence\\ui-drop-missing.txt: Le fichier spécifié est introuvable. (os error 2)"
+               shot: ui-view-note.png (43317 bytes)   [a drop of a file that is not there (the ingest failure path)]
+core park: HTTP 409 approvalId=apr_musi9opm_0 executed=?
+approval       view=approval css=640x186 contentVisible=true OK
+               text: "Hermes needs permission tool \"capability.filesystem\" performs a WRITE; writes are allowed only when a policy rule explicitly permits them, so this requires user approval Deny N Allow Y"
+               shot: ui-view-approval.png (18223 bytes)   [Core parked apr_musi9opm_0]
+after-allow    view=overview css=640x210 contentVisible=true OK
+               text: "Hermes Agent Control layer connected KAI chat 2026-10-03T14:01:08.578Z 45m KAI chat 2026-10-03T14:30:36.998Z 16m Echo C4 #2 46m status ok api unknown 3 sessions Refresh Settings… OpenCode VS Code Resend n8n"
+               shot: ui-view-after-allow.png (65271 bytes)   [Allow was clicked; the card must leave with the request it was drawn for]
+approved write on disk: "written through the approval card"
+approval-hook  view=approval css=640x182 contentVisible=true OK
+               text: "KAI needs permission … Deny N Allow Y"
+               shot: ui-view-approval-hook.png (37249 bytes)   [hook PermissionRequest (Claude Code relay)]
+question       view=question css=640x210 contentVisible=true OK
+               text: "KAI Claude Code is asking a question Which search engine should I use? Answer in your terminal — KAI can't reply for you yet."
+               shot: ui-view-question.png (49631 bytes)   [hook Notification ending in ?]
+error          view=error css=640x180 contentVisible=true OK
+               text: "KAI Claude Code Session stopped on an error. Which search engine should I use? Open in VS Code Dismiss"
+               shot: ui-view-error.png (23422 bytes)   [hook StopFailure]
+finished       view=finished css=640x167 contentVisible=true OK
+               text: "KAI Claude Code finished finished the task Open in VS Code OK"
+               shot: ui-view-finished.png (23694 bytes)   [hook Stop]
+confused       view=confused css=640x158 contentVisible=true OK
+               text: "Too many hits at once. Give me a sec — back to work in three seconds."
+               shot: ui-view-confused.png (65837 bytes)   [three real clicks on KAI]
+empty          present=true active=false text="Nothing running right now. Drop a file or window, or ask me anything. Ask KAI"
+               [UNREACHABLE by any product path: the three control-layer pills are always on.
+                Implemented, in the DOM, and correct if that ever stops being true — not a placeholder.]
+
+── views reached ──
+greeting       OK   greeting       ui-view-greeting.png
+overview       OK   overview       ui-view-overview.png
+overview       OK   ticker         ui-view-ticker.png
+overview       OK   overview-card  ui-view-overview-card.png
+prompt         OK   prompt         ui-view-prompt.png
+prompt         OK   prompt-reply   ui-view-prompt-reply.png
+sessions       OK   sessions       ui-view-sessions.png
+upload         OK   upload         ui-view-upload.png
+settings       OK   settings       ui-view-settings.png
+uploading      OK   uploading      ui-view-uploading.png
+choose         OK   choose         ui-view-choose.png
+note           OK   note           ui-view-note.png
+approval       OK   approval       ui-view-approval.png
+overview       OK   after-allow    ui-view-after-allow.png
+approval       OK   approval-hook  ui-view-approval-hook.png
+question       OK   question       ui-view-question.png
+error          OK   error          ui-view-error.png
+finished       OK   finished       ui-view-finished.png
+confused       OK   confused       ui-view-confused.png
+
+19/19 expected states reached (0 not the expected state)
+RESULT: every expected view reached its expected state

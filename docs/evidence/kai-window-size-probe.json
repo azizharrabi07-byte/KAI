@@ -1,0 +1,35 @@
+{
+  "harness": "kai-window-size-probe",
+  "at": "2026-10-05T14:20:45.977Z",
+  "launch": {
+    "path": "C:/Users/DELL/Desktop/kai/app/target/release/kai.exe",
+    "pid": 13684
+  },
+  "openResult": "ok",
+  "steps": [
+    "open_main_window → \"ok\"",
+    "{\n  \"scaleFactor\": \"ERR Command plugin:window|scale_factor not allowed by ACL\",\n  \"innerSize\": \"ERR Command plugin:window|inner_size not allowed by ACL\",\n  \"outerSize\": \"ERR Command plugin:window|outer_size not allowed by ACL\",\n  \"isMaximized\": \"ERR Command plugin:window|is_maximized not allowed by ACL\",\n  \"isVisible\": \"ERR Command plugin:window|is_visible not allowed by ACL\",\n  \"css\": {\n    \"outerW\": 985,\n    \"outerH\": 631,\n    \"innerW\": 985,\n    \"innerH\": 631,\n    \"dpr\": 1.435416579246521\n  },\n  \"cssAfterSetLogical1280x820\": {\n    \"outerW\": 985,\n    \"outerH\": 631,\n    \"innerW\": 985,\n    \"innerH\": 631\n  },\n  \"innerSizeAfter\": \"ERR Command plugin:window|inner_size not allowed by ACL\"\n}"
+  ],
+  "mainTarget": "http://tauri.localhost/shell.html",
+  "mainWindow": {
+    "scaleFactor": "ERR Command plugin:window|scale_factor not allowed by ACL",
+    "innerSize": "ERR Command plugin:window|inner_size not allowed by ACL",
+    "outerSize": "ERR Command plugin:window|outer_size not allowed by ACL",
+    "isMaximized": "ERR Command plugin:window|is_maximized not allowed by ACL",
+    "isVisible": "ERR Command plugin:window|is_visible not allowed by ACL",
+    "css": {
+      "outerW": 985,
+      "outerH": 631,
+      "innerW": 985,
+      "innerH": 631,
+      "dpr": 1.435416579246521
+    },
+    "cssAfterSetLogical1280x820": {
+      "outerW": 985,
+      "outerH": 631,
+      "innerW": 985,
+      "innerH": 631
+    },
+    "innerSizeAfter": "ERR Command plugin:window|inner_size not allowed by ACL"
+  }
+}

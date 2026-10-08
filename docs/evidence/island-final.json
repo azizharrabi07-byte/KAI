@@ -1,0 +1,223 @@
+{
+  "artifact": "KAI for Windows — island final evidence",
+  "generatedAt": "2026-10-04T14:50:58+01:00",
+  "generatedBy": "Hermes subagent (island owner: app/src-tauri/src/**, app/src/island/island.ts, app/src/main.ts, docs/evidence/island-final.json)",
+  "gitHead": "ee3ab22646bc2011f4476bc8aa299a033bd036e1",
+  "host": "Windows 11, real desktop, real WebView2, real KAI Core",
+  "artifactUnderTest": {
+    "exe": "C:/Users/DELL/Desktop/kai/app/target/release/kai.exe",
+    "exeMtime": "2026-10-04 14:28:54.455008300 +0100",
+    "exeSizeBytes": 5002240,
+    "build": "tauri build with prebuild ENABLED (kai-hook + core bundle)",
+    "islandUrl": "http://tauri.localhost/",
+    "cdpPort": 9222,
+    "webview2UserDataFolder": "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/wv2-fix"
+  },
+  "identity": {
+    "buildId": "af2c5a9b3a7e83a8",
+    "coreVersion": "0.1.0",
+    "protocolVersion": 1,
+    "gitCommit": "ee3ab22646bc2011f4476bc8aa299a033bd036e1",
+    "identityMatchesDisk": true,
+    "freshness": "fresh",
+    "identitySource": "C:/Users/DELL/Desktop/kai/app/target/release/core/build-info.json",
+    "observedForCorePids": [15972, 24192, 7492, 20240],
+    "note": "Every Core instance observed in this session reported the SAME buildId af2c5a9b3a7e83a8 / commit ee3ab22 / freshness fresh. The supervisor restarts the Core from the same artifact, so no restart ever introduced a different build.",
+    "tag": "END-TO-END PROVEN"
+  },
+  "unit": {
+    "appTsc": { "cmd": "cd app && npx tsc --noEmit", "exitCode": 0, "result": "clean" },
+    "appTests": { "cmd": "cd app && npm test", "tests": 111, "pass": 111, "fail": 0, "cancelled": 0, "skipped": 0, "result": "111/111" },
+    "coreTsc": { "cmd": "cd core && npx tsc -p tsconfig.json --noEmit", "exitCode": 0, "result": "clean" },
+    "coreTests": { "cmd": "cd core && npm test", "tests": 731, "pass": 718, "fail": 0, "cancelled": 0, "skipped": 13, "result": "731/718/0/13" },
+    "tag": "UNIT PROVEN",
+    "note": "Matches the stated baseline exactly (app 111/111, core 731/718/0/13). No source was modified by this session, so these are unchanged from the green HEAD."
+  },
+
+  "coordinates": {
+    "note": "All values are the island window's PHYSICAL desktop top-left, read from the live OS window (GetWindowRect via island-win.ps1) and from %APPDATA%/KAI/settings.json. This is the explicit move -> quit -> relaunch coordinate pair the prior round could not record.",
+    "tag": "END-TO-END PROVEN",
+    "proof1_restart_position_persistence": {
+      "before": {
+        "osWindowRect": "300,220",
+        "osWindowSize": "345x9",
+        "settingsIslandPos": { "x": 300, "y": 220 },
+        "islandMode": "compact"
+      },
+      "afterMove": {
+        "howMoved": "real OS window move (SetWindowPos) at the desktop — this fires the same Tauri `Moved` event a grip drag fires and exercises the same persistence path (island::note_user_move)",
+        "requested": { "x": 450, "y": 280 },
+        "osWindowRect": "450,280",
+        "osWindowSize": "1034x459",
+        "settingsIslandPos": { "x": 450, "y": 280 },
+        "kaiLogLine": "2026-10-04 14:37:27 island moved by the owner → 450,280 (saved)"
+      },
+      "afterQuit": {
+        "appPidKilled": 24404,
+        "corePidDiedWithApp": 10412,
+        "coreDiedViaJobObject": true,
+        "settingsIslandPos": { "x": 450, "y": 280 },
+        "note": "settings.json unchanged by the quit; port 8788 had no listener after the kill"
+      },
+      "afterRelaunch": {
+        "launchedVia": "launch-kai-fix.ps1 (WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222, WEBVIEW2_USER_DATA_FOLDER=scratch/wv2-fix)",
+        "newAppPid": 18056,
+        "newCorePid": 15972,
+        "cdpPid": 12540,
+        "osWindowRect": "450,280",
+        "osWindowSize": "1034x459",
+        "settingsIslandPos": { "x": 450, "y": 280 },
+        "activeSessionId": "sess_musv974c_7dhj",
+        "sessionsInIslandState": 20,
+        "historyLength": 100,
+        "identityBuildId": "af2c5a9b3a7e83a8",
+        "identityFreshness": "fresh"
+      },
+      "verdict": "The island was at 300,220, moved to 450,280, that position was persisted, the application was closed (app + child Core both gone), and a fresh launch restored the window to exactly 450,280. All four values recorded above.",
+      "tag": "END-TO-END PROVEN"
+    }
+  },
+
+  "corePid": {
+    "tag": "END-TO-END PROVEN",
+    "beforeThisSession": 10412,
+    "afterProof1Relaunch": 15972,
+    "afterOfflineRestart1": 24192,
+    "afterOfflineRestart2": 7492,
+    "afterExternalRestart": 20240,
+    "currentAtWrite": 20240,
+    "oneCoreAtATime": true,
+    "duplicateCoreCheck": "netstat -ano showed exactly ONE LISTENING socket on 127.0.0.1:8788 at every sample; the Core's own adopt/refuse logic (server.js main()) refuses to become a second control plane, and the app's supervisor adopts an existing Core rather than starting a second.",
+    "note": "See findings.unexplained_core_restarts — two restarts were NOT caused by this session's kill and are attributed to external activity in this repo."
+  },
+
+  "close": {
+    "tag": "END-TO-END PROVEN",
+    "method": "document.getElementById('island-close').click() in the live island page over CDP (the real button handler -> invoke('close_island'))",
+    "before": { "windowVisible": true, "windowSize": "1034x459", "corePid": 20240 },
+    "after": { "windowVisible": false, "windowSize": "345x9", "corePid": 20240 },
+    "kaiLogLine": "2026-10-04 14:48:08 island closed (window hidden; KAI runtime keeps running)",
+    "verdict": "The island window was hidden; the Core pid was UNCHANGED across the close."
+  },
+
+  "reopen": {
+    "tag": "END-TO-END PROVEN",
+    "method": "launched kai.exe again; the single-instance plugin routes it to show_island() + emits tray:'open'",
+    "after": { "windowVisible": true, "windowSize": "1034x459", "kaiExeCount": 1, "corePid": 20240, "conn": "ONLINE", "activeSessionId": "sess_musv974c_7dhj", "sessionsInIslandState": 20, "historyLength": 104, "historyLast": "RECOVERED" },
+    "verdict": "Same Core (20240), no second kai.exe, no second Core, same active session, same session list, history intact.",
+    "kaiLogLine": "2026-10-04 14:48:40 island reopened"
+  },
+
+  "restart": {
+    "tag": "END-TO-END PROVEN",
+    "meaning": "full application restart (kill kai.exe -> Core dies with it via the job object -> launch again)",
+    "evidence": "See coordinates.proof1_restart_position_persistence.afterQuit / afterRelaunch.",
+    "verdict": "Position restored to the persisted 450,280; same build; same active session; session list and chat history intact."
+  },
+
+  "offline": {
+    "tag": "END-TO-END PROVEN",
+    "setup": { "corePid": 15972, "connBefore": "ONLINE", "runtimeBeforeTraceRun": "WAITING_APPROVAL", "runtimeBeforeCharRun": "USING_TOOL", "activeSessionId": "sess_musv974c_7dhj", "activeTurnCountBefore": 143, "sessionsTotal": 36 },
+    "kill": { "method": "process.kill(15972) from the host (taskkill is silent under MSYS)", "result": "sent" },
+    "transitionMeasured": {
+      "traceRun_150msResolution": { "firstNonOnlineMs": 1481, "firstNonOnlineConn": "CONNECTING", "firstOfflineMs": 2983, "backOnlineMs": 9432 },
+      "charRun_250msResolution": { "firstOfflineMs": 1584, "runtimeBefore": "USING_TOOL", "runtimeAfter": "OFFLINE", "glowBefore": "radial-gradient(circle, rgb(99, 102, 241) 0%, transparent 62%)", "glowBeforeOpacity": "0.65", "glowAfter": "radial-gradient(circle, rgb(255, 255, 255) 0%, transparent 62%)", "glowAfterOpacity": "0.15" }
+    },
+    "runtimeLabelWhileOffline": "KAI Core is offline",
+    "noteWhileOffline": "KAI Core is not running — reconnecting…",
+    "verdict": "Within 1.5 s of the connection being reported non-ONLINE the runtime went OFFLINE, and the CHARACTER left its mid-task pose (indigo/0.65 -> white/0.15). It did not stay mid-task.",
+    "noStaleWorkingState": { "tag": "END-TO-END PROVEN", "detail": "The pre-kill pose was a real mid-task pose (USING_TOOL, driven by a genuine action.executed on the Core bus). It left for OFFLINE at +1584 ms and held until reconnect." }
+  },
+
+  "offline_request": {
+    "tag": "NOT PROVEN (as 'honest failure') / the no-fabrication half is END-TO-END PROVEN",
+    "request": "a chat turn submitted through the island's real chat input (input.value set + Enter keydown -> submit() -> Bridge.chatSend) 2.0 s after the Core was killed, while the island was OFFLINE",
+    "immediateObservation": { "runtime": "OFFLINE", "conn": "CONNECTING", "historyLengthBefore": 100, "historyLengthAfter250ms": 101, "assistantBubbleAdded": false, "historyLastAt250ms": "Offline probe: are you there?" },
+    "eventualObservation": { "historyLengthAtReconnect": 102, "replyText": "Yes, here — running on the default profile (deepseek-v4.1-flash via opencode-go). Tools available: terminal, browser, file ops, memory, skills, delegate. What do you need?", "recordedInCore": false, "coreActiveTurnCountAtThatTime": 143 },
+    "noFakeAnswer": { "tag": "END-TO-END PROVEN", "detail": "Nothing was fabricated: the island added only the user bubble immediately, never an invented assistant reply. The eventual reply is a REAL answer produced by the Hermes worker." },
+    "honestFailure": { "tag": "NOT PROVEN", "detail": "The request did NOT fail honestly. With the Core down, claude.rs::send() falls through core_chat (Ok(None), connection refused) to hermes_chat(), which POSTs to the Hermes gateway at 127.0.0.1:8642 — still up — and the island then shows the Hermes worker's own reply AS KAI's. The reply was not recorded in the Core (turnCount stayed 143), confirming it never reached the Core. So: no fake answer, but no honest failure either — the designed fallback answered, and its text (a worker self-description naming its model) bypasses the Core relay's worker-identity guard." }
+  },
+
+  "reconnect": {
+    "tag": "END-TO-END PROVEN",
+    "recovery": { "restartedBy": "the app's own Core supervisor (core_process.rs WATCH loop)", "kaiLogLine": "2026-10-04 14:40:27 core: the Core we started exited (1) — starting it again", "newCorePid": 24192, "islandBackOnlineMsTrace": 8068, "islandBackOnlineMsChar": 3166, "runtimeAfterReconnect": "IDLE", "connAfterReconnect": "ONLINE" },
+    "sessionCoherence": { "activeSessionIdBefore": "sess_musv974c_7dhj", "activeSessionIdAfter": "sess_musv974c_7dhj", "sessionIdsIdentical": true, "sessionsInIslandState": 20, "sessionsTotalInCore": 36, "duplicateSessionCreated": false },
+    "usesRecoveredCore": {
+      "method": "a chat turn was submitted AFTER reconnect and the RECOVERED Core's own recorded turns were read back over HTTP (GET /sessions/:id/turns)",
+      "activeTurnCountBefore": 143,
+      "activeTurnCountAfterUserTurn": 144,
+      "activeTurnCountAfterAssistantTurn": 145,
+      "recordedTurns": [
+        { "role": "user", "text": "Reconnect probe: reply with the single word RECOVERED", "at": "2026-10-04T13:40:43.251Z" },
+        { "role": "assistant", "text": "RECOVERED", "at": "2026-10-04T13:40:49.697Z", "agentId": "hermes" }
+      ],
+      "verdict": "The recovered Core (pid 24192) recorded the post-reconnect turn in the SAME session — the island genuinely used the recovered Core, not a stale one."
+    },
+    "noDuplicateCore": { "tag": "END-TO-END PROVEN", "detail": "Exactly one LISTENING socket on 127.0.0.1:8788 throughout; the Core's own adopt/refuse logic and the supervisor's adopt-or-spawn rule prevent a second control plane." },
+    "noDuplicateSession": { "tag": "END-TO-END PROVEN", "detail": "Active session unchanged and the session list identical before/after; no new session was created by the outage or the recovery." }
+  },
+
+  "hide": {
+    "tag": "END-TO-END PROVEN",
+    "observedThisSession": {
+      "hiddenState": { "osWindowSize": "345x9", "settingsIslandPos": { "x": 450, "y": 280 } },
+      "expandedState": { "osWindowSize": "1034x459", "settingsIslandPos": { "x": 450, "y": 280 } }
+    },
+    "verdict": "The hide FSM really shrinks the OS window (1034x459 -> 345x9) and does not move it. (The compact pill is DOM 288x32 but its OS window is the full panel; only `hidden` shrinks it.)"
+  },
+
+  "minimize_regression": {
+    "tag": "END-TO-END PROVEN",
+    "method": "real SW_MINIMIZE on the island window, then SW_RESTORE",
+    "settingsBefore": { "x": 450, "y": 280 },
+    "afterMinimize": { "iconic": true, "osWindowRect": "-32000,-32000", "settingsIslandPos": { "x": 450, "y": 280 } },
+    "kaiLogLine": "2026-10-04 14:50:43 island reported at -32000,-32000 while minimized (sentinel) — not saved; the saved position is unchanged",
+    "afterRestore": { "iconic": false, "osWindowRect": "450,280", "settingsIslandPos": { "x": 450, "y": 280 } },
+    "verdict": "The minimized-window sentinel never becomes the persisted position; the saved position survives a minimize and the restore returns the original."
+  },
+
+  "notProven": [
+    {
+      "claim": "a request made while KAI Core is offline fails honestly (surfaces an error and no answer)",
+      "class": "NOT PROVEN",
+      "observedInstead": "the request succeeded via the designed Hermes-worker fallback (claude.rs::hermes_chat) and the island showed the worker's raw reply as KAI's; nothing was fabricated, but nothing failed either",
+      "evidenceFile": "docs/evidence/island-final-offline.json"
+    }
+  ],
+
+  "blockedExternal": [
+    {
+      "claim": "stop the Hermes gateway too, to force the both-unreachable honest-failure path",
+      "class": "BLOCKED_EXTERNAL",
+      "reason": "127.0.0.1:8642 is the Hermes Agent api-server that this very session runs on; stopping it was out of scope and unsafe."
+    }
+  ],
+
+  "findings": [
+    {
+      "id": "unexplained_core_restarts",
+      "severity": "observation",
+      "detail": "Besides the intended kill, the Core restarted twice on its own: pid 24192 -> 7492 at 14:40:57 (itself after a 14:40:51 'exited (1)') and pid 7492 -> 20240 at 14:45:58. Both are logged as 'the Core we started exited (1) — starting it again'. Exit code 1 on Windows is TerminateProcess, i.e. an external kill, and the Core printed NO crash output. A Core left alone was stable: pid 20240 survived 60 s idle and pid 7492 survived 45 s after a direct POST /chat. A concurrent agent is working in this repo (Claude Code hook events fire throughout kai.log), so the most likely cause is external activity, not a product defect. It does not affect the proofs above: only one Core ever listened on 8788, and each proof's observations fell inside windows where the Core behaviour was as expected.",
+      "tag": "NOT PROVEN (cause)"
+    },
+    {
+      "id": "offline_chat_falls_back_to_hermes",
+      "severity": "possible_defect",
+      "detail": "While the island is OFFLINE (Core down), a chat turn is answered by the Hermes worker fallback and displayed as KAI's reply, bypassing the Core relay's worker-identity guard. If the product intent is 'Core offline => honest failure', claude.rs::send() should not fall through to hermes_chat when the island has declared the Core offline.",
+      "tag": "END-TO-END PROVEN (behaviour) / NOT PROVEN (honest failure)"
+    }
+  ],
+
+  "rawEvidence": {
+    "offlineRun": "docs/evidence/island-final-offline.json",
+    "characterRun": "docs/evidence/island-final-char.json",
+    "characterPngBefore": "docs/evidence/island-offline-before.png",
+    "characterPngDuring": "docs/evidence/island-offline-during.png",
+    "driverScripts": [
+      "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/island-final-offline.mjs",
+      "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/island-final-char.mjs",
+      "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/island-win.ps1",
+      "C:/Users/DELL/.hermes/profiles/kai/cache/scratch/cdp-kai.mjs"
+    ]
+  }
+}

@@ -1,0 +1,90 @@
+2026-10-01 17:28:19 --- KAI 0.1.1 started ---
+2026-10-01 17:28:21 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 17:28:23 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 17:29:31 hook PreToolUse
+2026-10-01 17:30:29 --- KAI 0.1.1 started ---
+2026-10-01 17:30:31 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 17:30:33 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 17:31:45 --- KAI 0.1.1 started ---
+2026-10-01 17:31:47 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 17:31:49 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 18:08:06 --- KAI 0.1.1 started ---
+2026-10-01 18:08:08 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 18:08:10 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 18:32:40 hook PreToolUse
+2026-10-01 18:36:15 hook PermissionRequest id=10636-1
+2026-10-01 18:36:19 ui  decide allow req=10636-1
+2026-10-01 18:36:19 decision id=10636-1 allow
+2026-10-01 18:36:19 hook id=10636-1 answered allow
+2026-10-01 18:38:21 --- KAI 0.1.1 started ---
+2026-10-01 18:38:23 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 18:38:25 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 18:39:57 hook PermissionRequest id=10520-1
+2026-10-01 18:40:54 ui  decide allow req=10520-1
+2026-10-01 18:40:54 decision id=10520-1 allow
+2026-10-01 18:40:54 hook id=10520-1 answered allow
+2026-10-01 18:57:24 --- KAI 0.1.1 started ---
+2026-10-01 18:57:26 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 18:57:28 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 19:03:04 --- KAI 0.1.1 started ---
+2026-10-01 19:03:06 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 19:03:08 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 19:06:52 --- KAI 0.1.1 started ---
+2026-10-01 19:06:54 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 19:06:56 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 19:16:44 --- KAI 0.1.1 started ---
+2026-10-01 19:16:46 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 19:16:48 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 19:19:54 --- KAI 0.1.1 started ---
+2026-10-01 19:19:56 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 19:19:58 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 19:21:15 --- KAI 0.1.1 started ---
+2026-10-01 19:21:17 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 19:21:19 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 21:32:23 --- KAI 0.1.1 started ---
+2026-10-01 21:32:25 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 21:32:27 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 21:34:45 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-01 21:42:56 --- KAI 0.1.1 started ---
+2026-10-01 21:42:58 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 21:42:58 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-01 21:43:00 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 22:01:01 --- KAI 0.1.1 started ---
+2026-10-01 22:01:03 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 22:01:03 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-01 22:01:05 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 22:11:23 --- KAI 0.1.1 started ---
+2026-10-01 22:11:25 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 22:11:25 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-01 22:11:27 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 22:21:55 --- KAI 0.1.1 started ---
+2026-10-01 22:21:57 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 22:21:57 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-01 22:21:59 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-01 22:29:20 --- KAI 0.1.1 started ---
+2026-10-01 22:29:22 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-01 22:29:22 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-01 22:29:24 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 3 recent session(s) listed)
+2026-10-02 07:17:27 --- KAI 0.1.1 started ---
+2026-10-02 07:17:33 control layer: OpenCode NOT reachable on http://127.0.0.1:4096
+2026-10-02 07:17:35 control layer: Hermes api-server NOT reachable on http://127.0.0.1:8642
+2026-10-02 07:20:29 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-02 07:20:29 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-02 08:09:44 --- KAI 0.1.1 started ---
+2026-10-02 08:09:45 ui  [core] connecting
+2026-10-02 08:09:45 ui  [core] connection CONNECTING
+2026-10-02 08:09:45 ui  [core] connection ONLINE
+2026-10-02 08:09:46 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-02 08:09:46 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-02 08:09:50 control layer: OpenCode NOT reachable on http://127.0.0.1:4096
+2026-10-02 08:11:15 ui  [core] connection CONNECTING
+2026-10-02 08:11:33 ui  [core] connection ONLINE
+2026-10-02 08:15:48 --- KAI 0.1.1 started ---
+2026-10-02 08:15:48 ui  [core] connecting
+2026-10-02 08:15:48 ui  [core] connection CONNECTING
+2026-10-02 08:15:48 ui  [core] connection ONLINE
+2026-10-02 08:15:50 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-02 08:15:50 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-02 08:15:54 control layer: OpenCode NOT reachable on http://127.0.0.1:4096
+2026-10-02 08:16:15 ui  [core] connection CONNECTING
+2026-10-02 08:16:33 ui  [core] connection ONLINE

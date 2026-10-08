@@ -1,0 +1,128 @@
+{
+  "slice": "KAI Visual Engine — validated Core→renderer vertical slice",
+  "generatedAt": "2026-10-04T18:14:00Z",
+  "rule": "KAI is the system; OpenGhost is a source of mechanisms. KAI remains the single control plane and the single security/policy authority. The slice is exactly: KAI Core -> structured visual intent -> validator -> KAI Visual Engine -> OpenGhost-derived mechanism -> real KAI UI.",
+  "licenceBoundary": "OpenGhost's engine is MIT; its name, ghost identity, artwork, animations and visual design are excluded. NOTHING was imported from styles.css, images/**, icons, cursor.png, the splash modules or any OpenGhost branding. The adapted mechanism draws KAI's own palette through the app's existing CSS vars.",
+  "tagLegend": {
+    "UNIT PROVEN": "exercised by an automated test or a typecheck in this repo",
+    "INTEGRATION PROVEN": "two real components proven to talk (live HTTP or live DOM), not the full chain",
+    "END-TO-END PROVEN": "the whole seam exercised in the REAL packaged product (kai.exe + its Core + its WebView2 renderer), captured live",
+    "MOCK ONLY": "proven only against a fake/stub",
+    "NOT PROVEN": "not demonstrated",
+    "BLOCKED_EXTERNAL": "could not be reached for a reason outside this repo"
+  },
+  "artifactIdentity": {
+    "tag": "END-TO-END PROVEN",
+    "kaiExe": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\kai.exe",
+    "exeMtime": "2026-10-04 19:12:46 +0100",
+    "coreBuildId": "f4d2232607117fa9",
+    "coreGitCommit": "ef044e26a0e3cd003b5527cf7efeaeedbc083f13",
+    "corePid": 11900,
+    "coreOwnsPort": "127.0.0.1:8788",
+    "freshness": "fresh",
+    "identityMatchesDisk": true,
+    "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+    "evidence": "GET /identity live; docs/evidence/visual-live.json .identity"
+  },
+  "claims": [
+    {
+      "claim": "The KAI-owned visual-intent contract, dialect parser and validator exist in Core and refuse (never repair) malformed/adversarial input, with hard bounds (64 nodes / 128 edges / 80-char labels / 20k source).",
+      "tag": "UNIT PROVEN",
+      "evidence": "core/src/visual/spec.ts; core/tests/visual.test.ts — 15 tests, all pass (part of the core suite: 755 tests, 742 pass, 0 fail, 13 skipped)",
+      "detail": "Rejections carry a named code+reason: UNSAFE_NODE_LABEL, SELF_LOOP, BAD_EDGE_ENDPOINT, BAD_NODE_ID, DUPLICATE_NODE, TOO_MANY_NODES, UNSUPPORTED_KIND, SOURCE_TOO_LARGE, BAD_KIND, EMPTY."
+    },
+    {
+      "claim": "Core exposes the seam over HTTP: POST /visual/compile (raw text -> validated intent) and POST /visual/validate (structured intent -> checked). A refusal is a rich 400 {error,reason,code,rejected}.",
+      "tag": "INTEGRATION PROVEN",
+      "evidence": "core/src/api/routes.ts (compileVisualHandler, validateVisualHandler); live HTTP in docs/evidence/visual-live.json .raw",
+      "detail": "Live: valid source -> 200 {intent}; 'A[<script>alert(1)</script>] --> B' -> 400 UNSAFE_NODE_LABEL; 'sequenceDiagram...' -> 400 UNSUPPORTED_KIND; 'A --> A' -> 400 SELF_LOOP."
+    },
+    {
+      "claim": "app/src/visual/engine.ts compiles clean after the beginAt fix (the Item.beginAt field is now set at build time as started + delay*1000 and consumed by step() as `now < item.beginAt`).",
+      "tag": "UNIT PROVEN",
+      "evidence": "cd app && npx tsc --noEmit -> exit 0",
+      "detail": "Also fixed: removed unused CYAN/svgRoot, cast path to SVGPathElement for getTotalLength, removed the stray `void back;`, converted the three delay: literals to beginAt."
+    },
+    {
+      "claim": "The layered flow layout is pure and deterministic, and the client-side guardIntent mirror refuses the same classes of malformed intent as Core.",
+      "tag": "UNIT PROVEN",
+      "evidence": "app/tests/visual.test.ts — 15 tests; app suite 133 tests, 133 pass (was 118/118; +15)",
+      "detail": "Layout: finite geometry, TD rank order, LR advance, determinism, label wrapping. Guard: NOT_AN_OBJECT, BAD_KIND, BAD_DIRECTION, EMPTY, UNSAFE_NODE_LABEL, BAD_EDGE_ENDPOINT, SELF_LOOP, DUPLICATE_NODE, TOO_MANY_NODES."
+    },
+    {
+      "claim": "The UI host (#kai-visual) is mounted in the real product and wired to the Core client; window.__kaiVisual exposes compile/render/reveal/hide and calls island.expand() before showing.",
+      "tag": "INTEGRATION PROVEN",
+      "evidence": "app/src/visual/mount.ts, app/src/visual/visual.css, app/src/main.ts (mountVisual(root, island, coreLink.client)); live: window.__kaiVisual present=true, host #kai-visual hidden=false, rect 721x320",
+      "detail": "Follows the src/character/** precedent (types=vocabulary, layout+engine=mechanism, mount=host). KAI's palette only, via app CSS vars (--card/--ink/--dim/--hairline/--indigo/--font)."
+    },
+    {
+      "claim": "The full seam works END TO END in the real packaged product: model-style text -> Core validator -> host -> engine -> real SVG in the real WebView2 UI.",
+      "tag": "END-TO-END PROVEN",
+      "evidence": "docs/evidence/visual-live.json .host; docs/evidence/visual-rendered.png",
+      "detail": "window.__kaiVisual.compile(valid flow) -> {ok:true,via:'core',receipt:{nodes:7,edges:6,width:289,height:486}}. Live DOM: 7 .kai-visual-node, 6 .kai-visual-edge, labels ['Model output','Core: parse','Validator','KAI Visual Engine','400 rejection','SVG renderer','Real KAI UI']."
+    },
+    {
+      "claim": "The renderer receipt is read from the renderer's OWN live handle (window.__kaiVisualEngine.lastReceipt), not from an internal function's return value.",
+      "tag": "END-TO-END PROVEN",
+      "evidence": "docs/evidence/visual-live.json .host.engineReceipt",
+      "detail": "window.__kaiVisualEngine.lastReceipt == the same receipt (nodes 7, edges 6, 289x486, renderedAt 2026-10-04T18:13:37.767Z); lastRejection null."
+    },
+    {
+      "claim": "The rendered result was visually inspected: a real node-and-edge flow is on screen.",
+      "tag": "END-TO-END PROVEN",
+      "evidence": "vision_analyze of docs/evidence/visual-rendered.png",
+      "detail": "vision description: dark background; 'Model output' box -> blue arrow -> 'Core: parse' box -> 'Validator' diamond -> two labelled branches ('accept' -> 'KAI Visual Engine', 'refuse' -> '400 rejection'); a scrollbar is present (the 486px diagram is taller than the 320px window and the host scrolls). White text, light-grey rounded node borders, bright-blue arrows."
+    },
+    {
+      "claim": "The validator is a real security boundary: adversarial model text cannot reach the renderer unvalidated.",
+      "tag": "END-TO-END PROVEN",
+      "evidence": "docs/evidence/visual-live.json .raw.rejections and .host.rejections; docs/evidence/visual-rejection.png",
+      "detail": "Raw HTTP 400 payload: {\"error\":true,\"reason\":\"\\\"nodes[0].label\\\" must not contain markup or control characters; got \\\"<script>alert(1)</script>\\\"\",\"code\":\"UNSAFE_NODE_LABEL\",\"rejected\":true}. The same source through the real host returns {ok:false,via:'core',code:'UNSAFE_NODE_LABEL'}. A malformed STRUCTURED intent handed straight to the engine (window.__kaiVisual.render) is refused by the client-side guard with UNSAFE_NODE_LABEL — the renderer re-checks even a payload that bypassed Core. The post-refusal screenshot is byte-identical to the rendered one (md5 9aff5bde610b1ec59d92073cded9cd39): the refusal drew nothing, leaving the screen unchanged."
+    },
+    {
+      "claim": "The canonical memory scope is intact: GET /memory/search?scope=bogus still enumerates subagent.",
+      "tag": "INTEGRATION PROVEN",
+      "evidence": "live GET /memory/search?scope=bogus -> 400 {\"error\":true,\"reason\":\"\\\"scope\\\" must be one of global, session, mission, employee, project, subagent; got \\\"bogus\\\"\"}; core/src/memory/model.ts MEMORY_SCOPES includes 'subagent'",
+      "detail": "No regression from the memory-scope work."
+    },
+    {
+      "claim": "NOTICE.md records the adapted-mechanism attribution and the excluded OpenGhost materials.",
+      "tag": "UNIT PROVEN",
+      "evidence": "NOTICE.md — new sections 'OpenGhost — an adapted mechanism' and 'What is NOT reused from OpenGhost'",
+      "detail": "Required attribution present verbatim: 'Portions adapted from OpenGhost (github.com/ANDRETRIPOL/OpenGhost), MIT License, Copyright (c) 2026 Andrew.'"
+    }
+  ],
+  "notProven": [
+    {
+      "claim": "A Core-driven automatic path (a real chat/model turn emits a visual intent that auto-renders).",
+      "tag": "NOT PROVEN",
+      "detail": "The seam is proven by driving the product's own host handle. No model turn is wired to call visualCompile yet, and no prompt instructs a model to emit the dialect."
+    },
+    {
+      "claim": "Diagram-kind coverage beyond 'flow'.",
+      "tag": "NOT PROVEN",
+      "detail": "Exactly one kind (flow) with three node shapes (box/round/diamond). OpenGhost's other 42 kinds are NOT ported."
+    },
+    {
+      "claim": "Island-view integration.",
+      "tag": "NOT PROVEN",
+      "detail": "No island view was added (scope discipline). The host is a fixed panel over the island and reveal() expands to the existing 'overview' view — a side effect on the island's displayed view, not a bespoke view."
+    },
+    {
+      "claim": "The entrance spring/animation asserted frame-by-frame.",
+      "tag": "NOT PROVEN",
+      "detail": "The engine is DOM-dependent and is proven live; its animation is not unit-tested. Layout + guard are unit-tested."
+    },
+    {
+      "claim": "The rest of OpenGhost's render stack (markdown live mode, stream-view, tex, highlight).",
+      "tag": "NOT PROVEN",
+      "detail": "Out of scope for this slice; not imported."
+    }
+  ],
+  "rawCaptures": {
+    "liveJson": "docs/evidence/visual-live.json",
+    "renderedScreenshot": "docs/evidence/visual-rendered.png",
+    "rejectionScreenshot": "docs/evidence/visual-rejection.png",
+    "driver": "docs/evidence/visual-live.mjs"
+  }
+}

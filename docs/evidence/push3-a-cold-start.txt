@@ -1,0 +1,191 @@
+################ 0. what the machine looks like now ################
+$ Get-Process kai | Select Id
+  kai.exe after stop: none
+
+$ netstat -ano | grep ':8788 .*LISTENING'      # before anything is launched
+  (nothing on 8788)
+
+$ curl -s -m 3 http://127.0.0.1:8788/state
+(no answer — nothing is running KAI Core)
+
+################ 1. a clean log ################
+kai.log rotated to kai.log.prepush3
+
+################ 2. launch the packaged app, cold ################
+$ powershell -File docs/evidence/launch-cdp.ps1     # sets the debug port via env only
+kai.exe started with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222
+
+$ Get-Process kai | Select Id,ProcessName,MainWindowTitle,Responding
+
+
+Id              : 6680
+ProcessName     : kai
+MainWindowTitle : KAI
+Responding      : True
+
+
+
+
+$ tail -30 %LOCALAPPDATA%\KAI\kai.log
+2026-10-02 09:52:23 --- KAI 0.1.1 started ---
+2026-10-02 09:52:23 ui  [core] connecting
+2026-10-02 09:52:23 ui  [core] connection CONNECTING
+2026-10-02 09:52:24 core: started C:\Users\DELL\.hermes\tools\node-26.7.0-win32-x64\node.exe C:\Users\DELL\Desktop\kai\app\target\release\core\server.js (pid 11548, tied to KAI's lifetime)
+2026-10-02 09:52:25 core: [kai-core] runtime started  agents={"hermes":true,"opencode":false}  missions=0 resumed/0 blocked
+2026-10-02 09:52:25 core: [kai-core] listening on http://127.0.0.1:8788  config={"hermes":{"baseUrl":"http://127.0.0.1:8642","apiKeyPresent":true,"timeoutMs":10000,"chatTimeoutMs":120000},"opencode":{"baseUrl":"http://127.0.0.1:4096","passwordPresent":false,"timeoutMs":10000},"server":{"host":"127.0.0.1","port":8788,"allowedOrigins":["http://localhost:1420","http://127.0.0.1:1420","http://tauri.localhost","tauri://localhos
+2026-10-02 09:52:25 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-02 09:52:25 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-02 09:52:26 ui  [core] connection ONLINE
+2026-10-02 09:52:29 control layer: OpenCode NOT reachable on http://127.0.0.1:4096
+
+$ netstat -ano | grep ':8788 .*LISTENING'
+  TCP    127.0.0.1:8788         0.0.0.0:0              LISTENING       11548
+
+$ Get-CimInstance Win32_Process -Filter ProcessId=<8788 owner> | Format-List
+
+
+ProcessId       : 11548
+ParentProcessId : 6680
+ExecutablePath  : C:\Users\DELL\.hermes\tools\node-26.7.0-win32-x64\node.exe
+CommandLine     : "C:\Users\DELL\.hermes\tools\node-26.7.0-win32-x64\node.exe" 
+                  C:\Users\DELL\Desktop\kai\app\target\release\core\server.js
+
+
+
+
+$ Get-CimInstance Win32_Process (children of kai.exe)
+  children of 6680:
+
+
+ProcessId   : 2604
+Name        : msedgewebview2.exe
+CommandLine : "C:\Program Files (x86)\Microsoft\EdgeWebView\Application\154.0.4258.48\msedgewebview2.exe" 
+              --embedded-browser-webview=1 --webview-exe-name=kai.exe --webview-exe-version=0.1.1 
+              --user-data-dir="C:\Users\DELL\AppData\Local\com.aziz.kai\EBWebView" --noerrdialogs 
+              --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-required 
+              --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port=9222 --lang=fr-FR 
+              --mojo-named-platform-channel-pipe=6680.20496.1250624790972716165 
+              /pfhostedapp:8e920ed2781d36f1a9a2d24665f4caea8d066cf6
+
+ProcessId   : 11548
+Name        : node.exe
+CommandLine : "C:\Users\DELL\.hermes\tools\node-26.7.0-win32-x64\node.exe" 
+              C:\Users\DELL\Desktop\kai\app\target\release\core\server.js
+
+
+
+
+$ curl -s http://127.0.0.1:8788/state   # the Core the app started
+{
+  "ok": true,
+  "startedAt": "2026-10-02T08:52:25.401Z",
+  "uptimeMs": 8762,
+  "database": {
+    "path": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\kai-core.db"
+  },
+  "agents": [
+    {
+      "id": "hermes",
+      "state": "idle",
+      "health": {
+        "ok": true,
+        "latencyMs": 2,
+        "endpoint": "http://127.0.0.1:8642",
+        "version": "unknown"
+      }
+    },
+    {
+      "id": "opencode",
+      "state": "offline",
+      "health": {
+        "ok": false,
+        "latencyMs": 1,
+        "endpoint": "http://127.0.0.1:4096",
+        "detail": "INTERNAL: transport failure talking to http://127.0.0.1:4096"
+      }
+    }
+  ],
+  "missions": {
+    "active": 0,
+    "unfinished": 0
+  },
+  "notifications": {
+    "unread": 0
+  },
+  "approvals": {
+    "pending": 0
+  },
+  "scheduler": {
+    "running": true,
+    "enabled": 0,
+    "total": 0
+  },
+  "tools": {
+    "registered": 4
+  
+
+$ curl -s -X POST http://127.0.0.1:8788/chat -d '{"text":"what is happening?"}'
+{
+  "agent": "core",
+  "from_state": true,
+  "intent": "status.summary",
+  "reply": "KAI status: 2 agent(s) — hermes (idle), opencode (offline); 0 active mission(s); 0 approval(s) pending.",
+  "data": {
+    "agents": [
+      {
+        "id": "hermes",
+        "state": "idle",
+        "lastActivity": "2026-10-02T08:52:34.219Z"
+      },
+      {
+        "id": "opencode",
+        "state": "offline",
+        "detail": "INTERNAL: transport failure talking to http://127.0.0.1:4096"
+      }
+    ],
+    "activeMissions": 0,
+    "pendingApprovals": 0
+  }
+}
+
+$ node docs/evidence/cdp.mjs eval "invoke('core_status')"   # what the app itself reports
+{"origin":"owned","pid":11548,"url":"http://127.0.0.1:8788","port":8788,"node":"C:\\Users\\DELL\\.hermes\\tools\\node-26.7.0-win32-x64\\node.exe","serverJs":"\\\\?\\C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\server.js","restarts":0}
+
+################ 3. kill the Core under the running app ################
+killing the Core pid 11548 (the app is left running)
+
+after the restart:
+  TCP    127.0.0.1:8788         0.0.0.0:0              LISTENING       14940
+$ tail -8 kai.log
+2026-10-02 09:52:25 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-02 09:52:26 ui  [core] connection ONLINE
+2026-10-02 09:52:29 control layer: OpenCode NOT reachable on http://127.0.0.1:4096
+2026-10-02 09:52:34 ui  [core] connection CONNECTING
+2026-10-02 09:52:38 core: the Core we started exited (1) — starting it again
+2026-10-02 09:52:38 core: started C:\Users\DELL\.hermes\tools\node-26.7.0-win32-x64\node.exe C:\Users\DELL\Desktop\kai\app\target\release\core\server.js (pid 14940, tied to KAI's lifetime)
+2026-10-02 09:52:38 core: [kai-core] runtime started  agents={"hermes":true,"opencode":false}  missions=0 resumed/0 blocked
+2026-10-02 09:52:38 core: [kai-core] listening on http://127.0.0.1:8788  config={"hermes":{"baseUrl":"http://127.0.0.1:8642","apiKeyPresent":true,"timeoutMs":10000,"chatTimeoutMs":120000},"opencode":{"baseUrl":"http://127.0.0.1:4096","passwordPresent":false,"timeoutMs":10000},"server":{"host":"127.0.0.1","port":8788,"allowedOrigins":["http://localhost:1420","http://127.0.0.1:1420","http://tauri.localhost","tauri://localhos
+$ curl -s http://127.0.0.1:8788/state | head -c 200
+{
+  "ok": true,
+  "startedAt": "2026-10-02T08:52:38.691Z",
+  "uptimeMs": 538,
+  "database": {
+    "path": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\kai-core.db"
+  },
+  "agents": [
+    {
+      "id":
+
+################ 4. kill the APP outright — is the Core orphaned? ################
+app pid 6680, Core pid 14940
+$ node -e "process.kill(6680)"        # TerminateProcess, not a clean exit
+
+kai.exe after the kill: none
+$ netstat -ano | grep ':8788 .*LISTENING'
+  (nothing on 8788 — the Core died with the app)
+$ tail -4 kai.log
+2026-10-02 09:52:38 core: the Core we started exited (1) — starting it again
+2026-10-02 09:52:38 core: started C:\Users\DELL\.hermes\tools\node-26.7.0-win32-x64\node.exe C:\Users\DELL\Desktop\kai\app\target\release\core\server.js (pid 14940, tied to KAI's lifetime)
+2026-10-02 09:52:38 core: [kai-core] runtime started  agents={"hermes":true,"opencode":false}  missions=0 resumed/0 blocked
+2026-10-02 09:52:38 core: [kai-core] listening on http://127.0.0.1:8788  config={"hermes":{"baseUrl":"http://127.0.0.1:8642","apiKeyPresent":true,"timeoutMs":10000,"chatTimeoutMs":120000},"opencode":{"baseUrl":"http://127.0.0.1:4096","passwordPresent":false,"timeoutMs":10000},"server":{"host":"127.0.0.1","port":8788,"allowedOrigins":["http://localhost:1420","http://127.0.0.1:1420","http://tauri.localhost","tauri://localhos

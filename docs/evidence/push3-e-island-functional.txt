@@ -1,0 +1,101 @@
+################ 1. the process ################
+$ Get-Process kai | Select Id,ProcessName,MainWindowTitle,Responding
+
+
+Id              : 7996
+ProcessName     : kai
+MainWindowTitle : KAI
+Responding      : True
+StartTime       : 10/2/2026 10:33:32 AM
+
+
+
+
+################ 2. the relay pipe (Claude Code's way in) ################
+$ [System.IO.Directory]::GetFiles('\\.\pipe\') | Where-Object { $_ -like '*kai-*' }
+\\.\pipe\kai-S-1-5-21-2720510131-810976395-3426585012-1001
+
+################ 3. the Core the APP started ################
+$ netstat -ano | grep ':8788 .*LISTENING'
+  TCP    127.0.0.1:8788         0.0.0.0:0              LISTENING       18072
+$ Get-CimInstance Win32_Process -Filter ProcessId=18072 | Select ParentProcessId,CommandLine
+
+
+ProcessId       : 18072
+ParentProcessId : 7996
+CommandLine     : "C:\Users\DELL\.hermes\tools\node-26.7.0-win32-x64\node.exe" 
+                  C:\Users\DELL\Desktop\kai\app\target\release\core\server.js
+
+
+
+  kai.exe pid: 7996    <- the Core's parent must be this
+
+$ cdp eval "invoke('core_status')"
+{"origin":"owned","pid":18072,"url":"http://127.0.0.1:8788","port":8788,"node":"C:\\Users\\DELL\\.hermes\\tools\\node-26.7.0-win32-x64\\node.exe","serverJs":"\\\\?\\C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\server.js","restarts":0}
+
+################ 4. kai.log: the control layer, as it recorded itself ################
+$ grep -E 'KAI 0.1.1 started|core: |control layer: ' kai.log | tail -12
+2026-10-02 09:58:53 core: [kai-core] listening on http://127.0.0.1:8788  config={"hermes":{"baseUrl":"http://127.0.0.1:8642","apiKeyPresent":true,"timeoutMs":10000,"chatTimeoutMs":120000},"opencode":{"baseUrl":"http://127.0.0.1:4096","passwordPresent":false,"timeoutMs":10000},"server":{"host":"127.0.0.1","port":8788,"allowedOrigins":["http://localhost:1420","http://127.0.0.1:1420","http://tauri.localhost","tauri://localhos
+2026-10-02 09:58:54 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-02 09:58:54 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-02 09:58:58 control layer: OpenCode NOT reachable on http://127.0.0.1:4096
+2026-10-02 10:24:15 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 0 recent session(s) listed)
+2026-10-02 10:33:33 --- KAI 0.1.1 started ---
+2026-10-02 10:33:34 core: started C:\Users\DELL\.hermes\tools\node-26.7.0-win32-x64\node.exe C:\Users\DELL\Desktop\kai\app\target\release\core\server.js (pid 18072, tied to KAI's lifetime)
+2026-10-02 10:33:35 core: [kai-core] runtime started  agents={"hermes":true,"opencode":true}  missions=0 resumed/0 blocked
+2026-10-02 10:33:35 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-02 10:33:35 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-02 10:33:35 core: [kai-core] listening on http://127.0.0.1:8788  config={"hermes":{"baseUrl":"http://127.0.0.1:8642","apiKeyPresent":true,"timeoutMs":10000,"chatTimeoutMs":120000},"opencode":{"baseUrl":"http://127.0.0.1:4096","passwordPresent":false,"timeoutMs":10000},"server":{"host":"127.0.0.1","port":8788,"allowedOrigins":["http://localhost:1420","http://127.0.0.1:1420","http://tauri.localhost","tauri://localhos
+2026-10-02 10:33:37 control layer: OpenCode reachable on http://127.0.0.1:4096 (server 1.18.33, healthy true, 0 recent session(s) listed)
+
+################ 5. one real chat turn in the island ################
+$ park the cursor, then wake and expand the island with the REAL mouse
+{"requested":"400,700","actual":"400,700"}
+{"requested":"959,4","actual":"959,4"}
+{"clicked":"959,30","actual":"959,30"}
+640pxx210px (expanded = 640pxx210px+)
+
+$ cdp eval  # where the Ask tab is
+  {"x":104.50472831726074,"y":24.987302780151367,"dpr":1.435416579246521}
+$ win-client.ps1 -TitleMatch KAI -TitleExact -X 104.50472831726074 -Y 24.987302780151367 -Dpr 1.435416579246521 -Action click     # REAL click on Ask
+real click at 593,36 (page 104.504728317261,24.9873027801514); cursor now 593,36
+$ cdp eval  # the chat view is the one on screen
+chat input present; its view is .on: true
+$ powershell  # does the ISLAND hold the OS keyboard focus?
+foreground window: KAI
+
+$ win-type.ps1 -Text 'what is happening?' -Enter        # REAL keystrokes
+SendInput sent 38 of 38 events (cbSize 40, lastError 203)
+
+$ cdp eval  # the chat log, as rendered
+YOU: what is happening? || KAI: 
+
+$ cdp eval  # the same turn through the Core, for comparison
+{
+  "agent": "core",
+  "from_state": true,
+  "intent": "status.summary",
+  "reply": "KAI status: 2 agent(s) — hermes (idle), opencode (idle); 0 active mission(s); 0 approval(s) pending.",
+  "data": {
+    "agents": [
+      {
+        "id": "hermes",
+        "state": "idle",
+        "lastActivity": "
+
+################ 6. the reply, which arrived after the script's 30 s poll (a real agent turn, not a stub) ################
+$ cdp eval  # the chat log, polled until the reply landed
+  (the turn is answered by the Hermes gateway first — claude.rs:hermes_chat — so it takes as long as the agent takes)
+YOU: what is happening? || KAI: Everything's mostly up. Quick snapshot:
+
+Gateway (pid 19944) is running and healthy — Discord connected, api_server on 127.0.0.1:8642 connected (1 active run, that's this session), heartbeats fresh as of 10:38.
+
+Running: Hermes Desktop, kai.exe (KAI app, started 10:33), an `opencode serve --port 4096` for the kai profile, and the opencode-ai CLI.
+
+Three things that are actually broken/degraded:
+
+1. automate-man:discord is FATAL — Discord rejects the connection because Message Content Intent isn't enabled for that bot in the Developer Portal. Needs a toggle at discord.com/developers → app → Bot → Privileged Gateway Intents, then a gateway restart. (kage and kai profiles are fine.)
+
+2. Title generation is failing repeatedly (400) on model deepseek-v4.1-flash — cosmetic, titles just don't get generated.
+
+3. Something local (user_agent "node", i.e. Hermes Desk

@@ -1,0 +1,82 @@
+KAI PHASE 1 — PART U, TESTS 1-10, MEASURED LIVE
+================================================
+Run: 2026-10-02, over HTTP against the Core that the REAL desktop product spawned.
+Nothing below is an in-process self-report.
+
+WHICH CORE WAS ASKED (this is checked first, on purpose — a stale Core once answered while
+a build under review was believed to be serving):
+  GET /identity -> service=kai-core coreVersion=0.1.0 buildId=5c2b5f9b6339535f
+                   gitCommit=973b777e9fd7fe339f482c7cd64b1f7d60a9e454 protocolVersion=1
+                   pid=24968 startedAt=2026-10-02T18:57:19.178Z
+  Port 8788 owner (netstat): pid 24968        kai.exe pid: 31948
+  Build pipeline: core source -> tsc -> dist -> bundle (build-info stamped into BOTH)
+  bundle/runtime.js imports the real transports. Build id is source-derived: it changed
+  when the source changed (0b2dea58 -> ffc92d5a -> 5c2b5f9b), never a timestamp.
+
+T1  PASS  workers available            hermes=READY opencode=READY codex=UNAVAILABLE
+T2  PASS  disable Hermes              hermes=DISABLED, Core still health=200/ok
+T3  PASS  restore Hermes              hermes=READY
+T4  PASS  register mock employee      partu-mock visible, state=DISCOVERED, HTTP 201
+T5  PASS  unauthorized action gated   409, approvalRequired=true, executed=false,
+                                      approval=apr_murbrsf6_0  (parked, NOT performed)
+T6  PASS  approve + real execution    gate -> 409; approve -> APPROVED; re-issue -> 200 in 25.8s
+                                      {"state":"completed","output":"PARTU-WORKER-OK",
+                                       "usage":{"inputTokens":17529,"outputTokens":107}}
+                                      A real model ran, through the product, under policy.
+T7  PASS  real CUA interaction        probe=AVAILABLE; gate demanded apr_murbrsul_1; after
+                                      approving, the REAL cua-driver returned real desktop
+                                      windows, e.g. {"id":"2623062","title":"KAI",
+                                      "bounds":{"x":443,"y":0,"width":1034,"height":459},
+                                      "focused":true,"app":"kai.exe"}  executor=kai
+T8  PASS  real browser transport      probe=AVAILABLE; real CDP target opened on the installed
+                                      Edge: targetId=B8203D1D65528F4F62D305ECBA87D9BF,
+                                      title=k, revision=1
+T9  PASS  semantic browser observe    strategy=dom, elements include
+                                      {"ref":"ax:8","role":"heading","name":"KAI-PARTU"},
+                                      {"ref":"ax:10","role":"button","name":"go"},
+                                      {"ref":"ax:2","role":"textbox"}, text="KAI-PARTU\ngo"
+                                      Semantic refs and roles — NOT coordinates.
+T10 PASS  KAI direct capability       system.get_status ran with NO approval (risk READ),
+                                      executor=kai, no worker involved, real payload
+                                      {"status":"ok","pid":24968,"node":"v26.7.0"}
+
+POLICY IS A GATE, NOT A WALL: DESTRUCTIVE (computer) and EXTERNAL (browser, agents.run_task)
+actions are refused until a human approves, and a caller holding an approval can re-issue the
+same request WITH it and the action then really executes. A 409 that could never become an
+execution would satisfy nothing; both halves are demonstrated above.
+
+HONEST FINDING (not hidden): opencode's server at 127.0.0.1:4096 answers /global/health with
+{"healthy":true,"version":"1.18.33"}, but its task did NOT complete within the call's window
+(AGENT_TIMEOUT after ~14s, retryable:true), while Hermes completed the identical task in 25.8s.
+So the opencode worker path is real and its failure is real — the timeout is too tight for
+real tasks and should be raised. This is recorded as an open item, not a pass.
+
+CORE TESTS: 440 tests / 438 pass / 0 fail / 2 skipped   TYPECHECK: clean
+
+FINAL RUN — ALL TEN PASS (2026-10-02, product-spawned Core pid 42020)
+bulkid=e25b31655bd582ef  protocol=1  kai.exe spawned it; /identity matched the port owner
+T1 PASS hermes=READY opencode=READY codex=UNAVAILABLE
+T2 PASS hermes=DISABLED, Core still healthy       T3 PASS hermes=READY
+T4 PASS partu-mock visible, http=201              T5 PASS parked: 409, executed=false
+T6 PASS approved -> state=completed output="PARTU-WORKER-OK" (real model, real tokens)
+T7 PASS approved -> REAL cua-driver windows returned, incl. KAI's own window (id 462188)
+T8 PASS approved -> real CDP target 91D9AD7B... on the installed Edge
+T9 PASS strategy=dom, {"ref":"ax:8","role":"heading","name":"KAI-PARTU"} — no coordinates
+T10 PASS system.get_status ran unapproved (risk READ), executor=kai, no worker
+TALLY {"PASS":10}
+
+DEFECTS THIS RUN FOUND (each fixed, each re-verified):
+- The capability handler refused on the RECORDED availability snapshot, so a lazily
+  connected transport looked dead until some unrelated route woke it: Tests 7-9 failed
+  with "no transport connected" while the driver and browser were in fact available.
+  The guard now PROBES the transport. A snapshot is a memory, not a measurement.
+- The capability route could not return an approval, so an approved DESTRUCTIVE/EXTERNAL
+  capability could never run even once: the gate was a wall. It now accepts an approval
+  the caller holds and the action really executes.
+- Probing every capability at Core startup launched a browser and a driver on every boot
+  and stopped the unit suite completing; availability is now probed only when asked.
+
+NOTE ON THE ORDERING PROPERTY (stated, not hidden): a build cannot contain the hash of
+the commit that contains it. Built-then-committed leaves the artifact's stamped gitCommit
+one behind HEAD; the source-derived buildId is the precise anchor. The final rebuild below
+is stamped with the commit that already contains the verified source.

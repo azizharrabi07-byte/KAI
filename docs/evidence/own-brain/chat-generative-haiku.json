@@ -1,0 +1,18 @@
+{
+  "agent": "core",
+  "from_state": false,
+  "intent": "unknown",
+  "conversation_id": "sess_musv974c_7dhj",
+  "reply": "Cursor blinks alone —\nthe dark screen waits for my words.\n\nOn the model: I can't honestly name one. I'm KAI, your agent running locally, and I don't have verified access from here to which underlying model is serving this turn — guessing a name would be inventing a fact. If you want it confirmed, point me at the config (or say the word and I'll look for where the runtime records it) and I'll read it rather than guess.\n\nSmall note: a haiku is normally three lines (5-7-5); I followed your two-line request, so the form is off by convention, not by accident.",
+  "data": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash"
+  },
+  "brain": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash"
+  },
+  "dependency": {
+    "normal_chat_calls_to_hermes": 0
+  }
+}

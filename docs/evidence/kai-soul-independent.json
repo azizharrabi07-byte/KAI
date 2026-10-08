@@ -1,0 +1,340 @@
+{
+  "artifact": "docs/evidence/kai-soul-independent.json",
+  "at": "2026-10-04",
+  "what": "Claim-by-claim status record for KAI's identity and independence: what is proven, on which build, and — explicitly — what is not. Companion to docs/KAI_SOUL.md, docs/KAI_RUNTIME_ARCHITECTURE.md and docs/KAI_HARNESS.md.",
+  "rule": "Fix the record to match the evidence. Every claim names (a) its status tag, (b) whether it is FILES EXIST or KAI FUNCTIONALLY OWNS THE MECHANISM, and (c) the build it was verified on. A claim with no execution evidence is NOT PROVEN; a claim that cannot be exercised here because an external dependency is absent is BLOCKED_EXTERNAL. A file that exists is not a mechanism that works.",
+  "tags": {
+    "UNIT PROVEN": "exercised by the repo's unit/integration tests, or verified by an exhaustive static check (grep over the tree) where the claim is about code structure — at the named build.",
+    "INTEGRATION PROVEN": "exercised through two or more real components (HTTP route -> runtime -> subsystem; real server + real worker endpoint), captured or test-driven.",
+    "END-TO-END PROVEN": "a live capture shows the user-visible behaviour, on the named build.",
+    "MOCK ONLY": "exercised only against mocks/fixtures, never a real component.",
+    "NOT PROVEN": "claimed in code or docs but has no execution evidence, or the mechanism does not exist.",
+    "BLOCKED_EXTERNAL": "cannot be proven on this machine because an external dependency is absent."
+  },
+  "builds": {
+    "b52353fd7400a6c1": {
+      "gitCommit": "8fea1bf34901a31b28b935adcdf23704f4707cb1",
+      "corePid": 9044,
+      "startedAt": "2026-10-04T19:18:28.552Z",
+      "freshness": "fresh",
+      "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+      "note": "The identity-foundation build. Hermes was genuinely killed for the twelve-step and direct captures (health.hermes.reachable=false at capture time)."
+    },
+    "7028f6cba503e3ef": {
+      "gitCommit": "c75fc5f6bc041c6ed3080547a1026a71d958e560",
+      "corePid": 4572,
+      "startedAt": "2026-10-04T20:52:19.608Z",
+      "freshness": "fresh",
+      "note": "The fixed artifact (L2 identity fix acc4b67 + approval-loop fix 6710b7f). Hermes was reachable and authorized during this capture."
+    },
+    "HEAD-98a80ae": {
+      "commit": "98a80ae9acfd927804f4c45bab0d37e14a82042f",
+      "at": "2026-10-04T22:29:08+01:00",
+      "note": "Static/test verification only — no live run on this commit. The working tree additionally carries in-flight, uncommitted changes by three parallel streams (core/src/api/routes.ts, core/src/runtime.ts, core/src/tools/{registry,builtin,workspace}.ts, core/src/sessions/store.ts); claims that depend on those changes are marked as such."
+    }
+  },
+  "captures": {
+    "docs/evidence/kai-twelve-hermes-down.json": {
+      "build": "b52353fd7400a6c1",
+      "at": "2026-10-04T19:31:20.965Z",
+      "shape": "4 relay steps + 9 probe questions = 13 raw answers; identity block; capability list; employee list; health (hermes unreachable); memory-scope refusal probe",
+      "note": "Hermes genuinely killed. Every answer is KAI-identified; none carries a worker voice."
+    },
+    "docs/evidence/kai-direct-hermes-down.json": {
+      "build": "b52353fd7400a6c1",
+      "at": "2026-10-04T19:32:50.759Z",
+      "shape": "17 read probes + capability measure + a full approval cycle (park -> decide -> re-issue) + session create + one chat fallback",
+      "note": "Hermes stopped (127.0.0.1:8642). 16 of 17 read probes returned 200; the single 400 is the documented scope-validation refusal (/memory/search?scope=subagent without a scopeId, code MEMORY_SCOPE_SUBJECT_UNKNOWN) — an honest error, not an outage."
+    },
+    "docs/evidence/kai-subagent-e2e.json": {
+      "build": "not recorded in-file (captured before acc4b67; same session as the b52353fd7400a6c1 captures)",
+      "at": "2026-10-04T19:38:14.793Z",
+      "shape": "the PRE-FIX L2 leak: the same payload answered by the worker itself, then by the worker under a persona preamble; subagent create + first run (parked)",
+      "note": "The defect reproduction. The fixed build's equivalent is kai-subagent-fixed.json."
+    },
+    "docs/evidence/kai-subagent-fixed.json": {
+      "build": "7028f6cba503e3ef",
+      "at": "2026-10-04T20:55:23.156Z",
+      "shape": "run(no id) -> park -> decide -> re-issue WITH id -> control(no id) + the persona /message path; full approval bookkeeping",
+      "note": "The L2 fix and the approval-loop contract, captured end-to-end on the fixed artifact. Raw file read back at 140,051 bytes."
+    }
+  },
+  "claims": [
+    {
+      "id": "C01",
+      "claim": "With Hermes genuinely killed, KAI boots, answers and stays KAI-identified — all 13 captured answers carry KAI's voice, none a worker's.",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS THE MECHANISM (behaviour exercised live, not just files present)",
+      "build": "b52353fd7400a6c1",
+      "evidence": ["docs/evidence/kai-twelve-hermes-down.json (health.hermes.reachable=false; all 13 answers)"]
+    },
+    {
+      "id": "C02",
+      "claim": "The identity answer is KAI's own: \"I am KAI. Hermes and OpenCode are workers I can use; I'm still KAI when they are unavailable.\"",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "b52353fd7400a6c1",
+      "evidence": ["kai-twelve-hermes-down.json steps[0], questions[0]"],
+      "note": "Answered from state (from_state=true), not from a model; sourced from the KAI_HOME identity layer."
+    },
+    {
+      "id": "C03",
+      "claim": "The harness answer is KAI's own: \"Yes — I have my own harness, and it isn't Hermes's. I run as KAI Core, my own Node/TypeScript runtime on this machine...\"",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "b52353fd7400a6c1",
+      "evidence": ["kai-twelve-hermes-down.json questions[3]"]
+    },
+    {
+      "id": "C04",
+      "claim": "The independence answer is KAI's own: \"No — I don't need a worker to exist, to boot, to know who I am or to speak... a worker does not become the speaker.\"",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "b52353fd7400a6c1",
+      "evidence": ["kai-twelve-hermes-down.json steps[3], questions[6], questions[7], questions[8]"]
+    },
+    {
+      "id": "C05",
+      "claim": "Worker-status honesty with the worker down: \"hermes is offline — it is not connected right now.\"",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "b52353fd7400a6c1",
+      "evidence": ["kai-twelve-hermes-down.json questions[5]"]
+    },
+    {
+      "id": "C06",
+      "claim": "With Hermes down, KAI's READ surfaces still answer and a full approval cycle completes: write parks 409 (approval apr_muu7x6mx_4) -> decide 200 (reissued) -> re-issue 200; a session is created 201; an unrecognised turn gets the honest fallback (\"...no agent is connected right now, so I can't hand it off.\").",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "b52353fd7400a6c1",
+      "evidence": ["docs/evidence/kai-direct-hermes-down.json"],
+      "note": "Precision: 16 of 17 read probes returned 200; the one 400 is the documented scope-validation refusal (/memory/search?scope=subagent without a scopeId — MEMORY_SCOPE_SUBJECT_UNKNOWN). \"Every READ surface returned 200\" is the loose form; this is the exact form."
+    },
+    {
+      "id": "C07",
+      "claim": "The pre-fix defect is real and captured: a KAI-managed subagent on the pre-fix artifact identified itself as the worker — \"I'm Hermes Agent, built by Nous Research...\" / \"I'm Hermes Agent (by Nous Research), running as a delegated subagent turn labeled 'probe'...\".",
+      "status": "END-TO-END PROVEN",
+      "ownership": "defect reproduced (this is what KAI FUNCTIONALLY DID NOT own)",
+      "build": "pre-fix artifact (build not recorded in-file; captured before acc4b67)",
+      "evidence": ["docs/evidence/kai-subagent-e2e.json (workerBareIdentity.output, workerWithPreamble.output)"],
+      "note": "Same capture also shows the pre-fix approval bug: a re-run parked apr_muu85d4o_6 while spending apr_muu84jzv_5 — a second id minted."
+    },
+    {
+      "id": "C08",
+      "claim": "The L2 fix is end-to-end: on the fixed artifact, all three captured subagent replies are grep-clean of \"Nous Research\", \"Hermes Agent\" and \"I am Hermes\" — the worker answers as KAI's worker (\"I'm a KAI worker — an executor running on KAI's behalf...\"; \"I'm Probe, a subagent spawned on KAI's behalf...\"; \"I'm Probe, KAI's identity probe...\").",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "7028f6cba503e3ef",
+      "evidence": ["docs/evidence/kai-subagent-fixed.json (summary.replyFromDecide, summary.replyFromReissue, messagePath.summary.reissueReply; file grep: 0 x \"Nous Research\", 0 x \"Hermes Agent\", 0 x \"I am Hermes\")"]
+    },
+    {
+      "id": "C09",
+      "claim": "The approval-loop contract: a re-issue WITH the parked approval id consumes the granted approval — 200, no second approval minted (reissueParkedAgain=false, reissueMintedApproval=null).",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "7028f6cba503e3ef",
+      "evidence": ["kai-subagent-fixed.json summary (parked apr_muuavbru_0, decideReissued=true, reissueStatus=200)"]
+    },
+    {
+      "id": "C10",
+      "claim": "The control: a fresh no-id call mints a NEW approval (apr_muuavmu0_1) which, rejected, leaves nothing pending (nothingPendingFinal=true).",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "7028f6cba503e3ef",
+      "evidence": ["kai-subagent-fixed.json summary (controlMintedFreshId=true, controlRejected=REJECTED)"]
+    },
+    {
+      "id": "C11",
+      "claim": "The persona /message path end-to-end: first call parks 409 (apr_muuawu2h_2) -> re-issue 200 with the persona's own reply and a measured execution block (executionId, sessionId, worker=hermes, durationMs).",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "7028f6cba503e3ef",
+      "evidence": ["kai-subagent-fixed.json messagePath.summary"]
+    },
+    {
+      "id": "C12",
+      "claim": "KAI's identity is loaded from KAI-owned resources — the KAI_HOME tree (identity/SOUL.md, user/USER.md, memory/MEMORY.md, skills/, workforce/, policy/, upgrades/) — not from a worker; a legacy flat KAI_HOME is migrated (copied, not reseeded) and the loader reads the tree, not the root copies.",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS (the spoken identity in C02-C05 is its output; the tree exists on disk and is test-covered)",
+      "build": "b52353fd7400a6c1 (behaviour) + repo at HEAD-98a80ae (files)",
+      "evidence": ["core/src/agent/kai-home.ts:11-17, :334-388, :317-327", "core/src/agent/soul.ts:160, :25, :125-127, :54-58", "core/tests/soul.test.ts (\"identity loads with Hermes unreachable\"; no Hermes leakage in the identity layer)", "kai-twelve-hermes-down.json"]
+    },
+    {
+      "id": "C13",
+      "claim": "The worker-relationship invariant is KAI-owned data, not prose: WORKER_RELATIONSHIP (core/src/agent/kai-capabilities.ts:76-82) — \"a worker provides information; a worker does not become the speaker\".",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS (data exists AND is what the live answers speak)",
+      "build": "b52353fd7400a6c1",
+      "evidence": ["core/src/agent/kai-capabilities.ts:76", "kai-twelve-hermes-down.json (the answers quote it verbatim)"]
+    },
+    {
+      "id": "C14",
+      "claim": "The delegation identity is actually sent to the worker: renderDelegationIdentity (kai-capabilities.ts:134-144) is wired through the Hermes adapter (hermesAdapter.ts:192, :210, :411) and supplied by the runtime (runtime.ts:1005-1008).",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "7028f6cba503e3ef",
+      "evidence": ["kai-subagent-fixed.json (the replies are the effect of the instruction the worker received)", "repo files at HEAD-98a80ae"]
+    },
+    {
+      "id": "C15",
+      "claim": "The relay boundary strips a worker's self-identification before its output becomes KAI's speech — a grammatical rule, not a phrase blocklist.",
+      "status": "INTEGRATION PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "HEAD-98a80ae (tests)",
+      "evidence": ["core/tests/relay.test.ts (presentWorkerResult strip tests)", "core/tests/routing-relay.test.ts (a real server relays a worker saying \"Hermes Agent is what I actually am...\" and the presented reply is stripped; the worker endpoint is a local test double, the relay path is real)", "core/src/chat/relay.ts:195, :311, :22-25"]
+    },
+    {
+      "id": "C16",
+      "claim": "Every identity/independence answer came from live state, never from a model: from_state=true on all 13 answers.",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "b52353fd7400a6c1",
+      "evidence": ["kai-twelve-hermes-down.json (every step/question: agent=core, from_state=true)"]
+    },
+    {
+      "id": "C17",
+      "claim": "The artifact-identity invariant: the running Core reports the build it actually loaded (buildId/gitCommit/pid/freshness, captured once at module load, cross-checked against disk) and a stale process refuses rather than pretending.",
+      "status": "INTEGRATION PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "b52353fd7400a6c1 + 7028f6cba503e3ef (live fields) / HEAD-98a80ae (refusal tests)",
+      "evidence": ["identity blocks in all three captures (freshness=fresh, identityMatchesDisk=true, distinct pids 9044/4572)", "core/tests/identity-integrity.test.ts (a rewritten stamp is STALE, never silently fresh; identitySelfCheck refuses)"]
+    },
+    {
+      "id": "C18",
+      "claim": "The subagent REST surface exists and is exercised live: create (201), run (park 409 -> re-issue 200), /message (park 409 -> re-issue 200).",
+      "status": "END-TO-END PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS",
+      "build": "b52353fd7400a6c1 (create/run) + 7028f6cba503e3ef (run/message)",
+      "evidence": ["kai-subagent-e2e.json (subagentCreate 201)", "kai-subagent-fixed.json (run + message flows)", "core/src/api/routes.ts:2548-2560 at HEAD-98a80ae"]
+    },
+    {
+      "id": "C19",
+      "claim": "Subagent safety is structural: a subagent has no handle to the tool registry, policy engine or approval service; it runs only through the one policy-governed executeTask path; an unavailable worker registers UNAVAILABLE rather than inventing a way to run.",
+      "status": "UNIT PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS (structure + tests; not separately captured live)",
+      "build": "HEAD-98a80ae",
+      "evidence": ["core/src/workforce/subagent.ts:17-29, :415-419", "core/tests/subagent.test.ts"]
+    },
+    {
+      "id": "C20",
+      "claim": "task.delegate now HAS a consumer: server.ts:532-560 performs the delegation through the one relay path, honouring avoid (the old \"the intent produces the sentence and hands it to nobody\" finding is closed).",
+      "status": "INTEGRATION PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS (test-driven through the real server; not present in the four live captures)",
+      "build": "HEAD-98a80ae (tests)",
+      "evidence": ["core/tests/routing-relay.test.ts (real server; asserts delegated=true and the relayed outcome)", "core/tests/chat.test.ts (router returns delegateTo hermes/opencode/undefined)"],
+      "note": "The server branch itself is real (createKaiServer + real HTTP); the worker endpoint it relays to is a local test double, and the branch does not appear in the four live captures. Live re-capture after the in-flight changes land would upgrade this to END-TO-END."
+    },
+    {
+      "id": "C21",
+      "claim": "The worker-runtime event vocabulary (attachProvider / ingestRuntime / subscribeRuntime / TurnAdapter / toControlPlaneEvent / serializeRuntimeEvent) is dead on the wire — zero production call sites; worker turns do not stream to the UI.",
+      "status": "UNIT PROVEN",
+      "ownership": "negative structural claim (exhaustive grep at HEAD-98a80ae)",
+      "build": "HEAD-98a80ae",
+      "evidence": ["repo-wide grep: only bus.ts definitions, interface entries, tests, and dist/bundle copies", "core/src/events/bus.ts:356, :121, :285, :383, :401", "app/src/core/runtime-state.ts:240"]
+    },
+    {
+      "id": "C22",
+      "claim": "The MCP module is committed and its machinery passes its own tests (28 tests across manager/capability/routes/runtime-e2e; full suite 792/779/0/13 at commit 98a80ae).",
+      "status": "INTEGRATION PROVEN",
+      "ownership": "FILES EXIST + mechanism test-proven in isolation; NOT yet owned by the committed runtime (see C23)",
+      "build": "HEAD-98a80ae",
+      "evidence": ["commit 98a80ae (core/src/mcp/{manager,routes,capability}.ts; core/tests/mcp-*.test.ts)", "docs/evidence/kai-mcp-final.json"]
+    },
+    {
+      "id": "C23",
+      "claim": "MCP is NOT wired into the committed runtime: zero committed runtime call sites; live GET /mcp still 404s at HEAD. The two one-line handovers are in-flight and uncommitted in the working tree (runtime.ts:1619-1622, routes.ts:2635).",
+      "status": "NOT PROVEN",
+      "ownership": "FILES EXIST (module) / mechanism NOT wired into the committed runtime",
+      "build": "HEAD-98a80ae (committed tree); working tree carries the uncommitted handovers",
+      "evidence": ["git show HEAD:core/src/runtime.ts — 0 x createMcpManager/installMcpCapability", "git show HEAD:core/src/api/routes.ts — 0 x registerMcpRoutes", "commit 98a80ae message: \"NOT PROVEN until the integration stream lands its two one-line handovers: live GET /mcp still 404s.\""]
+    },
+    {
+      "id": "C24",
+      "claim": "Third-party MCP server connectivity (real servers, their schemas, errors, auth flows).",
+      "status": "BLOCKED_EXTERNAL",
+      "ownership": "not owned here — no third-party server is installed on this machine",
+      "build": "HEAD-98a80ae",
+      "evidence": ["docs/evidence/kai-mcp-final.json (blockedExternal)"],
+      "note": "The honest substitute is KAI's own fixture server (a real process, real JSON-RPC), labelled as KAI's."
+    },
+    {
+      "id": "C25",
+      "claim": "The mission-brief identity field set (agentId, displayName, identity, soul, capabilities, limits, userContext, memoryAuthority, workforceAuthority, sessionAuthority, policyAuthority, approvalAuthority) as an identity MODEL.",
+      "status": "NOT PROVEN",
+      "ownership": "DOES NOT EXIST — repo-wide grep at HEAD finds no such model; displayName/*Authority do not occur; userContext exists only as a prompt-budget field",
+      "build": "HEAD-98a80ae",
+      "evidence": ["repo-wide grep (see docs/KAI_SOUL.md §4c for the closest real equivalents: session.agentId/agentOwner, KaiIdentity fields, KAI_LIMITS, the structural policy/approval/memory-scope enforcement)"]
+    },
+    {
+      "id": "C26",
+      "claim": "POST /soul as a route.",
+      "status": "NOT PROVEN",
+      "ownership": "DOES NOT EXIST as a route (grep over core/src/api/routes.ts finds none); the write CAPABILITY exists via the soul.set tool",
+      "build": "HEAD-98a80ae",
+      "evidence": ["core/src/agent/soul.ts:49-51 (SOUL_RELOAD_SEMANTICS names the route)", "runtime.ts:454, :728-742, :2640-2644 (soul.set tool + replaceSoul handler)"],
+      "note": "The reload semantics string in the code still names a route that is absent — a doc-vs-code gap recorded, not fixed (docs-only streams)."
+    },
+    {
+      "id": "C27",
+      "claim": "Subagent visual variant resolution (a persona's visual.variant resolved to a real asset).",
+      "status": "NOT PROVEN",
+      "ownership": "NOT WIRED — the runtime passes { path } only; resolveVisual returns the declared reference",
+      "build": "HEAD-98a80ae",
+      "evidence": ["runtime.ts:2538-2540", "core/src/workforce/subagent.ts:291-300"]
+    },
+    {
+      "id": "C28",
+      "claim": "executionId on action records (bus record joins a ledger row on ONE id).",
+      "status": "NOT PROVEN",
+      "ownership": "NOT in the committed tree (git show HEAD:core/src/tools/registry.ts — 0 x executionId). In the working tree it is emitted by spread (tools/registry.ts:369, 393-403), derived from the causal mission step via the ledger's own executionIdFor — code-level only, no live capture.",
+      "build": "HEAD-98a80ae (absent) / working tree (in-flight)",
+      "evidence": ["git show HEAD:core/src/tools/registry.ts", "working-tree core/src/tools/registry.ts:369, :393-403, :42"]
+    },
+    {
+      "id": "C29",
+      "claim": "recoveryDecision and employeeInstanceId on action records.",
+      "status": "NOT PROVEN",
+      "ownership": "declared on the type, copied by buildActionRecord, NEVER produced by the emitter — always undefined",
+      "build": "HEAD-98a80ae (and unchanged in the working tree)",
+      "evidence": ["core/src/observability/action-record.ts:54, :60, :95", "core/src/tools/registry.ts:348-405 (no assignments)"]
+    },
+    {
+      "id": "C30",
+      "claim": "The live OpenCode model inventory (what the server would actually serve).",
+      "status": "BLOCKED_EXTERNAL",
+      "ownership": "not provable here — the OpenCode server was down at both probe times",
+      "build": "HEAD-98a80ae",
+      "evidence": ["config-derived counts re-verified 2026-10-04: ~/.config/opencode/opencode.json = 35 providers / 1063 models; ~/.hermes/config.yaml lines 1-5, 16-20, 124-142", "no process listening on 127.0.0.1:4096 at probe times"],
+      "note": "The counts are what the config declares, not what would authenticate. This section of KAI_HARNESS.md is config-derived only."
+    },
+    {
+      "id": "C31",
+      "claim": "The running Core is the app's own artifact, not a stray process: identitySource points at app/target/release/core/build-info.json, with distinct pids (9044, 4572) and freshness=fresh in each capture.",
+      "status": "INTEGRATION PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS (captured in the live runs)",
+      "build": "b52353fd7400a6c1 + 7028f6cba503e3ef",
+      "evidence": ["identity blocks in kai-twelve-hermes-down.json, kai-direct-hermes-down.json, kai-subagent-fixed.json"]
+    },
+    {
+      "id": "C32",
+      "claim": "The relay guard is live (relayGuardIsLive) and the failure path speaks in KAI's voice (presentWorkerFailure) rather than a reply-less 502.",
+      "status": "UNIT PROVEN",
+      "ownership": "KAI FUNCTIONALLY OWNS (tests; the OpenCode-down path in the captures shows the server answering, though OpenCode-specific failure text was not separately asserted)",
+      "build": "HEAD-98a80ae",
+      "evidence": ["core/src/chat/relay.ts:276, :311", "core/tests/relay.test.ts"]
+    }
+  ],
+  "not_proven_summary": [
+    "C23 MCP runtime wiring at HEAD (live GET /mcp 404s; handovers uncommitted in the working tree).",
+    "C25 the brief's identity field set — does not exist anywhere.",
+    "C26 POST /soul as a route — absent; the capability is soul.set.",
+    "C27 subagent visual variant resolution — not wired.",
+    "C28 executionId on action records — absent at HEAD; in-flight in the working tree.",
+    "C29 recoveryDecision / employeeInstanceId — declared, never produced."
+  ],
+  "blocked_external_summary": [
+    "C24 third-party MCP server connectivity (none installed).",
+    "C30 the live OpenCode model inventory (server down at both probe times; config-derived counts only)."
+  ],
+  "honest_scope_note": "Live captures were taken on two builds (b52353fd7400a6c1 with Hermes genuinely killed; 7028f6cba503e3ef with Hermes up). Static claims are verified at HEAD 98a80ae; where the working tree carried in-flight changes, the claim says so. Nothing in this file is claimed as live-verified unless a capture is named."
+}

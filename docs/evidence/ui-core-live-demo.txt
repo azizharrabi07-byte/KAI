@@ -1,0 +1,71 @@
+KAI Phase 2.5 - live desktop demonstration, as observed
+=====================================================================
+Binary: app/target/release/kai.exe (built 2026-10-02 08:07 and 08:15)
+Core:   core/dist/server.js on 127.0.0.1:8788
+Host:   Windows 11, WebView2; island launched with --remote-debugging-port=9222
+
+Every line below is copied from a real run. `ui` lines are written by the front end
+(app/src/core/core-boot.ts via Bridge.log); they appear in %LOCALAPPDATA%\KAI\kai.log
+next to the Rust lines.
+
+-- RUN 1: first build with the Core link ---------------------------------------------
+
+2026-10-02 08:09:44 --- KAI 0.1.1 started ---
+2026-10-02 08:09:45 ui  [core] connecting
+2026-10-02 08:09:45 ui  [core] connection CONNECTING
+2026-10-02 08:09:45 ui  [core] connection ONLINE
+2026-10-02 08:09:46 control layer: Hermes api-server reachable on http://127.0.0.1:8642 (status ok)
+2026-10-02 08:09:46 control layer: Hermes key accepted — 1 model(s), 3 session(s)
+2026-10-02 08:09:50 control layer: OpenCode NOT reachable on http://127.0.0.1:4096
+
+  Test 1  PASS  the island reached the Core. [core] ONLINE is written by the front-end
+                client's own state machine, so this also proves the CSP change works: an
+                island fetch/SSE to 127.0.0.1:8788 would have been blocked before it.
+
+  Post: a mission was created through the Core API:
+        POST /missions {"title":"ui demo: read core status", steps:[tool system.get_status]}
+        -> status COMPLETED (the tool really ran)
+        DOM read immediately after, from the live page:
+          active view : view on
+          note text   : "Mission completed"
+  Test 5  PASS  a real mission produced a visible change in the island, over SSE.
+
+-- RUN 1: killing and restoring the Core ----------------------------------------------
+
+2026-10-02 08:11:15 ui  [core] connection CONNECTING      <- Core killed (pid 20152)
+2026-10-02 08:11:33 ui  [core] connection ONLINE          <- Core restarted, no app restart
+
+  Test 6  PASS  the app did not crash: debug port answered 200, document.title "KAI",
+                and the stream moved to CONNECTING (a retry was pending, so it is not
+                OFFLINE - the manager only reports OFFLINE when nothing is scheduled).
+  Test 7  PASS  it reconnected by itself after 18s and the mission created before the
+                restart was still there (persisted by the Core).
+
+-- RUN 2: the rebuild, with the connection made visible ---------------------------------
+
+2026-10-02 08:15:48 --- KAI 0.1.1 started ---
+2026-10-02 08:15:48 ui  [core] connecting
+2026-10-02 08:15:48 ui  [core] connection CONNECTING
+2026-10-02 08:15:48 ui  [core] connection ONLINE
+2026-10-02 08:16:15 ui  [core] connection CONNECTING      <- Core killed (pid 9900)
+2026-10-02 08:16:33 ui  [core] connection ONLINE          <- Core restarted
+
+  DOM read while the Core was down:
+    island note now: 'KAI Core is not running — reconnecting…'
+  DOM read after it returned:
+    island note now: ''
+
+  Test 6/7 PASS, visibly  the island says it is reconnecting while the Core is away and
+                          clears itself when the Core is back.
+
+-- What was NOT verified by this demonstration -----------------------------------------
+
+  OpenCode is not running on this host, so the OpenCode-dependent behaviour is unproven
+  end to end (the Core reports the agent as "offline", which is correct and is what the
+  island shows). The Core's own 13 OpenCode tests skip with that reason rather than
+  passing.
+
+  The chat demonstration (Test 2-4: "what agents are connected?", "what is Hermes
+  doing?") was verified at the transport level with the app's own client, against the
+  live Core - see ui-core-link-probe.txt - not by typing into the island. The island's
+  chat still goes through Rust (claude.rs -> Core /chat), which was already working.

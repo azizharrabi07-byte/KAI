@@ -1,0 +1,62 @@
+/* KAI workspace — the host's own styling.
+ *
+ * KAI's palette only, referenced through the app's existing CSS variables
+ * (--card, --ink, --dim, --hairline, --indigo, --font). The workspace is a
+ * fixed-position panel over the island, exactly like the visual host, so it
+ * needs no change to the island's layout.
+ */
+
+#kai-workspace.kai-workspace {
+  position: fixed;
+  inset: 0;
+  z-index: 62;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  background: var(--card, #141518);
+  color: var(--ink, #f5f6f8);
+  font-family: var(--font);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#kai-workspace.kai-workspace[hidden] {
+  display: none;
+}
+
+.kai-workspace .link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.kai-workspace .link-btn.on {
+  text-decoration: underline;
+}
+
+.kai-workspace .kai-workspace-tabs {
+  border-bottom: 1px solid var(--hairline, rgba(255, 255, 255, 0.06));
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+}
+
+.kai-workspace .kai-workspace-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kai-workspace .kai-workspace-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kai-workspace * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

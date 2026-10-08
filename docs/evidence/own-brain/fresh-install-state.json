@@ -1,0 +1,48 @@
+{
+  "ok": true,
+  "startedAt": "2026-10-05T16:57:34.434Z",
+  "uptimeMs": 12310,
+  "database": {
+    "path": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\kai-core.db"
+  },
+  "agents": [
+    {
+      "id": "hermes",
+      "state": "idle",
+      "health": {
+        "ok": true,
+        "latencyMs": 5,
+        "endpoint": "http://127.0.0.1:8642",
+        "version": "unknown"
+      }
+    },
+    {
+      "id": "opencode",
+      "state": "offline",
+      "health": {
+        "ok": false,
+        "latencyMs": 2,
+        "endpoint": "http://127.0.0.1:4096",
+        "detail": "INTERNAL: transport failure talking to http://127.0.0.1:4096"
+      }
+    }
+  ],
+  "missions": {
+    "active": 0,
+    "unfinished": 0
+  },
+  "notifications": {
+    "unread": 33
+  },
+  "approvals": {
+    "pending": 0
+  },
+  "scheduler": {
+    "running": true,
+    "enabled": 0,
+    "total": 11
+  },
+  "tools": {
+    "registered": 56
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "generatedAt": "2026-10-03T19:07:33.558Z",
+  "phase": "verify",
+  "islandUrl": "http://tauri.localhost/",
+  "afterReset": {
+    "variant": {
+      "id": "kai",
+      "label": "KAI",
+      "skin": "blue",
+      "theme": "aqua",
+      "accessory": "none",
+      "primaryColor": "#2E84F6",
+      "secondaryColor": "#A4E4FF"
+    }
+  },
+  "baseline": {
+    "variant": {
+      "id": "kai",
+      "label": "KAI",
+      "skin": "blue",
+      "theme": "aqua",
+      "accessory": "none",
+      "primaryColor": "#2E84F6",
+      "secondaryColor": "#A4E4FF"
+    },
+    "orbPng": "appearance-01-before-orb.png",
+    "islandPng": "appearance-01-before-island.png"
+  },
+  "selected": {
+    "skin": "yellow",
+    "theme": "sun",
+    "accessory": "cap"
+  },
+  "storedJson": "{\"id\":\"kai-coder\",\"label\":\"KAI-Coder\",\"skin\":\"yellow\",\"theme\":\"sun\",\"accessory\":\"cap\",\"primaryColor\":\"#FFC21A\",\"secondaryColor\":\"#FFEFA0\"}",
+  "afterNoRestart": {
+    "variant": {
+      "id": "kai-coder",
+      "label": "KAI-Coder",
+      "skin": "yellow",
+      "theme": "sun",
+      "accessory": "cap",
+      "primaryColor": "#FFC21A",
+      "secondaryColor": "#FFEFA0"
+    },
+    "orbPng": "appearance-02-after-orb.png",
+    "islandPng": "appearance-02-after-island.png"
+  },
+  "checks": {
+    "persistedAcrossRestart": true
+  },
+  "afterRestart": {
+    "variant": {
+      "id": "kai-coder",
+      "label": "KAI-Coder",
+      "skin": "yellow",
+      "theme": "progress",
+      "accessory": "cap",
+      "primaryColor": "#FFC21A",
+      "secondaryColor": "#FFEFA0"
+    },
+    "orbPng": "appearance-03-after-restart-orb.png",
+    "islandPng": "appearance-03-after-restart-island.png",
+    "storedJson": "{\"id\":\"kai-coder\",\"label\":\"KAI-Coder\",\"skin\":\"yellow\",\"theme\":\"progress\",\"accessory\":\"cap\",\"primaryColor\":\"#FFC21A\",\"secondaryColor\":\"#FFEFA0\"}"
+  }
+}

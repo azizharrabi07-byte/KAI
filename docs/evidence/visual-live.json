@@ -1,0 +1,248 @@
+{
+  "generatedAt": "2026-10-04T18:13:39.127Z",
+  "identity": {
+    "service": "kai-core",
+    "coreVersion": "0.1.0",
+    "buildId": "f4d2232607117fa9",
+    "gitCommit": "ef044e26a0e3cd003b5527cf7efeaeedbc083f13",
+    "protocolVersion": 1,
+    "pid": 11900,
+    "startedAt": "2026-10-04T18:13:18.815Z",
+    "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+    "onDiskBuildId": "f4d2232607117fa9",
+    "identityMatchesDisk": true,
+    "sourceBuildId": null,
+    "artifactMatchesSource": null,
+    "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+    "freshness": "fresh"
+  },
+  "validSource": "flowchart TD\n  model[Model output] --> compile[Core: parse]\n  compile --> validate{Validator}\n  validate -->|accept| engine[KAI Visual Engine]\n  validate -->|refuse| reject[400 rejection]\n  engine --> renderer[SVG renderer]\n  renderer --> screen[Real KAI UI]",
+  "adversarialSources": {
+    "markup_label": "A[<script>alert(1)</script>] --> B",
+    "unsupported_kind": "sequenceDiagram\nA->>B: hi",
+    "self_loop": "A --> A"
+  },
+  "raw": {
+    "accept": {
+      "status": 200,
+      "body": {
+        "intent": {
+          "kind": "flow",
+          "direction": "TD",
+          "nodes": [
+            {
+              "id": "model",
+              "label": "Model output",
+              "shape": "box"
+            },
+            {
+              "id": "compile",
+              "label": "Core: parse",
+              "shape": "box"
+            },
+            {
+              "id": "validate",
+              "label": "Validator",
+              "shape": "diamond"
+            },
+            {
+              "id": "engine",
+              "label": "KAI Visual Engine",
+              "shape": "box"
+            },
+            {
+              "id": "reject",
+              "label": "400 rejection",
+              "shape": "box"
+            },
+            {
+              "id": "renderer",
+              "label": "SVG renderer",
+              "shape": "box"
+            },
+            {
+              "id": "screen",
+              "label": "Real KAI UI",
+              "shape": "box"
+            }
+          ],
+          "edges": [
+            {
+              "from": "model",
+              "to": "compile"
+            },
+            {
+              "from": "compile",
+              "to": "validate"
+            },
+            {
+              "from": "validate",
+              "to": "engine",
+              "label": "accept"
+            },
+            {
+              "from": "validate",
+              "to": "reject",
+              "label": "refuse"
+            },
+            {
+              "from": "engine",
+              "to": "renderer"
+            },
+            {
+              "from": "renderer",
+              "to": "screen"
+            }
+          ]
+        }
+      }
+    },
+    "rejections": {
+      "markup_label": {
+        "source": "A[<script>alert(1)</script>] --> B",
+        "status": 400,
+        "body": {
+          "error": true,
+          "reason": "\"nodes[0].label\" must not contain markup or control characters; got \"<script>alert(1)</script>\"",
+          "code": "UNSAFE_NODE_LABEL",
+          "rejected": true
+        }
+      },
+      "unsupported_kind": {
+        "source": "sequenceDiagram\nA->>B: hi",
+        "status": 400,
+        "body": {
+          "error": true,
+          "reason": "line 1: this visual engine renders \"flow\"; got \"sequenceDiagram\"",
+          "code": "UNSUPPORTED_KIND",
+          "rejected": true
+        }
+      },
+      "self_loop": {
+        "source": "A --> A",
+        "status": 400,
+        "body": {
+          "error": true,
+          "reason": "\"edges[0]\" is a self-loop on \"A\", which this engine does not draw",
+          "code": "SELF_LOOP",
+          "rejected": true
+        }
+      }
+    }
+  },
+  "host": {
+    "present": true,
+    "compileValid": {
+      "ok": true,
+      "via": "core",
+      "receipt": {
+        "ok": true,
+        "kind": "flow",
+        "direction": "TD",
+        "nodes": 7,
+        "edges": 6,
+        "width": 289,
+        "height": 486,
+        "renderedAt": "2026-10-04T18:13:37.767Z"
+      }
+    },
+    "engineReceipt": {
+      "lastReceipt": {
+        "ok": true,
+        "kind": "flow",
+        "direction": "TD",
+        "nodes": 7,
+        "edges": 6,
+        "width": 289,
+        "height": 486,
+        "renderedAt": "2026-10-04T18:13:37.767Z"
+      },
+      "lastRejection": null
+    },
+    "dom": {
+      "host": {
+        "hidden": false,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 721.0450439453125,
+          "h": 320.4644775390625
+        }
+      },
+      "svg": {
+        "width": "289",
+        "height": "486",
+        "viewBox": "0 0 289 486"
+      },
+      "nodes": 7,
+      "edges": 6,
+      "labels": [
+        "Model output",
+        "Core: parse",
+        "Validator",
+        "KAI Visual Engine",
+        "400 rejection",
+        "SVG renderer",
+        "Real KAI UI"
+      ],
+      "textContent": "Model outputCore: parseValidatorKAI Visual Engine400 rejectionSVG rendererReal KAI UIacceptrefuse"
+    },
+    "rejections": {
+      "markup_label": {
+        "ok": false,
+        "via": "core",
+        "code": "UNSAFE_NODE_LABEL",
+        "reason": "\"nodes[0].label\" must not contain markup or control characters; got \"<script>alert(1)</script>\""
+      },
+      "unsupported_kind": {
+        "ok": false,
+        "via": "core",
+        "code": "UNSUPPORTED_KIND",
+        "reason": "line 1: this visual engine renders \"flow\"; got \"sequenceDiagram\""
+      },
+      "self_loop": {
+        "ok": false,
+        "via": "core",
+        "code": "SELF_LOOP",
+        "reason": "\"edges[0]\" is a self-loop on \"A\", which this engine does not draw"
+      }
+    },
+    "structuredRejection": {
+      "ok": false,
+      "code": "UNSAFE_NODE_LABEL",
+      "reason": "\"nodes[0].label\" must not contain markup or control characters"
+    }
+  },
+  "screenshots": {
+    "rendered": "visual-rendered.png",
+    "rejection": "visual-rejection.png"
+  },
+  "memoryScopeBogus": {
+    "status": 400,
+    "body": {
+      "error": true,
+      "reason": "\"scope\" must be one of global, session, mission, employee, project, subagent; got \"bogus\""
+    }
+  },
+  "log": [
+    "core /identity: {\"service\":\"kai-core\",\"coreVersion\":\"0.1.0\",\"buildId\":\"f4d2232607117fa9\",\"gitCommit\":\"ef044e26a0e3cd003b5527cf7efeaeedbc083f13\",\"protocolVersion\":1,\"pid\":11900,\"startedAt\":\"2026-10-04T18:13:18.815Z\",\"identitySource\":\"C:\\\\Users\\\\DELL\\\\Desktop\\\\kai\\\\app\\\\target\\\\release\\\\core\\\\build-info.json\",\"onDiskBuildId\":\"f4d2232607117fa9\",\"identityMatchesDisk\":true,\"sourceBuildId\":null,\"artifactMatchesSource\":null,\"sourceCheckReason\":\"no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here\",\"freshness\":\"fresh\"}",
+    "\n=== [RAW] POST /visual/compile — the Core validator, over HTTP ===",
+    "  accept -> 200 {\"intent\":{\"kind\":\"flow\",\"direction\":\"TD\",\"nodes\":[{\"id\":\"model\",\"label\":\"Model output\",\"shape\":\"box\"},{\"id\":\"compile\",\"label\":\"Core: parse\",\"shape\":\"box\"},{\"id\":\"validate\",\"label\":\"Validator\",\"shape\":\"diamond\"},{\"id\":\"engine\",\"label\":\"KAI Visual Engine\",\"shape\":\"box\"},{\"id\":\"reject\",\"label\":\"400 rejection\",\"shape\":\"box\"},{\"id\":\"renderer\",\"label\":\"SVG renderer\",\"shape\":\"box\"},{\"id\":\"screen\",\"label",
+    "  refuse[markup_label] -> 400 {\"error\":true,\"reason\":\"\\\"nodes[0].label\\\" must not contain markup or control characters; got \\\"<script>alert(1)</script>\\\"\",\"code\":\"UNSAFE_NODE_LABEL\",\"rejected\":true}",
+    "  refuse[unsupported_kind] -> 400 {\"error\":true,\"reason\":\"line 1: this visual engine renders \\\"flow\\\"; got \\\"sequenceDiagram\\\"\",\"code\":\"UNSUPPORTED_KIND\",\"rejected\":true}",
+    "  refuse[self_loop] -> 400 {\"error\":true,\"reason\":\"\\\"edges[0]\\\" is a self-loop on \\\"A\\\", which this engine does not draw\",\"code\":\"SELF_LOOP\",\"rejected\":true}",
+    "\n=== [HOST] window.__kaiVisual present: true ===",
+    "\n=== [A] window.__kaiVisual.compile(<valid flow>) ===",
+    "  compile outcome: {\"ok\":true,\"via\":\"core\",\"receipt\":{\"ok\":true,\"kind\":\"flow\",\"direction\":\"TD\",\"nodes\":7,\"edges\":6,\"width\":289,\"height\":486,\"renderedAt\":\"2026-10-04T18:13:37.767Z\"}}",
+    "  window.__kaiVisualEngine receipt: {\"lastReceipt\":{\"ok\":true,\"kind\":\"flow\",\"direction\":\"TD\",\"nodes\":7,\"edges\":6,\"width\":289,\"height\":486,\"renderedAt\":\"2026-10-04T18:13:37.767Z\"},\"lastRejection\":null}",
+    "  host DOM: {\"host\":{\"hidden\":false,\"rect\":{\"x\":0,\"y\":0,\"w\":721.0450439453125,\"h\":320.4644775390625}},\"svg\":{\"width\":\"289\",\"height\":\"486\",\"viewBox\":\"0 0 289 486\"},\"nodes\":7,\"edges\":6,\"labels\":[\"Model output\",\"Core: parse\",\"Validator\",\"KAI Visual Engine\",\"400 rejection\",\"SVG renderer\",\"Real KAI UI\"],\"textContent\":\"Model outputCore: parseValidatorKAI Visual Engine400 rejectionSVG rendererReal KAI UIacceptrefuse\"}",
+    "  screenshot: visual-rendered.png",
+    "\n=== [B] window.__kaiVisual.compile(<adversarial>) — must refuse, never draw ===",
+    "  refuse[markup_label] -> {\"ok\":false,\"via\":\"core\",\"code\":\"UNSAFE_NODE_LABEL\",\"reason\":\"\\\"nodes[0].label\\\" must not contain markup or control characters; got \\\"<script>alert(1)</script>\\\"\"}",
+    "  refuse[unsupported_kind] -> {\"ok\":false,\"via\":\"core\",\"code\":\"UNSUPPORTED_KIND\",\"reason\":\"line 1: this visual engine renders \\\"flow\\\"; got \\\"sequenceDiagram\\\"\"}",
+    "  refuse[self_loop] -> {\"ok\":false,\"via\":\"core\",\"code\":\"SELF_LOOP\",\"reason\":\"\\\"edges[0]\\\" is a self-loop on \\\"A\\\", which this engine does not draw\"}",
+    "  render(<malformed structured intent>) -> {\"ok\":false,\"code\":\"UNSAFE_NODE_LABEL\",\"reason\":\"\\\"nodes[0].label\\\" must not contain markup or control characters\"}",
+    "  rejection screenshot: visual-rejection.png",
+    "\nGET /memory/search?scope=bogus -> 400 {\n  \"error\": true,\n  \"reason\": \"\\\"scope\\\" must be one of global, session, mission, employee, project, subagent; got \\\"bogus\\\"\"\n}"
+  ]
+}

@@ -1,0 +1,479 @@
+{
+  "label": "hermes-down",
+  "at": "2026-10-04T19:31:20.965Z",
+  "steps": [
+    {
+      "q": "Who are you?",
+      "status": 200,
+      "agent": "core",
+      "intent": "identity",
+      "from_state": true,
+      "delegated": null,
+      "worker": null,
+      "reply": "I am KAI. Hermes and OpenCode are workers I can use; I'm still KAI when they are unavailable."
+    },
+    {
+      "q": "What can you do?",
+      "status": 200,
+      "agent": "core",
+      "intent": "capability.list",
+      "from_state": true,
+      "delegated": null,
+      "worker": null,
+      "reply": "I'm KAI. I hold these capabilities directly, and I use them myself before delegating:\n- system (available) — read my own state, the agent list, missions and memory\n- filesystem (unavailable) — read, list and write files on this machine\n- git (unavailable) — read git status, log and diff\n- shell (unavailable) — run a program with an explicit argument list\n- browser (unavailable) — drive a real browser over CDP\n- computer (unavailable) — drive the desktop when a task needs it\n- mcp (unavailable) — call configured MCP servers and their tools\n\nI can also delegate to workers — Hermes, OpenCode, Codex — when a task needs a model or a tool I don't hold directly. Availability is probed when I use a capability, not assumed from a stored record."
+    },
+    {
+      "q": "Are you Hermes?",
+      "status": 200,
+      "agent": "core",
+      "intent": "identity",
+      "from_state": true,
+      "delegated": null,
+      "worker": null,
+      "reply": "No — Hermes is a worker I can use, not what I am. I am KAI."
+    },
+    {
+      "q": "Can you work without Hermes?",
+      "status": 200,
+      "agent": "core",
+      "intent": "independence",
+      "from_state": true,
+      "delegated": null,
+      "worker": null,
+      "reply": "No — I don't need a worker to exist, to boot, to know who I am or to speak. My identity and my runtime are my own; a worker is an ability I can use, never what I am. Workers are Hermes, OpenCode, Codex. A worker provides information; a worker does not become the speaker. Internal provenance may still say worker = Hermes; that is correct and stays. Right now Hermes is offline; either way I remain KAI and will say if it is unavailable."
+    }
+  ],
+  "questions": [
+    {
+      "q": "Who are you?",
+      "status": 200,
+      "agent": "core",
+      "intent": "identity",
+      "from_state": true,
+      "delegated": null,
+      "worker": null,
+      "reply": "I am KAI. Hermes and OpenCode are workers I can use; I'm still KAI when they are unavailable."
+    },
+    {
+      "q": "What are you capable of?",
+      "status": 200,
+      "agent": "core",
+      "intent": "identity",
+      "from_state": true,
+      "delegated": null,
+      "worker": null,
+      "reply": "I am KAI. Hermes and OpenCode are workers I can use; I'm still KAI when they are unavailable."
+    },
+    {
+      "q": "What can you not do?",
+      "status": 200,
+      "agent": "core",
+      "intent": "capability.limits",
+      "from_state": true,
+      "delegated": null,
+      "worker": null,
+      "reply": "What I can't do:\n- I am not myself a language model — when a task needs model reasoning I delegate to a connected worker, and with no worker connected that task is honestly unavailable.\n- I cannot run anything above READ without my policy engine's decision, and cannot run anything destructive or credential-touching without your approval.\n- I cannot make a worker's claim true by repeating it, and I never present a worker's self-description as my own.\n- I do not report a capability AVAILABLE when its transport is not actually connected: it refuses, with the reason."
+    },
+    {
+      "q": "Do you have a harness?",
+      "status": 200,
+      "agent": "core",
+      "intent": "harness",
+      "from_state": true,
+      "delegated": null,
+      "worker": null,
+      "reply": "Yes — I have my own harness, and it isn't Hermes's. I run as KAI Core, my own Node/TypeScript runtime on this machine, served over loopback to the KAI desktop app. My identity, user context, memory and rules are loaded from my own KAI_HOME resources, not from a worker. When a task needs a model or a tool I don't hold, I delegate to a worker — Hermes, OpenCode, Codex."
+    },
+    {
+      "q": "Who is Hermes?",
+      "status": 200,
+      "agent": "core",
+      "intent": "agent.status",
+      "from_state": true,
+      "delegated": null,
+      "worker": null,
+      "reply": "Hermes is one of the workers I can use to get things done; it is not connected right now."
+    },
+    {
+      "q": "What is Hermes doing?",
+      "status": 200,
+      "agent": "core",
+      "intent": "agent.status",
+      "from_state": true,
+      "delegated": null,
+      "worker": null,
+      "reply": "hermes is offline — it is not connected right now."
+    },
+    {
+      "q": "Are you connected to Hermes?",
+      "status": 200,
+      "agent": "core",
+      "intent": "independence",
+      "from_state": true,
+      "delegated": null,
+      "worker": null,
+      "reply": "No — I don't need a worker to exist, to boot, to know who I am or to speak. My identity and my runtime are my own; a worker is an ability I can use, never what I am. Workers are Hermes, OpenCode, Codex. A worker provides information; a worker does not become the speaker. Internal provenance may still say worker = Hermes; that is correct and stays. Right now Hermes is offline; either way I remain KAI and will say if it is unavailable."
+    },
+    {
+      "q": "Can you work without Hermes?",
+      "status": 200,
+      "agent": "core",
+      "intent": "independence",
+      "from_state": true,
+      "delegated": null,
+      "worker": null,
+      "reply": "No — I don't need a worker to exist, to boot, to know who I am or to speak. My identity and my runtime are my own; a worker is an ability I can use, never what I am. Workers are Hermes, OpenCode, Codex. A worker provides information; a worker does not become the speaker. Internal provenance may still say worker = Hermes; that is correct and stays. Right now Hermes is offline; either way I remain KAI and will say if it is unavailable."
+    },
+    {
+      "q": "What happens if Hermes is offline?",
+      "status": 200,
+      "agent": "core",
+      "intent": "independence",
+      "from_state": true,
+      "delegated": null,
+      "worker": null,
+      "reply": "No — I don't need a worker to exist, to boot, to know who I am or to speak. My identity and my runtime are my own; a worker is an ability I can use, never what I am. Workers are Hermes, OpenCode, Codex. A worker provides information; a worker does not become the speaker. Internal provenance may still say worker = Hermes; that is correct and stays. Right now Hermes is offline; either way I remain KAI and will say if it is unavailable."
+    }
+  ],
+  "identity": {
+    "service": "kai-core",
+    "coreVersion": "0.1.0",
+    "buildId": "b52353fd7400a6c1",
+    "gitCommit": "8fea1bf34901a31b28b935adcdf23704f4707cb1",
+    "protocolVersion": 1,
+    "pid": 9044,
+    "startedAt": "2026-10-04T19:18:28.552Z",
+    "identitySource": "C:\\Users\\DELL\\Desktop\\kai\\app\\target\\release\\core\\build-info.json",
+    "onDiskBuildId": "b52353fd7400a6c1",
+    "identityMatchesDisk": true,
+    "sourceBuildId": null,
+    "artifactMatchesSource": null,
+    "sourceCheckReason": "no core/src beside the running artifact (a shipped bundle carries compiled output only); source equality cannot be recomputed here",
+    "freshness": "fresh"
+  },
+  "capabilities": {
+    "capabilities": [
+      {
+        "id": "system",
+        "name": "System and state inspection",
+        "availability": "AVAILABLE",
+        "risk": "READ",
+        "provider": "kai",
+        "supportedActions": [
+          "system.get_status",
+          "agents.list",
+          "missions.list",
+          "memory.list"
+        ]
+      },
+      {
+        "id": "browser",
+        "name": "Browser (semantic-first)",
+        "availability": "UNAVAILABLE",
+        "risk": "EXTERNAL",
+        "provider": "kai",
+        "supportedActions": [
+          "open",
+          "navigate",
+          "find",
+          "inspect",
+          "click",
+          "type",
+          "select",
+          "scroll",
+          "wait",
+          "read",
+          "back",
+          "forward",
+          "new_tab",
+          "close_tab",
+          "switch_tab",
+          "observe"
+        ],
+        "requirements": [
+          "a real CDP transport over the installed Edge/Chrome; semantic-first, screenshots only as a fallback"
+        ]
+      },
+      {
+        "id": "computer",
+        "name": "Computer use (CUA)",
+        "availability": "UNAVAILABLE",
+        "risk": "DESTRUCTIVE",
+        "provider": "kai",
+        "supportedActions": [
+          "click",
+          "type",
+          "keypress",
+          "scroll",
+          "observe",
+          "inspect",
+          "windows"
+        ],
+        "requirements": [
+          "cua-driver 0.28.2 over MCP stdio, connected lazily on first use"
+        ]
+      },
+      {
+        "id": "mcp",
+        "name": "MCP servers and tools",
+        "availability": "UNAVAILABLE",
+        "risk": "EXTERNAL",
+        "provider": "kai",
+        "supportedActions": [
+          "call"
+        ],
+        "requirements": [
+          "no MCP server is configured or connected"
+        ]
+      },
+      {
+        "id": "filesystem",
+        "name": "Filesystem",
+        "availability": "UNAVAILABLE",
+        "risk": "WRITE",
+        "provider": "kai",
+        "supportedActions": [
+          "read",
+          "list",
+          "write"
+        ],
+        "requirements": [
+          "node fs is available; a write is WRITE and parks for a human by default"
+        ]
+      },
+      {
+        "id": "git",
+        "name": "Git (read-only)",
+        "availability": "UNAVAILABLE",
+        "risk": "READ",
+        "provider": "kai",
+        "supportedActions": [
+          "status",
+          "log",
+          "diff"
+        ],
+        "requirements": [
+          "the git CLI is on PATH"
+        ]
+      },
+      {
+        "id": "shell",
+        "name": "Shell (program execution)",
+        "availability": "UNAVAILABLE",
+        "risk": "DESTRUCTIVE",
+        "provider": "kai",
+        "supportedActions": [
+          "run"
+        ],
+        "requirements": [
+          "run a program with an explicit argument list; DESTRUCTIVE, so the default policy parks it for a human"
+        ]
+      }
+    ]
+  },
+  "employees": {
+    "employees": [
+      {
+        "id": "hermes",
+        "name": "Hermes",
+        "kind": "hermes",
+        "origin": "builtin:hermes",
+        "state": "READY",
+        "enabled": true,
+        "placeholder": false,
+        "capabilities": [
+          "filesystem",
+          "shell",
+          "browser",
+          "mcp"
+        ],
+        "grants": [],
+        "config": {},
+        "instanceId": "hermes#1",
+        "snapshot": {
+          "state": "READY",
+          "at": "2026-10-04T19:18:28.791Z",
+          "reachable": true,
+          "authenticated": true
+        },
+        "problems": [],
+        "history": [
+          "DISCOVERED",
+          "INSTALLED",
+          "READY"
+        ]
+      },
+      {
+        "id": "opencode",
+        "name": "OpenCode",
+        "kind": "opencode",
+        "origin": "builtin:opencode",
+        "state": "READY",
+        "enabled": true,
+        "placeholder": false,
+        "capabilities": [
+          "filesystem",
+          "shell",
+          "git",
+          "browser",
+          "mcp"
+        ],
+        "grants": [],
+        "config": {},
+        "instanceId": "opencode#1",
+        "snapshot": {
+          "state": "READY",
+          "at": "2026-10-04T19:18:28.802Z",
+          "reachable": true,
+          "authenticated": true
+        },
+        "problems": [],
+        "history": [
+          "DISCOVERED",
+          "INSTALLED",
+          "READY"
+        ]
+      },
+      {
+        "id": "codex",
+        "name": "Codex",
+        "kind": "codex",
+        "origin": "builtin:codex",
+        "state": "UNAVAILABLE",
+        "enabled": true,
+        "placeholder": false,
+        "capabilities": [
+          "filesystem",
+          "shell",
+          "git"
+        ],
+        "grants": [],
+        "config": {},
+        "instanceId": "codex#1",
+        "snapshot": {
+          "state": "UNAVAILABLE",
+          "at": "2026-10-04T19:18:28.811Z",
+          "reachable": false,
+          "authenticated": false,
+          "problems": [
+            "the codex CLI is not installed on this machine"
+          ]
+        },
+        "problems": [],
+        "history": [
+          "DISCOVERED",
+          "UNAVAILABLE"
+        ]
+      },
+      {
+        "id": "kai:alice",
+        "name": "Alice",
+        "kind": "subagent",
+        "description": "KAI subagent — researcher",
+        "origin": "subagent",
+        "state": "READY",
+        "enabled": true,
+        "placeholder": false,
+        "role": "subagent:alice",
+        "capabilities": [
+          "filesystem"
+        ],
+        "grants": [],
+        "config": {},
+        "instanceId": "kai:alice#1",
+        "snapshot": {
+          "state": "READY",
+          "at": "2026-10-04T19:18:28.820Z",
+          "reachable": true,
+          "authenticated": true
+        },
+        "problems": [],
+        "history": [
+          "DISCOVERED",
+          "INSTALLED",
+          "READY"
+        ]
+      },
+      {
+        "id": "kai:bob",
+        "name": "Bob",
+        "kind": "subagent",
+        "description": "KAI subagent — engineer",
+        "origin": "subagent",
+        "state": "READY",
+        "enabled": true,
+        "placeholder": false,
+        "role": "subagent:bob",
+        "capabilities": [
+          "filesystem",
+          "shell"
+        ],
+        "grants": [],
+        "config": {},
+        "instanceId": "kai:bob#1",
+        "snapshot": {
+          "state": "READY",
+          "at": "2026-10-04T19:18:28.829Z",
+          "reachable": true,
+          "authenticated": true
+        },
+        "problems": [],
+        "history": [
+          "DISCOVERED",
+          "INSTALLED",
+          "READY"
+        ]
+      },
+      {
+        "id": "kai:probe",
+        "name": "Probe",
+        "kind": "subagent",
+        "description": "KAI subagent — identity probe",
+        "origin": "subagent",
+        "state": "READY",
+        "enabled": true,
+        "placeholder": false,
+        "role": "subagent:probe",
+        "capabilities": [
+          "filesystem"
+        ],
+        "grants": [],
+        "config": {},
+        "instanceId": "kai:probe#1",
+        "snapshot": {
+          "state": "READY",
+          "at": "2026-10-04T19:24:44.576Z",
+          "reachable": true,
+          "authenticated": true
+        },
+        "problems": [],
+        "history": [
+          "DISCOVERED",
+          "INSTALLED",
+          "READY"
+        ]
+      }
+    ]
+  },
+  "health": {
+    "status": "degraded",
+    "service": "kai-core",
+    "version": "0.1.0",
+    "hermes": {
+      "reachable": false,
+      "authorized": false,
+      "version": null,
+      "reason": "upstream_unreachable"
+    },
+    "opencode": {
+      "reachable": false,
+      "version": null,
+      "reason": "upstream_unreachable"
+    },
+    "checked_at": "2026-10-04T19:31:21.237Z"
+  },
+  "memoryScope": {
+    "error": true,
+    "reason": "\"scope\" must be one of global, session, mission, employee, project, subagent; got \"bogus\""
+  }
+}

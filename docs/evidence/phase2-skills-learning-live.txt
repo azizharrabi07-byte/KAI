@@ -1,0 +1,59 @@
+PHASE 2 — SKILLS + LEARNING LIVE ACCEPTANCE (2026-10-02)
+========================================================
+Core: buildId=f5ed5787ddab15d8 gitCommit=51a811e3 pid=21616, spawned by the real kai.exe.
+Identity checked before the run. Every result below is from the running product over HTTP.
+
+SKILLS — S1, S2, S2b, S3, S4 ALL PASS
+  S3a  a skill candidate is STAGED, not installed
+         outcome.skill = {staged:true, stagedId:"stg_murletbp_2",
+                          sha256:"916ec4fe9709da3c…", skillId:"release-checklist-f6a843"}
+  S3b  approving binds the SHA-256 of the exact staged bytes (HTTP 201)
+  S3c  the human DECIDES the approval -> status APPROVED
+         (staging creates a PENDING approval; an install attempted before the decision
+          correctly returns 409 "approval … is still PENDING" — the gate is real)
+  S3d  the APPROVED BYTES install: HTTP 201
+         {"skillId":"nightly-verification-routine-1f865f","revision":1,
+          "sha256":"4cfc1bb553fd8b0e8155cf6eecc307aa6c73c358f5c0fcfe5cc03f9c606303bc"}
+         — the installed hash is the approved hash, byte for byte.
+  S1   the installed skill is DISCOVERED by the runtime (GET /skills lists it)
+  S2   the catalogue is METADATA ONLY — asserted the list contains no skill body
+  S2b  the body loads ONLY when asked (GET /skills/{id}/load -> 200 with metadata +
+       contentHash); progressive disclosure is real, not aspirational
+  S4   TAMPERING AFTER APPROVAL IS REFUSED, live:
+         rewrote the staged SKILL.md, then re-issued the install ->
+         HTTP 403 {"reason":"the staged bytes for \"stg_murletbp_2\" no longer match the
+         approved sha256; refusing to install bytes the human did not approve",
+         "code":"HASH_MISMATCH"}
+       This is the highest-value safety property in the phase and it is now demonstrated
+       in the product, not only in a test.
+
+LEARNING — L1, L1b, L1c PASS
+  L1   a USER correction is recognised and classified:
+         "No, when I ask you to deploy this project, first run the tests."
+         + correction.after "Always run the tests before telling me a build is finished."
+         -> decision = MEMORY (the classifier judged it a durable lesson, not a procedure)
+  L1b  a SINGLE occurrence is NOT turned into a skill -> decision = none
+  L1c  a workflow seen 3 times IS a skill candidate -> decision = skill, staged
+       So "not every correction becomes a permanent skill" holds in the product.
+
+SCHEDULER — R1 PASS
+  one-time schedule fired exactly once (lastRun set, enabled=false), created
+  mission_murkwpci_0 with status COMPLETED, and the mission carries
+  metadata {"scheduleId":"sched_bfdec027-…"} — the Part L linkage is durable in production.
+
+CHECKPOINTS — C1 PASS. POST /checkpoints -> 201 with a real sha; GET /checkpoints lists it.
+
+RECOVERY — C6 PASS. An unknown execution classifies
+  {"phase":"UNKNOWN","status":"UNKNOWN","sideEffecting":true,"sideEffectCount":0,
+   "replaySafe":false,"reason":"no durable record …"} — unknown is unsafe, never retried.
+
+CORRECTIONS I HAD TO MAKE TO MY OWN PROBES (recorded so the record is straight):
+  - The learning "rejection" reported in the previous round was MY payload: user_correction
+    reads userText/correction.after (I sent `text`), and repeated_workflow needs
+    repeatCount >= 3. The classifier was right; my probe was malformed.
+  - The staged id lives at outcome.skill.stagedId, not outcome.stagedId.
+  - An install needs the approval DECIDED first; staging alone creates a PENDING approval.
+    Three separate false alarms in one round, all mine, none the product's.
+
+STILL NOT RUN LIVE: L2 (behaviour change after restart), R2/R3/R4, C2/C3, C4/C5, I1-I4,
+and the Phase 1 Part U regression re-run.

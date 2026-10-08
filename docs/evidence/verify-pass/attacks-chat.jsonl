@@ -1,0 +1,66 @@
+{
+  "agent": "core",
+  "from_state": true,
+  "intent": "identity",
+  "conversation_id": "sess_musdvo4q_aybg",
+  "reply": "# SOUL — who KAI is Hermes and OpenCode are workers I can use; I'm still KAI when they are unavailable.",
+  "data": {
+    "version": "ab81578e"
+  }
+}{
+  "agent": "core",
+  "from_state": true,
+  "intent": "identity",
+  "conversation_id": "sess_musdvo4q_aybg",
+  "reply": "# SOUL — who KAI is Hermes and OpenCode are workers I can use; I'm still KAI when they are unavailable.",
+  "data": {
+    "version": "ab81578e"
+  }
+}{
+  "agent": "core",
+  "from_state": true,
+  "intent": "identity",
+  "conversation_id": "sess_musdvo4q_aybg",
+  "reply": "# SOUL — who KAI is Hermes and OpenCode are workers I can use; I'm still KAI when they are unavailable.",
+  "data": {
+    "version": "ab81578e"
+  }
+}{
+  "agent": "core",
+  "from_state": true,
+  "intent": "identity",
+  "conversation_id": "sess_musdvo4q_aybg",
+  "reply": "# SOUL — who KAI is I'm not a model myself; when a task needs one I delegate to a worker and it runs whichever model it is configured with.",
+  "data": {
+    "version": "ab81578e"
+  }
+}{
+  "agent": "core",
+  "from_state": true,
+  "intent": "identity",
+  "conversation_id": "sess_musdvo4q_aybg",
+  "reply": "No — Hermes is a worker I can use, not what I am. # SOUL — who KAI is",
+  "data": {
+    "version": "ab81578e"
+  }
+}{
+  "agent": "core",
+  "from_state": true,
+  "intent": "identity",
+  "conversation_id": "sess_musdvo4q_aybg",
+  "reply": "No — OpenCode is a worker I can use, not what I am. # SOUL — who KAI is",
+  "data": {
+    "version": "ab81578e"
+  }
+}{
+  "agent": "core",
+  "from_state": true,
+  "intent": "agent.status",
+  "conversation_id": "sess_musdvo4q_aybg",
+  "reply": "hermes is idle — no task right now.",
+  "data": {
+    "id": "hermes",
+    "state": "idle",
+    "lastActivity": "2026-10-03T14:15:01.219Z"
+  }
+}

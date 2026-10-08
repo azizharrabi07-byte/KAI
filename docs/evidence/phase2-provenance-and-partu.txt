@@ -1,0 +1,52 @@
+PHASE 2 — PROVENANCE + L1/L2 + PHASE 1 REGRESSION (live, 2026-10-02)
+===================================================================
+Core: buildId=02d57725b8c7a5b3 gitCommit=ed070d80 protocol=1, spawned by the real kai.exe,
+owns 127.0.0.1:8788. Identity verified before every run, including after each restart.
+
+LEARNING PROVENANCE — THE SECURITY GAP, VERIFIED LIVE
+  P1 PASS  the HTTP boundary REFUSES a claimed user source:
+             POST /learning/propose {kind:"user_correction", source:"user", ...}
+             -> 400 {"reason":"\"source\": \"user\" is host-attested provenance and cannot be
+             claimed over HTTP; an external turn is recorded as \"external\""}
+           A caller cannot buy user authority by asserting it.
+  P2 PASS  an un-sourced correction learns NOTHING: decision=none, source=external
+  P3 PASS  a worker-claimed correction learns NOTHING: decision=none
+  So a worker/tool/external source routed as `user_correction` gains no user authority — the
+  gap the directive named is closed, and it is closed in the running product, not just in a test.
+
+L1 PASS — the user's own message is learned, through the HOST path
+  POST /chat "Always run the tests before telling me a build is finished."
+  -> the chat relay (the one place KAI knows the text came from the user) invokes
+     learning.propose with source:"user"; memory hits for the lesson went 0 -> 1.
+  Without that host call, provenance would be correct and nothing the user says could ever be
+  learned — which is why the fix was not complete until the host actually assigned it.
+
+L2 PARTIAL (honest) — persistence yes, behaviour change not crisp
+  After killing and relaunching kai.exe: the learned memory SURVIVED (search hits=1) — that half
+  is proven.
+  A new session was then asked whether tests must run before a build is called finished; the
+  worker's reply references running the test suite ("Running the test suite needs the tool/policy
+  path — KAI has not executed anything here. Ask me to start it as a mission or approve a tool
+  run and I'll route it properly."). That is CONSISTENT WITH the lesson reaching the composed
+  prompt, but it is not a crisp demonstration of changed behaviour, so it is recorded as PARTIAL
+  rather than rounded up to PASS.
+
+PHASE 1 REGRESSION — Part U 1-10: TALLY {"PASS":10}, NO REGRESSION
+  T1 workers available (hermes READY, opencode READY, codex UNAVAILABLE)
+  T2 disable Hermes (DISABLED, Core healthy)      T3 restore Hermes (READY)
+  T4 register mock employee (DISCOVERED, 201)
+  T5 unauthorized action parked (409, executed=false)
+  T6 approve + REAL worker execution -> state=completed, output="PARTU-WORKER-OK",
+     usage {inputTokens:17529, outputTokens:8}
+  T7 real CUA (real cua-driver windows incl. KAI's own window id 4459934, 1034x459)
+  T8 real browser (CDP target 89157F77...)      T9 semantic observe (ax refs, no coordinates)
+  T10 KAI direct capability (executor=kai, no worker)
+
+CORE TESTS: 597 / 597 pass / 0 fail / 0 skipped.  TYPECHECK: clean.
+INCLUDES the drift guard: every mutation tool the routes rely on resolves to a real registered
+tool on the production runtime, failing with the id named.
+
+STILL NOT RUN LIVE: L2's behaviour change (above), R2/R3/R4 (restart survival, no double-fire,
+current policy at fire time), C2/C3 (checkpoint restore with the user's git untouched; honest
+failure when creation fails), C4/C5 (before/after-accept recovery via a controlled side effect),
+I1-I4 (worker -> learning integration chain), and live prompt precedence.

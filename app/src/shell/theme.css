@@ -1,0 +1,222 @@
+/* KAI theme — Light / Dark / System, applied across the WHOLE main window.
+ *
+ * The presence UI (the owner's reference design) was authored light-only, and
+ * the app-wide `.kai-*` surfaces (home / sessions / chat) were authored
+ * dark-only. This sheet is what makes BOTH respond to one theme choice:
+ *
+ *   * `html[data-theme="dark"] #kai-presence-root` re-skins the presence chrome
+ *     (the rail, cards, composer, palette, drawer) for dark;
+ *   * a mounted `.kai-embed` gets its OWN variable context, so the app-wide
+ *     `.kai-*` pages read coherent colours inside the presence shell in both
+ *     themes (the presence shell's `--ink` means "dark text on light", the
+ *     app pages' `--ink` means "text colour" — they must not collide).
+ *
+ * `ThemeController` (shell/theme.ts) writes `data-theme` on this root and
+ * mirrors it on `document.documentElement`. Loaded after presence.css so an
+ * equal-specificity rule loses and the `[data-theme]` attribute (higher
+ * specificity) wins without `!important`.
+ */
+
+/* ── Presence chrome: DARK ────────────────────────────────────────────────── */
+
+html[data-theme="dark"] #kai-presence-root {
+  color-scheme: dark;
+  --ink: #e8edf7;
+  --soft: #9aa7c2;
+  --blue: #6aa9e6;
+  --line: rgba(255, 255, 255, 0.12);
+  --glass: rgba(26, 33, 50, 0.72);
+  --ok: #3fbf93;
+  --warn: #e0a83a;
+  --err: #e26478;
+  color: var(--ink);
+  background:
+    radial-gradient(55% 50% at 78% -5%, rgba(var(--ar), var(--ag), var(--ab), 0.28), transparent 70%),
+    radial-gradient(45% 45% at 0% 75%, rgba(var(--ar), var(--ag), var(--ab), 0.16), transparent 70%),
+    #0b1120;
+}
+
+html[data-theme="dark"] #kai-presence-root .rail { background: rgba(14, 20, 34, 0.6); }
+html[data-theme="dark"] #kai-presence-root .rb:hover { background: rgba(255, 255, 255, 0.08); color: var(--ink); }
+html[data-theme="dark"] #kai-presence-root .rb.on { background: rgba(255, 255, 255, 0.12); color: var(--ink); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4); }
+html[data-theme="dark"] #kai-presence-root .rb .n { background: var(--blue); color: #06101f; }
+
+html[data-theme="dark"] #kai-presence-root .pill { border-color: var(--line); }
+html[data-theme="dark"] #kai-presence-root .pill:hover { background: rgba(255, 255, 255, 0.08); }
+html[data-theme="dark"] #kai-presence-root .pill.pri { background: #2f6fd0; color: #fff; border-color: #2f6fd0; }
+html[data-theme="dark"] #kai-presence-root .pill.pri:hover { background: #3d7fdf; }
+html[data-theme="dark"] #kai-presence-root .badge { background: var(--blue); color: #06101f; }
+html[data-theme="dark"] #kai-presence-root .proj { border-color: var(--line); }
+
+html[data-theme="dark"] #kai-presence-root .blk { border-color: var(--line); box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35); }
+html[data-theme="dark"] #kai-presence-root .u { background: #2f6fd0; }
+html[data-theme="dark"] #kai-presence-root .ti { background: rgba(255, 255, 255, 0.08); color: var(--blue); }
+html[data-theme="dark"] #kai-presence-root .ti.mcp { background: rgba(124, 92, 224, 0.22); color: #b9a6f5; }
+html[data-theme="dark"] #kai-presence-root details.tc pre { background: rgba(0, 0, 0, 0.35); border-color: var(--line); }
+html[data-theme="dark"] #kai-presence-root .tag { background: rgba(124, 92, 224, 0.28); color: #c9b8ff; }
+html[data-theme="dark"] #kai-presence-root .chip { background: rgba(74, 143, 214, 0.22); color: #a9cef5; }
+html[data-theme="dark"] #kai-presence-root .chip.ok { background: rgba(63, 191, 147, 0.2); color: #7fe0bb; }
+html[data-theme="dark"] #kai-presence-root .chip.warn { background: rgba(224, 168, 58, 0.2); color: #f0c674; }
+html[data-theme="dark"] #kai-presence-root .chip.err { background: rgba(226, 100, 120, 0.2); color: #ff9fb0; }
+html[data-theme="dark"] #kai-presence-root .chip.mut { background: rgba(255, 255, 255, 0.08); color: var(--soft); }
+html[data-theme="dark"] #kai-presence-root .ask { border-color: rgba(224, 168, 58, 0.5); background: linear-gradient(rgba(224, 168, 58, 0.14), rgba(20, 26, 40, 0.7)); }
+html[data-theme="dark"] #kai-presence-root .ask h4 { color: #f0c674; }
+html[data-theme="dark"] #kai-presence-root .ask .cmd { background: rgba(0, 0, 0, 0.3); border-color: var(--line); }
+html[data-theme="dark"] #kai-presence-root .btn { background: rgba(255, 255, 255, 0.08); border-color: var(--line); color: var(--ink); }
+html[data-theme="dark"] #kai-presence-root .btn.pri { background: #2f6fd0; border-color: #2f6fd0; color: #fff; }
+html[data-theme="dark"] #kai-presence-root .btn.warn { background: #d99b2e; border-color: #d99b2e; color: #241700; }
+html[data-theme="dark"] #kai-presence-root .sum { background: linear-gradient(120deg, rgba(30, 40, 60, 0.9), rgba(20, 40, 34, 0.8)); border-color: var(--line); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.4); }
+
+html[data-theme="dark"] #kai-presence-root .comp { background: rgba(18, 24, 38, 0.92); border-color: var(--line); box-shadow: 0 16px 54px rgba(0, 0, 0, 0.5); }
+html[data-theme="dark"] #kai-presence-root .seg { background: rgba(255, 255, 255, 0.06); }
+html[data-theme="dark"] #kai-presence-root .seg button[aria-pressed="true"] { background: var(--blue); color: #06101f; }
+html[data-theme="dark"] #kai-presence-root .tb { background: rgba(255, 255, 255, 0.06); border-color: var(--line); }
+html[data-theme="dark"] #kai-presence-root .tb:hover { background: rgba(255, 255, 255, 0.12); color: var(--ink); }
+html[data-theme="dark"] #kai-presence-root .go { background: var(--blue); color: #06101f; }
+html[data-theme="dark"] #kai-presence-root .go:hover { background: #8bc0f0; }
+html[data-theme="dark"] #kai-presence-root .chips button { background: rgba(255, 255, 255, 0.05); border-color: var(--line); }
+html[data-theme="dark"] #kai-presence-root .chips button:hover { background: rgba(255, 255, 255, 0.12); color: var(--ink); }
+html[data-theme="dark"] #kai-presence-root .ab { border-color: var(--line); }
+html[data-theme="dark"] #kai-presence-root .ab:hover { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4); }
+
+html[data-theme="dark"] #kai-presence-root .pop { background: rgba(20, 27, 42, 0.98); border-color: var(--line); box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55); }
+html[data-theme="dark"] #kai-presence-root .pr:hover { background: rgba(255, 255, 255, 0.08); }
+html[data-theme="dark"] #kai-presence-root .sw { background: rgba(255, 255, 255, 0.18); }
+html[data-theme="dark"] #kai-presence-root .sw::after { background: #cdd6e8; }
+
+html[data-theme="dark"] #kai-presence-root .lab { background: rgba(20, 27, 42, 0.97); box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55); }
+html[data-theme="dark"] #kai-presence-root .fg button { background: rgba(255, 255, 255, 0.06); border-color: var(--line); }
+html[data-theme="dark"] #kai-presence-root .fg button:hover { background: rgba(255, 255, 255, 0.12); color: var(--ink); }
+
+html[data-theme="dark"] #kai-presence-root .dr { background: rgba(14, 20, 34, 0.78); border-left-color: var(--line); }
+html[data-theme="dark"] #kai-presence-root .dif { background: rgba(0, 0, 0, 0.3); }
+html[data-theme="dark"] #kai-presence-root .ev::before { border-color: #0b1120; }
+html[data-theme="dark"] #kai-presence-root .arow { border-color: var(--line); }
+
+html[data-theme="dark"] #kai-presence-root .trow { border-color: var(--line); }
+html[data-theme="dark"] #kai-presence-root .trow:hover { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); }
+html[data-theme="dark"] #kai-presence-root .mini { background: rgba(255, 255, 255, 0.08); border-color: var(--line); color: var(--ink); }
+html[data-theme="dark"] #kai-presence-root .mini:hover { background: rgba(255, 255, 255, 0.14); }
+html[data-theme="dark"] #kai-presence-root .acard { border-color: var(--line); }
+html[data-theme="dark"] #kai-presence-root .acard:hover { box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5); }
+html[data-theme="dark"] #kai-presence-root .acard.add { border-color: rgba(255, 255, 255, 0.2); }
+
+html[data-theme="dark"] #kai-presence-root .sb { background: rgba(14, 20, 34, 0.7); border-top-color: var(--line); }
+html[data-theme="dark"] #kai-presence-root .sb button:hover { background: rgba(255, 255, 255, 0.08); color: var(--ink); }
+html[data-theme="dark"] #kai-presence-root .sb .d.n { background: #5a6683; }
+
+html[data-theme="dark"] #kai-presence-root .ov { background: rgba(3, 6, 14, 0.55); }
+html[data-theme="dark"] #kai-presence-root .pal,
+html[data-theme="dark"] #kai-presence-root .modal { background: rgba(20, 27, 42, 0.98); box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6); }
+html[data-theme="dark"] #kai-presence-root .pal li button:hover,
+html[data-theme="dark"] #kai-presence-root .pal li button.sel { background: rgba(74, 143, 214, 0.22); }
+html[data-theme="dark"] #kai-presence-root .fld input,
+html[data-theme="dark"] #kai-presence-root .fld textarea { background: rgba(0, 0, 0, 0.25); color: var(--ink); border-color: var(--line); }
+html[data-theme="dark"] #kai-presence-root .chk button { background: rgba(255, 255, 255, 0.08); border-color: var(--line); }
+html[data-theme="dark"] #kai-presence-root .chk button[aria-pressed="true"] { background: var(--blue); color: #06101f; border-color: var(--blue); }
+html[data-theme="dark"] #kai-presence-root .hues button { border-color: #0b1120; }
+html[data-theme="dark"] #kai-presence-root .toast { background: #2f6fd0; }
+
+/* ── Palette rows (the registry's own markup) ─────────────────────────────── */
+
+#kai-presence-root .pal-group {
+  padding: 10px 14px 4px;
+  font: 600 11px/1 "Figtree", system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+#kai-presence-root .pal-label { flex: 1 1 auto; font-weight: 500; }
+#kai-presence-root .pal-row small { margin-left: auto; color: var(--soft); font: 12px "DM Mono", monospace; }
+#kai-presence-root .pal-empty { padding: 22px 16px; text-align: center; color: var(--soft); font-size: 14px; }
+#kai-presence-root .pal input::placeholder { color: var(--soft); }
+
+/* ── The embedded app surfaces (home / sessions / chat) ───────────────────── */
+
+/* Their own variable context — presence's `--ink` (dark text on light) must
+ * not leak into the app pages' `--ink` (the text colour itself). */
+#kai-presence-root .kai-embed {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  --ink: #0d1c3d;
+  --ink-2: #26365c;
+  --dim: #5b6b8f;
+  --dim-2: #66759a;
+  --dim-3: #7b89ab;
+  --dim-4: #8b98b8;
+  --dim-5: #b3bdd4;
+  --card: rgba(255, 255, 255, 0.72);
+  --card-flat: #f3f7fc;
+  --tab-on: #eef4fb;
+  --hairline: rgba(11, 24, 56, 0.1);
+  --red: #d9435f;
+  --red-text: #c02a44;
+  --green: #1f9d74;
+  --green-2: #1f9d74;
+  --amber: #c98512;
+  --cyan: #2b8bb0;
+  --indigo: #4a8fd6;
+  --pink: #d1519a;
+  color: var(--ink);
+}
+html[data-theme="dark"] #kai-presence-root .kai-embed {
+  --ink: #e8edf7;
+  --ink-2: #cdd6e8;
+  --dim: #9aa7c2;
+  --dim-2: #8f9cba;
+  --dim-3: #7d8aa8;
+  --dim-4: #6e7a96;
+  --dim-5: #5a6683;
+  --card: #161d2e;
+  --card-flat: #111726;
+  --tab-on: #1b2233;
+  --hairline: rgba(255, 255, 255, 0.1);
+  --red-text: #ff8d97;
+  --green-2: #34d399;
+  --amber: #f5a524;
+  --cyan: #22d3ee;
+  --indigo: #6366f1;
+  --pink: #f472b6;
+}
+
+/* A page mounted inside the embed is always visible and flows (the shell's
+ * outlet toggles `.on`; here the view itself owns visibility). */
+#kai-presence-root .kai-embed .kai-page {
+  position: relative;
+  inset: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  padding: 20px 24px 28px;
+}
+#kai-presence-root .kai-embed .kai-sessions-host,
+#kai-presence-root .kai-embed .kai-chat-host { padding: 0; }
+
+/* The dark-authored hover/border whites read wrong on the light embed. */
+html[data-theme="light"] #kai-presence-root .kai-embed .kai-stat,
+html[data-theme="light"] #kai-presence-root .kai-embed .kai-card,
+html[data-theme="light"] #kai-presence-root .kai-embed .kai-quick-btn { border-color: rgba(11, 24, 56, 0.1); }
+html[data-theme="light"] #kai-presence-root .kai-embed .kai-quick-btn { background: rgba(11, 24, 56, 0.035); }
+html[data-theme="light"] #kai-presence-root .kai-embed .kai-quick-btn:hover { background: rgba(11, 24, 56, 0.07); border-color: rgba(11, 24, 56, 0.16); }
+html[data-theme="light"] #kai-presence-root .kai-embed .kai-feed-row { background: rgba(11, 24, 56, 0.02); }
+html[data-theme="light"] #kai-presence-root .kai-embed .kai-feed-row:nth-child(even) { background: rgba(11, 24, 56, 0.04); }
+html[data-theme="light"] #kai-presence-root .kai-embed .kai-page::-webkit-scrollbar-thumb { background: rgba(11, 24, 56, 0.16); }
+
+/* ── Home command centre (embedded) ──────────────────────────────────────── */
+
+#kai-presence-root .kai-embed .kai-home-state { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+#kai-presence-root .kai-embed .kai-home-state-row { display: flex; align-items: baseline; gap: 12px; padding: 5px 0; }
+#kai-presence-root .kai-embed .kai-home-state-k { flex: 0 0 160px; font: 500 12.5px var(--font); color: var(--dim); }
+#kai-presence-root .kai-embed .kai-home-state-v { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12.5px var(--mono); color: var(--ink-2); }
+
+#kai-presence-root .kai-embed .kai-feed-row { align-items: center; }
+#kai-presence-root .kai-embed .kai-feed-main { display: flex; flex-direction: column; gap: 1px; flex: 1 1 auto; min-width: 0; }
+#kai-presence-root .kai-embed .kai-feed-sub { font: 400 11.5px var(--mono); color: var(--dim-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#kai-presence-root .kai-embed .kai-feed-action { flex: 0 0 auto; border: 1px solid var(--hairline); background: transparent; color: var(--ink-2); border-radius: 999px; padding: 4px 12px; font: 600 11.5px var(--font); cursor: pointer; }
+#kai-presence-root .kai-embed .kai-feed-action:hover { background: rgba(99, 102, 241, 0.16); }
+html[data-theme="light"] #kai-presence-root .kai-embed .kai-feed-action { border-color: rgba(11, 24, 56, 0.14); color: var(--indigo); }

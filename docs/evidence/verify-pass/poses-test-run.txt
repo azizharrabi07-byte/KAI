@@ -1,0 +1,24 @@
+core /identity: {"service":"kai-core","coreVersion":"0.1.0","buildId":"2de85812ffd99f1f","gitCommit":"9c1d4f8af04536b822bca1a548c67406bdb071a0","protocolVersion":1,"pid":44684,"startedAt":"2026-10-03T17:10:10.876Z"}
+
+=== driving the six runtime states with real triggers ===
+PASS  THINKING: glow=rgb(167, 139, 250)  opacity=0.65  label="KAI is thinking…"  orbHash=e45b05b3  (entered on trigger)  -> pose-orb-thinking.png  pose-island-thinking.png
+PASS  USING_TOOL: glow=rgb(99, 102, 241)  opacity=0.65  label="KAI is using a tool…"  orbHash=7686b3eb  (already showing)  -> pose-orb-using_tool.png  pose-island-using_tool.png
+  trigger POST /missions -> 201 COMPLETED
+PASS  SUCCESS: glow=rgb(52, 211, 153)  opacity=0.65  label="KAI finished"  orbHash=cb6a9e0d  (entered on trigger)  -> pose-orb-success.png  pose-island-success.png
+  trigger POST /missions -> 201 FAILED
+PASS  ERROR: glow=rgb(244, 80, 94)  opacity=0.65  label="KAI hit an error"  orbHash=d903c7f6  (entered on trigger)  -> pose-orb-error.png  pose-island-error.png
+  trigger POST /notifications/ntf_musne1mt_3/read -> 200
+PASS  USING_TOOL: glow=rgb(99, 102, 241)  opacity=0.65  label="KAI is using a tool…"  orbHash=3a610ea7  (entered on trigger)  -> pose-orb-using_tool.png  pose-island-using_tool.png
+  agent mission -> 201 WAITING_APPROVAL
+  approving parked approval apr_musne331_2 ( agents.run_task )
+  trigger decide -> 200
+PASS  WORKING: glow=rgb(59, 158, 255)  opacity=0.65  label="KAI is working…"  orbHash=a8a85258  (entered on trigger)  -> pose-orb-working.png  pose-island-working.png
+  trigger POST /capabilities/computer/test -> 409 tool "capability.computer" is DESTRUCTIVE; destructive actions always require user approva
+PASS  WAITING_APPROVAL: glow=rgb(245, 165, 36)  opacity=0.65  label="KAI needs your approval"  orbHash=2bedd724  (entered on trigger)  -> pose-orb-waiting_approval.png  pose-island-waiting_approval.png
+
+=== summary ===
+observed states: 6 / 6
+distinct glows: 6  distinct labels: 6  -> allDistinct: true
+repeated pose (USING_TOOL x2): entry1.hash=7686b3eb entry2.hash=3a610ea7 identical=false
+orb animation (distinct hashes in last 40 x 200ms samples): 40 -> moving: true
+wrote poses-test-results.json

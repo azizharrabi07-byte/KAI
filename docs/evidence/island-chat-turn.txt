@@ -1,0 +1,14 @@
+# Island chat: the two runs side by side — 2026-10-01T19:29:27+01:00
+
+## A. KAI Core running (the real turn)
+$ curl -s http://127.0.0.1:8788/health   # -> status ok
+   island chat -> 'KAI-ISLAND-OK'   (kai-ui-04-chat.png)
+
+## B. KAI Core stopped (negative control)
+   island chat -> 'API key missing. Open settings.'   (kai-ui-05-core-down.png)
+
+## Why this proves the path
+$ node cdp.mjs eval "__TAURI_INTERNALS__.invoke('secret_present',{key:'anthropic-api-key'})"
+anthropic-api-key present: false
+   KAI has no Anthropic key, so the direct Claude path cannot answer.
+   With Core up the island answers; with Core down it cannot. The reply came through Core.

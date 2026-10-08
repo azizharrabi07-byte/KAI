@@ -1,0 +1,52 @@
+
+################ 1. app typecheck ################
+$ (cd app && npx tsc --noEmit)
+  exit 0 — no diagnostics
+
+################ 2. core typecheck ################
+$ (cd core && npm run typecheck)
+  exit 0 — no diagnostics
+
+################ 3. app tests ################
+$ (cd app && npm test)
+  exit code: 0
+  ℹ tests 57
+  ℹ pass 57
+  ℹ fail 0
+  ℹ skipped 0
+
+################ 4. the servers, before the core suite ################
+$ curl -s http://127.0.0.1:8642/health
+{"status": "ok", "platform": "hermes-agent", "version": "unknown"}
+$ curl -s http://127.0.0.1:4096/global/health
+{"healthy":true,"version":"1.18.33"}
+$ curl -s http://127.0.0.1:4096/session | (number of sessions)
+  sessions on this OpenCode server: 0
+
+################ 5. core tests, straight from TypeScript ################
+$ (cd core && npm test)
+  exit code: 1
+  ℹ tests 229
+  ℹ pass 227
+  ℹ fail 2
+  ℹ skipped 0
+  --- failing tests, verbatim titles ---
+  ✖ opencode: listSessions() returns an array whose entries carry an id (23.0105ms)
+  ✖ kai core: GET /agents/opencode/sessions proxies the live session list (31.4389ms)
+  ✖ failing tests:
+  ✖ opencode: listSessions() returns an array whose entries carry an id (23.0105ms)
+  ✖ kai core: GET /agents/opencode/sessions proxies the live session list (31.4389ms)
+  (the whole run is in docs/evidence/push3-core-npm-test.txt)
+
+################ 6. the packaged build ################
+$ (cd app && npm run tauri build)
+  run separately; the tail of the real log:
+          Info Patching C:\Users\DELL\Desktop\kai\app\target\release\kai.exe with bundle type information: nsis
+          Info Target: x64
+       Running makensis to produce C:\Users\DELL\Desktop\kai\app\target\release\bundle\nsis\KAI_0.1.1_x64-setup.exe
+      Finished 1 bundle at:
+          C:\Users\DELL\Desktop\kai\app\target\release\bundle\nsis\KAI_0.1.1_x64-setup.exe (1.96 MiB)
+  
+  -rwxr-xr-x 1 DELL 197121 2059734 Oct  2 10:29 app/target/release/bundle/nsis/KAI_0.1.1_x64-setup.exe
+  -rw-r--r-- 1 DELL 197121   23522 Oct  2 10:27 app/target/release/core/server.js
+  -rwxr-xr-x 2 DELL 197121 4966400 Oct  2 10:29 app/target/release/kai.exe

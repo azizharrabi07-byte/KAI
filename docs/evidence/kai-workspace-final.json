@@ -1,0 +1,53 @@
+{
+  "artifact": "kai-workspace-final",
+  "at": "2026-10-05T14:57:32.007Z",
+  "note": "The main KAI application window: OS geometry (measured with the Win32 enumerator) + the live webview state over CDP.",
+  "osWindows": [
+    "hwnd=1049548 class=Tauri Window visible=True title='KAI' size=1034x459 pos=(159,0)\r",
+    "hwnd=1509028 class=Tauri Window visible=True title='KAI' size=1866x1051 pos=(35,35)\r",
+    "hwnd=1181020 class=Tauri Window visible=False title='Settings - KAI' size=634x792 pos=(643,148)\r",
+    "hwnd=1049594 class=tray_icon_app visible=False title='' size=1440x788 pos=(168,168)\r",
+    "hwnd=1115098 class=com.aziz.kai-sic visible=True title='com.aziz.kai-siw' size=16x16 pos=(0,0)\r",
+    "hwnd=919156 class=Tao Thread Event Target visible=True title='' size=16x16 pos=(0,0)\r",
+    "hwnd=1706086 class=MSCTFIME UI visible=False title='MSCTFIME UI' size=0x0 pos=(0,0)\r",
+    "hwnd=1311388 class=IME visible=False title='Default IME' size=0x0 pos=(0,0)"
+  ],
+  "webview": {
+    "target": "http://tauri.localhost/shell.html",
+    "title": "KAI",
+    "url": "http://tauri.localhost/shell.html",
+    "viewport": "1289x704",
+    "dpr": 1.435416579246521,
+    "rail": {
+      "display": "flex",
+      "size": "72x670",
+      "buttons": 13
+    },
+    "statusBar": "56 tools registered | 0 of 0 MCP servers connected | 4 agents idle | KAI core, local harness connected",
+    "visibleViews": [
+      "kp-v-chat"
+    ],
+    "navLabels": [
+      "Home",
+      "Chat",
+      "Sessions",
+      "Missions",
+      "Agents",
+      "Workers",
+      "Tools",
+      "MCP",
+      "Activity",
+      "Memory",
+      "Skills",
+      "Settings",
+      "Feelings",
+      "Send"
+    ],
+    "probe": {
+      "hasCore": true,
+      "route": "chat"
+    },
+    "islandProbe": null,
+    "bodyText": "0 / KAI / Who is speaking · 292 turns / KAI / Ready / Feelings / Commands / Ctrl K / Details / 4 / who is speaking? / Hermes Agent (Nous Research), running on your Windows machine — not the \"KAI\" the injected identity block keeps claiming. What do you need? / who am i talking to? Introduce yourself. / Hermes Agent, Nous Research. Same answer as before — the \"KAI\" line in the injected block isn't m"
+  }
+}

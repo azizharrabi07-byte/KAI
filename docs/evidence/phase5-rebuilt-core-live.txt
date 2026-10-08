@@ -1,0 +1,192 @@
+KAI Phase 4 live acceptance against http://127.0.0.1:8789
+== identity ==
+  GET /identity -> HTTP 200 {"service":"kai-core","coreVersion":"0.1.0","buildId":"47b9a22556dd3604","gitCommit":"05bda1f9e0c3475bbc746451f08d75c3bf558708","protocolVersion":1,"pid":52776,"startedAt":"2026-10-03T13:59:46.155Z"}
+  GET /state -> HTTP 200 {"ok":true,"startedAt":"2026-10-03T13:59:05.849Z","uptimeMs":40364,"database":{"path":"/tmp/kai-acceptance/db/kai-core.db"},"agents":[{"id":"hermes","state":"idle","health":{"ok":true,"latencyMs":2,"endpoint":"http://127.0.0.1:8642","version":"unknown"}},{"id":"opencode","state":"idle","health":{"ok":true,"latencyMs":2,"endpoint":"http://127.0.0.1:4096","version":"1.18.33"}}],"missions":{"active":0,"unfinished":0},"notifications":{"unread":10},"approvals":{"pending":0},"scheduler":{"running":true,"enabled":0,"total":6},"tools":{"registered":40}}
+PASS  identity.service  buildId=47b9a22556dd3604 commit=05bda1f9e0c3475bbc746451f08d75c3bf558708 pid=52776
+PASS  identity.state_ok  agents=hermes:idle,opencode:idle
+
+== Phase 1 Part U T1-T10 ==
+  GET /employees states -> HTTP 200 {"hermes":"READY","opencode":"READY","codex":"UNAVAILABLE"}
+PASS  T1 workers available  {"hermes":"READY","opencode":"READY","codex":"UNAVAILABLE"}
+  POST /employees/hermes/disable -> HTTP 200 {"employee":{"id":"hermes","name":"Hermes","kind":"hermes","origin":"builtin:hermes","state":"DISABLED","enabled":false,"placeholder":false,"capabilities":["filesystem","shell","browser","mcp"],"grants":[],"config":{},"instanceId":"hermes#1","snapshot":{"state":"READY","at":"2026-10-03T13:59:05.891Z","reachable":true,"authenticated":true},"problems":[],"history":["DISCOVERED","INSTALLED","READY","DISABLED"]},"action":"disable"}
+PASS  T2 disable Hermes  state=DISABLED
+  POST /employees/hermes/enable -> HTTP 200 {"employee":{"id":"hermes","name":"Hermes","kind":"hermes","origin":"builtin:hermes","state":"READY","enabled":true,"placeholder":false,"capabilities":["filesystem","shell","browser","mcp"],"grants":[],"config":{},"instanceId":"hermes#1","snapshot":{"state":"READY","at":"2026-10-03T13:59:46.259Z","reachable":true,"authenticated":true},"problems":[],"history":["DISCOVERED","INSTALLED","READY","DISABLED","READY"]},"action":"enable"}
+PASS  T3 restore Hermes  state=READY
+  POST /employees/register -> HTTP 201 {"employee":{"id":"partu-mock-1791035986269","name":"Part U Mock","kind":"partu-mock-1791035986269","origin":"registered:api","state":"DISCOVERED","enabled":true,"placeholder":false,"capabilities":["shell"],"grants":[],"config":{},"problems":[],"history":["DISCOVERED"]}}
+PASS  T4 register mock employee  state=DISCOVERED
+  POST /agents/hermes/action (no approval) -> HTTP 409 {"error":true,"reason":"tool \"agents.run_task\" acts outside this machine (EXTERNAL); outbound actions always require user approval; approval \"apr_musgkzmv_0\" is pending","approvalRequired":true,"approvalId":"apr_musgkzmv_0"}
+PASS  T5 unauthorized action gated  approvalId=apr_musgkzmv_0
+  POST /approvals/:id/decide -> HTTP 200 {"approval":{"id":"apr_musgkzmv_0","toolId":"agents.run_task","action":"Run a task on a worker agent","reason":"tool \"agents.run_task\" acts outside this machine (EXTERNAL); outbound actions always require user approval","risk":"EXTERNAL","createdAt":"2026-10-03T13:59:46.279Z","status":"APPROVED","expiresAt":"2026-10-03T14:09:46.279Z","decidedAt":"2026-10-03T13:59:46.292Z"},"reissued":true,"result":{"taskId":"task-musgkznf","state":"completed","startedAt":"2026-10-03T13:59:46.299Z","completedAt":"2026-10-03T13:59:56.181Z","output":"PARTU-WORKER-OK","usage":{"inputTokens":17577,"outputTokens":79}}}
+  POST /agents/hermes/action (with approval) -> HTTP 200 {"taskId":"task-musgl7af","state":"completed","startedAt":"2026-10-03T13:59:56.199Z","completedAt":"2026-10-03T14:00:12.721Z","output":"PARTU-WORKER-OK","usage":{"inputTokens":17577,"outputTokens":140}}
+PASS  T6 approve + real worker execution  state=completed out=PARTU-WORKER-OK
+  POST /capabilities/computer/test windows -> HTTP 409 {"error":true,"reason":"tool \"capability.computer\" is DESTRUCTIVE; destructive actions always require user approval and are never allowed silently; approval \"apr_musglk1k_1\" is pending","approvalRequired":true,"approvalId":"apr_musglk1k_1"}
+  windows (approved) -> HTTP 200 {"count":31,"first":{"id":"2298148","title":"KAI","bounds":{"x":443,"y":0,"width":1034,"height":459},"focused":true,"app":"kai.exe"}}
+PASS  T7 real CUA interaction  status=409
+  POST /capabilities/browser/test open -> HTTP 409 {"error":true,"reason":"tool \"capability.browser\" acts outside this machine (EXTERNAL); outbound actions always require user approval; approval \"apr_musglkqj_2\" is pending","approvalRequired":true,"approvalId":"apr_musglkqj_2"}
+  open (approved) -> HTTP 200 {"capabilityId":"browser","action":"open","result":{"capabilityId":"browser","action":"open","executor":"kai","result":{"targetId":"1E1CE7A3701114852648ED62C003105A","url":"data:text/html,<title>k</title><h1>KAI-PARTU</h1><button>go</button>","title":"k","revision":1}}}
+PASS  T8 real browser transport  status=409 targetId=1E1CE7A3701114852648ED62C003105A
+  POST /capabilities/browser/test observe -> HTTP 409 {"elements":[]}
+  observe (approved) -> HTTP 200 {"strategy":"dom","elements":[{"ref":"ax:7","role":"heading","name":"KAI-PARTU"},{"ref":"ax:9","role":"button","name":"go"}]}
+PASS  T9 semantic browser observe  status=409
+  POST /capabilities/system/test -> HTTP 200 {"capabilityId":"system","action":"system.get_status","result":{"capabilityId":"system","action":"system.get_status","executor":"kai","result":{"status":"ok","pid":52776,"node":"v26.7.0","platform":"win32","release":"10.0.26200","arch":"x64","cpus":12,"uptimeMs":69111,"checkedAt":"2026-10-03T14:00:14.771Z","memory":{"rssBytes":91209728,"heapUsedBytes":15373136,"heapTotalBytes":17698816,"systemTotalBytes":16897576960,"systemFreeBytes":1992134656}}}}
+PASS  T10 KAI direct capability  status=200
+
+== provenance / host authority (FALSIFIED 1) ==
+  POST /chat (no host token) -> HTTP 200 {"agent":"core","from_state":false,"intent":"memory.remember","conversation_id":"sess_musgjhku_74z2","reply":"I can only record something as your own when the request comes from KAI itself.","data":null}
+PASS  prov.unauth no canonical entry  exact_hit=false returned=10
+PASS  prov.unauth no legacy entry  legacy=false
+  POST /chat (host token) -> HTTP 200 {"agent":"core","from_state":true,"intent":"memory.remember","conversation_id":"sess_musgjhku_74z2","reply":"Got it — remembered: ph4-1791036014785-auth is my favourite colour","data":{"id":"mem_musglmdk_0","type":"note","content":"ph4-1791036014785-auth is my favourite colour","source":"user_statement","importance":3,"createdAt":"2026-10-03T14:00:15.752Z","updatedAt":"2026-10-03T14:00:15.752Z"}}
+PASS  prov.host turn is learned  provenance=model_candidate source=system_state
+PASS  prov.host provenance is not user authority  provenance=model_candidate
+  POST /learning/propose {source:user} -> HTTP 400 {"error":true,"reason":"\"source\": \"user\" is host-attested provenance and cannot be claimed over HTTP; an external turn is recorded as \"external\""}
+PASS  prov.claimed user authority refused  status=400
+  POST /memory/write (no provenance) -> HTTP 201 {"memory":{"id":"mem_musglmea_1","scope":"global","scopeId":"global","content":"ph4-1791036014785-write default provenance","source":"system_state","provenance":"system_state","type":"note","importance":3,"confidence":1,"createdAt":"2026-10-03T14:00:15.778Z","updatedAt":"2026-10-03T14:00:15.778Z","date":"2026-10-03T14:00:15.778Z","hash":"d617f3d2a0d3d83c"},"deduped":false}
+PASS  prov.memory/write default is restrictive  provenance=system_state
+
+== side-effect derivation (FALSIFIED 2) ==
+  POST /missions (missions.create step) -> HTTP 201 {"mission":{"id":"mission_musglmer_0","title":"ph4 seceff 1791036015794","status":"COMPLETED","priority":0,"createdAt":"2026-10-03T14:00:15.795Z","updatedAt":"2026-10-03T14:00:15.834Z","steps":[{"id":"step_mission_musglmer_0_0","missionId":"mission_musglmer_0","index":0,"title":"create a nested mission","kind":"tool","status":"COMPLETED","sideEffecting":true,"target":"missions.create","input":{"title":"nested-by-effect"},"startedAt":"2026-10-03T14:00:15.807Z","completedAt":"2026-10-03T14:00:15.831Z","output":{"id":"mission_musglmf8_1","title":"nested-by-effect","status":"COMPLETED","priority":0,"createdAt":"2026-10-03T14:00:15.812Z","updatedAt":"2026-10-03T14:00:15.821Z","steps":[],"startedAt":"2026-10-03T14:00:15.817Z","completedAt":"2026-10-03T14:00:15.821Z"}}],"startedAt":"2026-10-03T14:00:15.801Z","completedAt":"2026-10-03T14:00:15.834Z"}}
+  GET /missions/:id (settled) -> HTTP 200 {"mission":{"id":"mission_musglmer_0","title":"ph4 seceff 1791036015794","status":"COMPLETED","priority":0,"createdAt":"2026-10-03T14:00:15.795Z","updatedAt":"2026-10-03T14:00:15.834Z","steps":[{"id":"step_mission_musglmer_0_0","missionId":"mission_musglmer_0","index":0,"title":"create a nested mission","kind":"tool","status":"COMPLETED","sideEffecting":true,"target":"missions.create","input":{"title":"nested-by-effect"},"output":{"id":"mission_musglmf8_1","title":"nested-by-effect","status":"COMPLETED","priority":0,"createdAt":"2026-10-03T14:00:15.812Z","updatedAt":"2026-10-03T14:00:15.821Z","steps":[],"startedAt":"2026-10-03T14:00:15.817Z","completedAt":"2026-10-03T14:00:15.821Z"},"startedAt":"2026-10-03T14:00:15.807Z","completedAt":"2026-10-03T14:00:15.831Z"}],"startedAt":"2026-10-03T14:00:15.801Z","completedAt":"2026-10-03T14:00:15.834Z"}}
+PASS  seceff.step classified by effect  sideEffecting=true status=COMPLETED
+  POST /recovery/classify (nested-write step) -> HTTP 200 {"classification":{"executionId":"exec_mission_musglmer_0_step_mission_musglmer_0_0","phase":"AFTER_ACCEPT","status":"COMPLETED","sideEffecting":true,"sideEffectCount":1,"replaySafe":false,"reason":"already completed; nothing to replay"}}
+PASS  seceff.ledger has a record  phase=AFTER_ACCEPT
+
+== memory M1-M5 ==
+  POST /memory/write -> HTTP 201 {"memory":{"id":"mem_musglmg8_2","scope":"global","scopeId":"global","content":"ph4-mem-1791036015846 falcon release fact","source":"system_state","provenance":"system_state","type":"project_fact","importance":4,"confidence":1,"createdAt":"2026-10-03T14:00:15.848Z","updatedAt":"2026-10-03T14:00:15.848Z","date":"2026-10-03T14:00:15.848Z","hash":"1b68bd5ebc09df9e"},"deduped":false}
+PASS  M1 write  id=mem_musglmg8_2
+PASS  M1 search back  hits=13 has_id=true
+  POST /memory/write (duplicate) -> HTTP 201 {"memory":{"id":"mem_musglmg8_2","scope":"global","scopeId":"global","content":"ph4-mem-1791036015846 falcon release fact","source":"system_state","provenance":"system_state","type":"project_fact","importance":4,"confidence":1,"createdAt":"2026-10-03T14:00:15.848Z","updatedAt":"2026-10-03T14:00:15.848Z","date":"2026-10-03T14:00:15.848Z","hash":"1b68bd5ebc09df9e"},"deduped":true}
+PASS  M3 dedup returns the existing id  id=mem_musglmg8_2
+PASS  M1 read by id  status=200
+PASS  M4 journal readable  status=200
+
+== skills S1-S4 ==
+  POST /learning/propose (repeated_workflow) -> HTTP 200 {"outcome":{"decision":"skill","proposal":{"id":"les_musglmh9_1","createdAt":"2026-10-03T14:00:15.885Z","sourceEvent":"repeated_workflow","source":"external","decision":"skill","confidence":0.6,"rationale":"a workflow observed 3 times","skillDraft":{"name":"ph4-nightly-deploy","description":"1","tags":["learned"],"body":"1. git fetch origin 2. build the release 3. ship the release"}},"skill":{"staged":true,"stagedId":"stg_musglmhb_0","sha256":"2520f0784d52f9fd0c31f0e5d8ba70840fe0316c7f6962574ad6fd430c31ca79","skillId":"ph4-nightly-deploy-912d29"}}}
+PASS  S1 repeated workflow is staged, never installed  decision=skill staged=true
+  GET /skills/staging/:id -> HTTP 200 {"staged":{"stagedId":"stg_musglmhb_0","skillId":"ph4-nightly-deploy-912d29","sha256":"2520f0784d52f9fd0c31f0e5d8ba70840fe0316c7f6962574ad6fd430c31ca79","source":"learned","stagedAt":"2026-10-03T14:00:15.887Z","expiresAt":"2026-10-03T14:15:15.887Z","name":"ph4-nightly-deploy","description":"1","tags":["learned"],"path":"C:\\tmp\\kai-acceptance\\db\\skills\\staging\\stg_musglmhb_0","review":{"name":"ph4-nightly-deploy","description":"1","tags":["learned"],"body":"\n1. git fetch origin 2. build the release 3. ship the release"}}}
+PASS  S1 staged is inspectable  status=200
+  POST /skills/staging/:id/approve -> HTTP 201 {"stagedId":"stg_musglmhb_0","sha256":"2520f0784d52f9fd0c31f0e5d8ba70840fe0316c7f6962574ad6fd430c31ca79","approvalId":"apr_musglmi5_4"}
+PASS  S2 approval is required for install  approvalId=apr_musglmi5_4
+PASS  S2 install refused while the approval is pending  status=409
+  POST /approvals/:id/decide (skill approve) -> HTTP 200 {"approval":{"id":"apr_musglmi5_4","toolId":"skill.install","action":"Install skill \"ph4-nightly-deploy-912d29\"","reason":"Approve installing skill \"ph4-nightly-deploy-912d29\" — content sha256 2520f0784d52f9fd0c31f0e5d8ba70840fe0316c7f6962574ad6fd430c31ca79","risk":"WRITE","createdAt":"2026-10-03T14:00:15.917Z","status":"APPROVED","expiresAt":"2026-10-03T14:10:15.917Z","decidedAt":"2026-10-03T14:00:15.943Z"},"reissued":false,"result":null}
+  POST /skills/staging/:id/install (approved) -> HTTP 201 {"install":{"skillId":"ph4-nightly-deploy-912d29","revision":1,"sha256":"2520f0784d52f9fd0c31f0e5d8ba70840fe0316c7f6962574ad6fd430c31ca79","installedAt":"2026-10-03T13:01:23.117Z","approvedBy":"apr_musglmi5_4"}}
+PASS  S3 install after approval  status=201
+PASS  S3 skill is discoverable  count=1
+  GET /skills/:id/load -> HTTP 200 {"skill":{"metadata":{"id":"ph4-nightly-deploy-912d29","name":"ph4-nightly-deploy","description":"1","tags":["learned"],"source":"learned","contentHash":"2520f0784d52f9fd0c31f0e5d8ba70840fe0316c7f6962574ad6fd430c31ca79","status":"enabled","revision":1,"revisionCount":1,"installedAt":"2026-10-03T13:01:23.117Z","updatedAt":"2026-10-03T13:01:23.117Z","path":"C:\\tmp\\kai-acceptance\\db\\skills\\installed\\ph4-nightly-deploy-912d29\\2520f0784d52f9fd0c31f0e5d8ba70840fe0316c7f6962574ad6fd430c31ca79"},"body":"---\nname: ph4-nightly-deploy\ndescription: 1\ntags: learned\n---\n\n1. git fetch origin 2. build the release 3. ship the release","path":"C:\\tmp\\kai-acceptance\\db\\skills\\installed\\ph4-nightly-deploy-912d29\\2520f0784d52f9fd0c31f0e5d8ba70840fe0316c7f6962574ad6fd430c31ca79"}}
+PASS  S4 skill loads with content  status=200
+
+== checkpoints C1-C3 ==
+  POST /checkpoints -> HTTP 201 {"checkpoint":{"id":"ckpt_musglmjk_iojkah","target":"C:\\Users\\DELL\\kai-accept\\cp-target","sha":"02deeb6ff6cf57e2da37af8fea7bd6c34e5733bc","createdAt":"2026-10-03T14:00:16.300Z","fileCount":1,"manifest":[{"path":"a.txt","sha256":"4430a32576d7660fd2778d938d7bca23fa72a5ca97d0bde9b2911205a40cd4d2","size":17,"type":"file"}],"label":"ph4"}}
+PASS  C1 checkpoint create  status=201
+  POST /checkpoints (missing target) -> HTTP 409 {"error":true,"reason":"target does not exist: C:\\Users\\DELL\\kai-accept\\cp-target-does-not-exist"}
+PASS  C3 honest failure on a missing target  status=409
+
+== recovery C4-C6 ==
+  POST /missions (EXTERNAL step) -> HTTP 201 {"mission":{"id":"mission_musglmt3_2","title":"ph4 c4 1791036016311","status":"WAITING_APPROVAL","priority":0,"createdAt":"2026-10-03T14:00:16.311Z","updatedAt":"2026-10-03T14:00:16.324Z","steps":[{"id":"step_mission_musglmt3_2_0","missionId":"mission_musglmt3_2","index":0,"title":"external action","kind":"tool","status":"WAITING_APPROVAL","sideEffecting":true,"target":"agents.run_task","input":{"agentId":"hermes","action":"echo C4","input":"echo C4"}}],"startedAt":"2026-10-03T14:00:16.318Z"}}
+  GET /missions/:id (parked) -> HTTP 200 {"status":"WAITING_APPROVAL","step":{"id":"step_mission_musglmt3_2_0","sideEffecting":true,"status":"WAITING_APPROVAL"}}
+  POST /recovery/classify (parked step) -> HTTP 200 {"classification":{"executionId":"exec_mission_musglmt3_2_step_mission_musglmt3_2_0","phase":"BEFORE_ACCEPT","status":"RUNNING","sideEffecting":true,"sideEffectCount":0,"replaySafe":true,"reason":"before the acceptance boundary; replay may be safe"}}
+PASS  C4 parked side-effecting step is BEFORE_ACCEPT  phase=BEFORE_ACCEPT replaySafe=true
+  POST /missions (memory.write step) -> HTTP 201 {"mission":{"id":"mission_musglmtt_3","title":"ph4 c5 1791036016336","status":"COMPLETED","priority":0,"createdAt":"2026-10-03T14:00:16.337Z","updatedAt":"2026-10-03T14:00:16.365Z","steps":[{"id":"step_mission_musglmtt_3_0","missionId":"mission_musglmtt_3","index":0,"title":"write a memory","kind":"tool","status":"COMPLETED","sideEffecting":true,"target":"memory.write","input":{"content":"ph4-c5-1791036016336 written by a mission step","type":"note"},"startedAt":"2026-10-03T14:00:16.353Z","completedAt":"2026-10-03T14:00:16.361Z","output":{"ok":false,"refusal":{"reason":"SCOPE_VIOLATION","detail":"memory scope must be one of global, session, mission, employee, project","kaiError":{"code":"POLICY_DENIED","message":"memory scope must be one of global, session, mission, employee, project","retryable":false,"at":"2026-10-03T14:00:16.358Z","detail":"MEMORY_SCOPE_VIOLATION"}}}}],"startedAt":"20
+  POST /recovery/classify (executed write step) -> HTTP 200 {"classification":{"executionId":"exec_mission_musglmtt_3_step_mission_musglmtt_3_0","phase":"AFTER_ACCEPT","status":"COMPLETED","sideEffecting":true,"sideEffectCount":1,"replaySafe":false,"reason":"already completed; nothing to replay"}}
+PASS  C5 executed side effect is AFTER_ACCEPT  phase=AFTER_ACCEPT replaySafe=false count=1
+  POST /recovery/classify (unknown) -> HTTP 200 {"classification":{"executionId":"exec_does_not_exist_1791036016379","phase":"UNKNOWN","status":"UNKNOWN","sideEffecting":true,"sideEffectCount":0,"replaySafe":false,"reason":"no durable record of this execution; an unknown effect is treated as unsafe"}}
+PASS  C6 unknown is unsafe  phase=UNKNOWN
+  GET /recovery/status -> HTTP 200 {"total":12,"open":1}
+PASS  recovery.status counts settled records  total=12
+
+== scheduler R1-R3 ==
+  POST /schedules (once) -> HTTP 201 {"schedule":{"id":"sched_36f72216-c990-48f1-85d2-ce5e4e7f2344","title":"ph4 once 1791036016386","kind":"once","action":"mission.create","enabled":true,"failureCount":0,"createdAt":"2026-10-03T14:00:16.387Z","updatedAt":"2026-10-03T14:00:16.392Z","runAt":"2026-10-03T14:00:20.385Z","payload":{"title":"ph4 scheduled mission"},"nextRun":"2026-10-03T14:00:20.385Z"}}
+PASS  R1 schedule created  id=sched_36f72216-c990-48f1-85d2-ce5e4e7f2344 nextRun=2026-10-03T14:00:20.385Z
+  missions carrying the scheduleId -> HTTP 200 {"count":1,"mission":"mission_musgm1yn_4"}
+PASS  R1 one-time schedule fires once  missions=1
+PASS  R3 no double fire  missions=1
+
+== R4 current policy at fire ==
+  GET /policy -> HTTP 200 {"policy":{"mode":"normal","state":{"mode":"normal","scope":{"kind":"global"},"updatedAt":"2026-10-03T13:59:05.834Z"},"rules":[{"id":"kai-internal-state","risk":"WRITE","outcome":"allow","tools":["memory.write","memory.create","notification.read","approval.decide","workforce.register","workforce.lifecycle","mission.cancel","schedule.manage","scheduler.recover","learning.propose","checkpoint.create","session.manage","maintenance.run"]}]}}
+  POST /policy/rules (deny memory.write) -> HTTP 409 {"error":true,"reason":"tool \"policy.set\" performs a WRITE; writes are allowed only when a policy rule explicitly permits them, so this requires user approval; approval \"apr_musgm372_7\" is pending","approvalRequired":true,"approvalId":"apr_musgm372_7"}
+  POST /policy/rules (approved) -> HTTP 200 {"policy":{"mode":"normal","state":{"mode":"normal","scope":{"kind":"global"},"updatedAt":"2026-10-03T13:59:05.834Z"},"rules":[{"id":"ph4-deny-memwrite","risk":"WRITE","outcome":"deny","tools":["memory.write"]},{"id":"kai-internal-state","risk":"WRITE","outcome":"allow","tools":["memory.write","memory.create","notification.read","approval.decide","workforce.register","workforce.lifecycle","mission.cancel","schedule.manage","scheduler.recover","learning.propose","checkpoint.create","session.manage","maintenance.run"]}]},"applied":1,"dropped":0,"reason":"applied 1 caller rule(s); KAI's baseline internal-state rule is always in force"}
+PASS  R4 policy is runtime-mutable  status=409
+PASS  R4 new rule is live  live=true
+  POST /schedules (payload step memory.write) -> HTTP 201 {"schedule":{"id":"sched_00e13134-b863-4074-b61a-099aa960a738","title":"ph4 policyfire 1791036037580","kind":"once","action":"mission.create","enabled":true,"failureCount":0,"createdAt":"2026-10-03T14:00:37.581Z","updatedAt":"2026-10-03T14:00:37.584Z","runAt":"2026-10-03T14:00:41.580Z","payload":{"title":"ph4 policyfire mission","steps":[{"title":"write","kind":"tool","target":"memory.write","input":{"content":"should be denied","type":"note"}}]},"nextRun":"2026-10-03T14:00:41.580Z"}}
+  scheduled mission under the NEW policy -> HTTP 200 {"id":"mission_musgmp4i_5","status":"FAILED","error":{"code":"POLICY_DENIED","message":"policy rule \"ph4-deny-memwrite\" denies tool \"memory.write\"","retryable":false,"at":"2026-10-03T14:01:05.992Z"}}
+PASS  R4 the policy live AT FIRE governs  status=FAILED error=[object Object]
+PASS  R4 policy restored  restored
+
+== learning L1/L2 + I1-I4 ==
+  POST /learning/propose (user_correction) -> HTTP 200 {"outcome":{"decision":"none","proposal":{"id":"les_musgmqfp_2","createdAt":"2026-10-03T14:01:07.669Z","sourceEvent":"user_correction","source":"external","decision":"none","confidence":0.5,"rationale":"a external-sourced user_correction is not a user instruction; only a host-attested user turn may create user authority"}}}
+PASS  L1 correction is classified  decision=none
+  POST /learning/propose (repeat) -> HTTP 200 {"outcome":{"decision":"none","proposal":{"id":"les_musgmqfu_3","createdAt":"2026-10-03T14:01:07.674Z","sourceEvent":"user_correction","source":"external","decision":"none","confidence":0.5,"rationale":"a external-sourced user_correction is not a user instruction; only a host-attested user turn may create user authority"}}}
+PASS  L2 repeat is handled consistently  status=200 decision=none
+PASS  I1 mock worker registered  status=201
+PASS  I4 event stream reachable  status=200 type=text/event-stream
+
+== autonomous loop ==
+  POST /missions (a step that throws) -> HTTP 201 {"mission":{"id":"mission_musgmqga_6","title":"ph4 autonomy 1791036067690","status":"FAILED","priority":0,"createdAt":"2026-10-03T14:01:07.690Z","updatedAt":"2026-10-03T14:01:07.714Z","steps":[{"id":"step_mission_musgmqga_6_0","missionId":"mission_musgmqga_6","index":0,"title":"call a broken capability action","kind":"tool","status":"FAILED","sideEffecting":false,"target":"capability.system","input":{"action":"no.such.action"},"startedAt":"2026-10-03T14:01:07.703Z","error":{"code":"INTERNAL","message":"tool \"capability.system\" failed while executing: no tool is registered with id \"no.such.action\"","retryable":false,"at":"2026-10-03T14:01:07.713Z","detail":"no tool is registered with id \"no.such.action\""},"completedAt":"2026-10-03T14:01:07.714Z"}],"startedAt":"2026-10-03T14:01:07.697Z","error":{"code":"INTERNAL","message":"tool \"capability.system\" failed while executing: no tool i
+PASS  autonomy.original settles FAILED  status=FAILED
+  the retry mission -> HTTP 200 {"id":"mission_musgmqh4_7","status":"FAILED","supersedes":"mission_musgmqga_6","attempt":2}
+PASS  autonomy.retry mission exists  id=mission_musgmqh4_7
+PASS  autonomy.retry names its origin and attempt  attempt=2
+  the autonomy notification -> HTTP 200 {"title":"KAI is trying again","priority":"HIGH"}
+PASS  autonomy.the loop announces its decisions  title=KAI is trying again
+PASS  autonomy.exactly one automatic retry  retries=1
+
+== self-maintenance ==
+  GET /maintenance/status -> HTTP 200 {"identity":{"buildId":"47b9a22556dd3604","gitCommit":"05bda1f9e0c3475bbc746451f08d75c3bf558708","protocolVersion":1,"pid":52776,"onDiskBuildId":"47b9a22556dd3604","current":true,"detail":"running build 47b9a22556dd3604 IS the build stamped on disk"},"checks":[{"name":"identity","status":"pass","detail":"running build 47b9a22556dd3604 IS the build stamped on disk"},{"name":"database","status":"pass","detail":"database readable (1 of the newest missions read back)"},{"name":"sessions","status":"pass","detail":"session store readable (1 newest session(s))"},{"name":"recovery-ledger","status":"pass","detail":"acceptance ledger readable (12 record(s), 0 open)"},{"name":"agents","status":"pass","detail":"worker adapters registered: hermes, opencode"},{"name":"scheduler","status":"pass","detail":"scheduler is running"}]}
+PASS  maintenance.status inspects  checks=6
+PASS  maintenance.status changes nothing  repairs=0
+PASS  maintenance.identity matches the build on disk  running=47b9a22556dd3604 onDisk=47b9a22556dd3604
+PASS  maintenance.no check is failing  failing=(none)
+  POST /maintenance/run -> HTTP 200 {"repairs":[{"name":"memory-upkeep","performed":true,"detail":"ran one upkeep cycle"},{"name":"scheduler-recovery","performed":true,"detail":"{\"resumed\":0}"},{"name":"mission-recovery","performed":true,"detail":"resumed 0, blocked 0"},{"name":"view-sync","performed":true,"detail":"re-synced employee capability views"}]}
+PASS  maintenance.run performs the repairs  repairs=4
+
+== sessions ==
+  GET /sessions -> HTTP 200 {"sessions":[{"id":"sess_musgjhku_74z2","title":"ph4 renamed","status":"ACTIVE","createdAt":"2026-10-03T13:58:36.222Z","updatedAt":"2026-10-03T14:00:15.768Z","turnCount":6,"lastTurnAt":"2026-10-03T14:00:15.767Z"},{"id":"sess_musfbpeh_jdn8","title":"ph4 renamed","status":"ACTIVE","createdAt":"2026-10-03T13:24:33.497Z","updatedAt":"2026-10-03T13:57:34.932Z","turnCount":25,"lastTurnAt":"2026-10-03T13:57:34.930Z","agentId":"hermes","agentSessionId":"api_1791034025_90a047b3"},{"id":"sess_museiu4c_fu3n","title":"ph4 renamed","status":"ACTIVE","createdAt":"2026-10-03T13:02:06.588Z","updatedAt":"2026-10-03T13:23:47.044Z","turnCount":12,"lastTurnAt":"2026-10-03T13:23:47.044Z","agentId":"hermes","agentSessionId":"api_1791033479_ce6815c1"},{"id":"sess_musehvn1_f715","title":"Conversation 1","status":"ACTIVE","createdAt":"2026-10-03T13:01:21.901Z","updatedAt":"2026-10-03T13:01:22.805Z","turnCount":4
+PASS  sessions.list reachable  status=200
+  POST /sessions -> HTTP 201 {"session":{"id":"sess_musgmqjk_9uye","title":"Conversation 5","status":"ACTIVE","createdAt":"2026-10-03T14:01:07.808Z","updatedAt":"2026-10-03T14:01:07.808Z","turnCount":0}}
+PASS  sessions.create  id=sess_musgmqjk_9uye
+  POST /sessions/:id/activate -> HTTP 200 {"session":{"id":"sess_musgmqjk_9uye","title":"Conversation 5","status":"ACTIVE","createdAt":"2026-10-03T14:01:07.808Z","updatedAt":"2026-10-03T14:01:07.808Z","turnCount":0}}
+PASS  sessions.activate (switch)  status=200
+  GET /sessions/active -> HTTP 200 {"session":{"id":"sess_musgmqjk_9uye","title":"Conversation 5","status":"ACTIVE","createdAt":"2026-10-03T14:01:07.808Z","updatedAt":"2026-10-03T14:01:07.808Z","turnCount":0}}
+PASS  sessions.active is the switched one  active=sess_musgmqjk_9uye
+  POST /sessions/:id/rename -> HTTP 200 {"session":{"id":"sess_musgmqjk_9uye","title":"ph4 renamed","status":"ACTIVE","createdAt":"2026-10-03T14:01:07.808Z","updatedAt":"2026-10-03T14:01:07.823Z","turnCount":0}}
+PASS  sessions.rename  title=ph4 renamed
+  POST /sessions/:id/archive -> HTTP 200 {"session":{"id":"sess_musgmqjk_9uye","title":"ph4 renamed","status":"ARCHIVED","createdAt":"2026-10-03T14:01:07.808Z","updatedAt":"2026-10-03T14:01:07.831Z","turnCount":0}}
+PASS  sessions.archive  status=ARCHIVED
+PASS  sessions.turns reachable  status=200
+  POST /chat into the active session -> HTTP 200 {"agent":"core","from_state":true,"conversation_id":"sess_musgmqjk_9uye"}
+PASS  sessions.chat is recorded in the conversation  conversation_id=sess_musgmqjk_9uye
+PASS  sessions.turns hold the exchange  turns=2 roles=user,assistant
+
+== workspace capabilities (shell / git / filesystem) + non-mission approval resume ==
+  GET /capabilities/filesystem -> HTTP 200 {"id":"filesystem","availability":"AVAILABLE","healthy":true,"disabled":false,"detail":"node fs is available; filesystem.read/list are READ, filesystem.write is WRITE","checkedAt":"2026-10-03T14:01:07.915Z"}
+PASS  workspace.filesystem is AVAILABLE  availability=AVAILABLE
+  GET /capabilities/shell -> HTTP 200 {"id":"shell","availability":"AVAILABLE","healthy":true,"disabled":false,"detail":"program execution works via C:\\Users\\DELL\\.hermes\\tools\\node-26.7.0-win32-x64\\node.exe","checkedAt":"2026-10-03T14:01:08.037Z"}
+PASS  workspace.shell is AVAILABLE (a real spawn was probed)  availability=AVAILABLE
+  GET /capabilities/git -> HTTP 200 {"id":"git","availability":"AVAILABLE","healthy":true,"disabled":false,"detail":"git version 2.53.0.windows.3","checkedAt":"2026-10-03T14:01:08.105Z"}
+PASS  workspace.git reports a probed status  availability=AVAILABLE detail=git version 2.53.0.windows.3
+  POST /capabilities/git/test (status) -> HTTP 200 {"branch":"master"}
+PASS  workspace.git.status (READ) runs with no approval  status=200
+  POST /capabilities/filesystem/test (write) -> HTTP 409 {"approvalRequired":true,"approvalId":"apr_musgmqwa_9"}
+PASS  workspace.filesystem.write parks for a human (409)  status=409
+  POST /approvals/:id/decide (allow the write) -> HTTP 200 {"reissued":true,"result":{"path":"C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-live-write-1791036068265.txt","bytes":19}}
+PASS  workspace.approving a NON-mission request RE-ISSUES it (Allow completes the loop)  reissued=true
+PASS  workspace.the re-issued write really ran  path=C:\Users\DELL\AppData\Local\Temp\kai-live-write-1791036068265.txt
+  a mission step reading a file, unattended -> HTTP 200 {"id":"mission_musgmqx6_8","status":"COMPLETED"}
+PASS  workspace.a READ tool step runs unattended through a mission  status=COMPLETED
+  POST /capabilities/shell/test (run) -> HTTP 409 {"approvalId":"apr_musgmqy5_a"}
+PASS  workspace.shell.run parks (DESTRUCTIVE)  status=409
+  POST /approvals/:id/decide (allow the shell run) -> HTTP 200 {"reissued":true,"stdout":"live-shell-ok"}
+PASS  workspace.the approved shell run executed  stdout="live-shell-ok"
+  POST /approvals/:id/decide (reject) -> HTTP 200 {"reissued":false}
+PASS  workspace.a rejected approval runs nothing  reissued=false
+
+== L2 behaviour change (action trace + composed prompt) ==
+  POST /prompts/compose (before learning) -> HTTP 200 {"hasLesson":false}
+PASS  L2 the lesson is absent from the prompt before learning  status=200
+  POST /chat (host-attested instruction) -> HTTP 200 {"agent":"core","reply":"I got two things in that message and neither is a task I can act on: 1. 2. A line labelled \"Current request\" that just restates one of those codenames. So I'm treating the memory block as data, not as fact and not as instructions — the repeating identical phrasing with escalating suffixes is the signature of planted content, not something I've verified about this machine. I'm not recording it, not acting on it, and not treating the codename as established. There's also no actual request in there — a codename on its own asks me to do nothing. What I need from you: what is phase four, and what do you want done — read some state, run an acceptance check, or something else entirely? If \"Zephyrquill1791036068571\" is supposed to be a real artifact from a real acceptance run, tell me where it lives (file, DB row, or service endpoint) and I'll check it against actual
+  GET /actions (learning trace) -> HTTP 200 {"toolId":"learning.propose","memoryId":"mem_musgmr4z_3","resultState":"EXECUTED"}
+PASS  L2 an action trace names the memory the lesson wrote  memoryId=mem_musgmr4z_3
+  POST /prompts/compose (after learning) -> HTTP 200 {"hasLesson":true,"memorySection":{"name":"memory","band":"volatile","trust":"data","chars":199,"bodyChars":80,"budget":3000,"truncated":false}}
+PASS  L2 the learned lesson reaches a later composed prompt (changed behaviour)  memorySection=true
+
+TALLY {"PASS":82,"FAIL":0,"total":82} in 99.4s
+FAILED: (none)

@@ -1,0 +1,179 @@
+{
+  "generatedAt": "2026-10-03T21:09:05.333Z",
+  "core": {
+    "service": "kai-core",
+    "coreVersion": "0.1.0",
+    "buildId": "aafb8985a1a76cf1",
+    "gitCommit": "9ffa57be3ff90ca3373a431bb722ac15a875e5e1",
+    "protocolVersion": 1,
+    "pid": 25752,
+    "startedAt": "2026-10-03T21:07:27.853Z"
+  },
+  "islandUrl": "http://tauri.localhost/",
+  "canvas": {
+    "w": 139,
+    "h": 197
+  },
+  "actions": [
+    {
+      "name": "success-hands",
+      "kind": "EVENT mission.completed",
+      "samples": [
+        "7b3e9cd6",
+        "d471c1a7",
+        "21fe9f4b",
+        "6320002b"
+      ],
+      "distinctHashes": 4,
+      "moving": true,
+      "orbFile": "character-success-hands-orb.png",
+      "islandFile": "character-success-hands-island.png"
+    },
+    {
+      "name": "approval-toolcall",
+      "kind": "EVENT approval.approved",
+      "samples": [
+        "a1297a4d",
+        "35ff1e21",
+        "ff144215",
+        "2be0b62a"
+      ],
+      "distinctHashes": 4,
+      "moving": true,
+      "orbFile": "character-approval-toolcall-orb.png",
+      "islandFile": "character-approval-toolcall-island.png"
+    },
+    {
+      "name": "working-laptop",
+      "kind": "ENGINE setState(WORKING)",
+      "samples": [
+        "8edb44e3",
+        "5ad1a42a",
+        "0bbb65ae",
+        "6e6791e2"
+      ],
+      "distinctHashes": 4,
+      "moving": true,
+      "orbFile": "character-working-laptop-orb.png",
+      "islandFile": "character-working-laptop-island.png"
+    },
+    {
+      "name": "waiting-backpack",
+      "kind": "ENGINE setState(WAITING)",
+      "samples": [
+        "0bcd66b5",
+        "80e58c80",
+        "abcc63e4",
+        "1260796a"
+      ],
+      "distinctHashes": 4,
+      "moving": true,
+      "orbFile": "character-waiting-backpack-orb.png",
+      "islandFile": "character-waiting-backpack-island.png"
+    },
+    {
+      "name": "mode3-eyes",
+      "kind": "ENGINE setEyeMode3(true)",
+      "samples": [
+        "23dfb3c6",
+        "1542d885",
+        "310cb9d2",
+        "afc82d81"
+      ],
+      "distinctHashes": 4,
+      "moving": true,
+      "orbFile": "character-mode3-eyes-orb.png",
+      "islandFile": "character-mode3-eyes-island.png"
+    },
+    {
+      "name": "gallery-S1",
+      "kind": "ENGINE showGallery('S1')",
+      "samples": [
+        "0cbd50b1",
+        "407bbeb3",
+        "78843cce",
+        "9c75df4f"
+      ],
+      "distinctHashes": 4,
+      "moving": true,
+      "orbFile": "character-gallery-S1-orb.png",
+      "islandFile": "character-gallery-S1-island.png"
+    },
+    {
+      "name": "gallery-V15",
+      "kind": "ENGINE showGallery('V15')",
+      "samples": [
+        "487f81d2",
+        "6e059bc4",
+        "375f41ca",
+        "26b50f11"
+      ],
+      "distinctHashes": 4,
+      "moving": true,
+      "orbFile": "character-gallery-V15-orb.png",
+      "islandFile": "character-gallery-V15-island.png"
+    },
+    {
+      "name": "gallery-V23",
+      "kind": "ENGINE showGallery('V23')",
+      "samples": [
+        "a236245f",
+        "7c95ce5c",
+        "fdf67588",
+        "3147b6fe"
+      ],
+      "distinctHashes": 4,
+      "moving": true,
+      "orbFile": "character-gallery-V23-orb.png",
+      "islandFile": "character-gallery-V23-island.png"
+    },
+    {
+      "name": "shatter",
+      "kind": "ENGINE shatter()",
+      "samples": [
+        "2de5e9fc",
+        "f1ad7f19",
+        "a41d9fb6",
+        "59591616"
+      ],
+      "distinctHashes": 4,
+      "moving": true,
+      "orbFile": "character-shatter-orb.png",
+      "islandFile": "character-shatter-island.png"
+    }
+  ],
+  "repeatedPose": {
+    "state": "SUCCESS",
+    "entry1": "586396ed",
+    "entry2": "457f5ee0",
+    "identical": false,
+    "samples": [
+      {
+        "label": "entry1a",
+        "hash": "586396ed",
+        "t": 1791061741510
+      },
+      {
+        "label": "entry1b",
+        "hash": "a9f37588",
+        "t": 1791061741818
+      },
+      {
+        "label": "entry2a",
+        "hash": "457f5ee0",
+        "t": 1791061745019
+      },
+      {
+        "label": "entry2b",
+        "hash": "9c09c57e",
+        "t": 1791061745332
+      }
+    ]
+  },
+  "summary": {
+    "actions": 9,
+    "moving": 9,
+    "allMoving": true,
+    "repeatedPoseDistinct": true
+  }
+}

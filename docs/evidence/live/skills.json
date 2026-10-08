@@ -1,0 +1,36 @@
+{
+  "skills": [
+    {
+      "id": "nightly-verification-routine-1f865f",
+      "name": "nightly-verification-routine",
+      "description": "1",
+      "tags": [
+        "learned"
+      ],
+      "source": "learned",
+      "contentHash": "4cfc1bb553fd8b0e8155cf6eecc307aa6c73c358f5c0fcfe5cc03f9c606303bc",
+      "status": "enabled",
+      "revision": 1,
+      "revisionCount": 1,
+      "installedAt": "2026-10-02T23:27:37.028Z",
+      "updatedAt": "2026-10-02T23:27:37.028Z",
+      "path": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\skills\\installed\\nightly-verification-routine-1f865f\\4cfc1bb553fd8b0e8155cf6eecc307aa6c73c358f5c0fcfe5cc03f9c606303bc"
+    },
+    {
+      "id": "ph4-nightly-deploy-912d29",
+      "name": "ph4-nightly-deploy",
+      "description": "1",
+      "tags": [
+        "learned"
+      ],
+      "source": "learned",
+      "contentHash": "2520f0784d52f9fd0c31f0e5d8ba70840fe0316c7f6962574ad6fd430c31ca79",
+      "status": "enabled",
+      "revision": 1,
+      "revisionCount": 1,
+      "installedAt": "2026-10-03T10:15:38.715Z",
+      "updatedAt": "2026-10-03T10:15:38.715Z",
+      "path": "C:\\Users\\DELL\\AppData\\Local\\KAI\\core\\skills\\installed\\ph4-nightly-deploy-912d29\\2520f0784d52f9fd0c31f0e5d8ba70840fe0316c7f6962574ad6fd430c31ca79"
+    }
+  ]
+}

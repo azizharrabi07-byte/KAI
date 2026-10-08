@@ -1,0 +1,38 @@
+RAW CAPTURE — taken on the LIVE Core (http://127.0.0.1:8788, the Core the desktop app runs)
+BEFORE this fix, with the supervisor's seeded credential already in place.
+Command: curl -s -X POST http://127.0.0.1:8788/chat -H "content-type: application/json"
+         -d '{"text":"Write a two-line haiku about terminals, then name the model you used"}'
+Response body, verbatim:
+
+{
+  "agent": "core",
+  "from_state": false,
+  "intent": "unknown",
+  "conversation_id": "sess_musv974c_7dhj",
+  "reply": "My own model provider isn't answering that right now — http. I'm still KAI and my memory and state are available; ask me for status, what I remember, or what I can do, or tell me to retry.",
+  "data": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash",
+    "error": "http"
+  },
+  "brain": null,
+  "dependency": {
+    "normal_chat_calls_to_hermes": 0
+  }
+}
+
+GET /independence on the same Core, before the fix, already reported
+inference.configured=true, inference.reachable=true, capabilities
+chat/stream/structured/embeddings=true — which is exactly why the defect was
+invisible from that surface: /models answers 200 without the routing header, so
+"reachable" was true while every generative turn answered HTTP 400.
+
+The provider-level raw status codes from that same pre-fix state (the probe in
+docs/evidence/kai-own-brain-final.json re-runs it with the fix in place):
+
+  POST https://opencode.ai/zen/go/v1/chat/completions   (no extra header)          -> HTTP 400
+    {"type":"error","error":{"type":"MissingSessionID","message":"Request is missing x-opencode-session and cannot be routed efficiently. Please see https://opencode.ai/docs/go/#where-can-i-use-it"}}
+
+  POST https://opencode.ai/zen/go/v1/chat/completions   + x-opencode-session + UA  -> HTTP 200
+    {"id":"0217912181181005b7c5d80188542749d9bf0e4ecbfb37f8c15b1", "model":"deepseek-v4.1-flash",
+     "content":"pong", "usage":{"prompt_tokens":38,"completion_tokens":14,"total_tokens":52}}

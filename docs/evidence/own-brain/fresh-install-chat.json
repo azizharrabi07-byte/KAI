@@ -1,0 +1,18 @@
+{
+  "agent": "core",
+  "from_state": false,
+  "intent": "unknown",
+  "conversation_id": "sess_musv974c_7dhj",
+  "reply": "KAI-OWN-BRAIN-OK",
+  "data": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash"
+  },
+  "brain": {
+    "provider": "opencode-go",
+    "model": "deepseek-v4.1-flash"
+  },
+  "dependency": {
+    "normal_chat_calls_to_hermes": 0
+  }
+}

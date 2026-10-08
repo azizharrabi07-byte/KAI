@@ -1,0 +1,63 @@
+# ── KAI ───────────────────────────────────────────────────────────────────────
+# Simple, opinionated ignore list for the KAI workspace.
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Build output
+dist/
+build/
+out/
+bundle/
+release/
+*.tsbuildinfo
+
+# Rust / Tauri
+target/
+**/target/
+Cargo.lock.bak
+
+# Local data, logs, secrets — never commit runtime state
+*.log
+logs/
+data/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+.env
+.env.*
+!.env.example
+secrets.json
+
+# …except the build/verification evidence, which is deliberately committed so the
+# claims in the README can be checked against real output.
+!docs/evidence/*.log
+!core/evidence/*.txt
+!core/evidence/*.log
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Scratch
+tmp/
+.cache/
+
+# Agent probe scratch — never part of the product
+.tmpchrome/
+.scratch-*.mjs
+.scratch-*.txt
+.scratch-core*.log
+
+# Created by the opencode server when it probes a project directory.
+.opencode/
