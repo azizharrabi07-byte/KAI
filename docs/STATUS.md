@@ -3,10 +3,10 @@
 Current, honest status of the KAI source tree. Everything here was produced by running the
 commands shown; nothing is claimed from reading code.
 
-- **Commit:** `160d94e` ("supervisor trust loop — claims are not proof, evidence is")
+- **Commit:** `2d2f4b9` ("per-item retry ceiling from a durable dispatch ledger")
   — the newest **code** commit. A docs-only follow-up (this file, the supervisor
-  contract, the OpenBot re-verification) changes no source, so `160d94e` is the
-  exact tree the suites, probes and build below were run against.
+  contract, the refreshed probe evidence) changes no source, so `2d2f4b9` is the
+  exact tree the suites, probes and counts below were run against.
 - **Date:** 2026-10-09
 - **State:** experimental, single-machine, actively developed. Not a released product.
 
@@ -25,14 +25,20 @@ The supervisor trust repair (started in a previous session) was finished and ver
   (`ASK_USER`) — never a silent `CHANGES_REQUESTED` stall.
 - **Truthful dispatch.** `POST /work-items` plans (`work.planned`; 201 means a durable
   item was created); `delegated` flips only when a worker is really dispatched.
-- **Retry budget at the boundary**, per (item, worker), so callers cannot bypass it
-  while a legitimate worker switch still works.
+- **Retry ceiling is now per ITEM, from a durable dispatch ledger.** One attempt per
+  worker dispatch, classified `initial` / `retry` (same worker, ≤ `maxRetries`) /
+  `reassign` (different worker, ≤ `maxReassignments`). A caller can no longer buy
+  extra attempts by rotating workers, while the breaker's sanctioned worker switch
+  still works. Exhaustion parks the item `BLOCKED` with a durable next action.
 - **Approvals are final** (approved / rejected / expired cannot be re-spent) and
   duplicate deliveries are no-ops.
 - **`/audit` and `/summary`** are real commands in the production command path, plus a
   durable once-per-local-day summary offer on the one scheduler.
 - **Handoff persistence fix:** the parsed worker handoff is stored before review, so a
   run that parks (review or a guarded evidence check) is resumable.
+- **`board.annotate` now merges** (it documents itself as additive but used to replace
+  `outputs`), so parking a run no longer drops the persisted Outcome Contract, the
+  resume keys or the dispatch ledger.
 - See `docs/architecture/KAI_SUPERVISOR_TRUST.md` for the full contract.
 
 ## Test status
@@ -45,21 +51,45 @@ cd core && npm test
 
 | | |
 |---|---|
-| tests | 1186 |
-| pass | 1172 |
+| tests | 1193 |
+| pass | 1179 |
 | fail | 1 |
 | skipped | 13 |
 
-The **1 failure is environmental, not a regression** (`core/src/server.test.ts:249`,
-"POST /chat runs a real turn through Hermes"): the test's own runtime reports the Hermes
-capability as unavailable. It failed identically on the pre-change baseline, so it is
-pre-existing. Note the **live** Core's own health probe (below) reports Hermes
-`reachable+authorized`, so this is specific to the test runtime's wiring, not to Hermes
-being down. Left visible on purpose — not skipped, not hidden.
+The **1 failure is an external dependency, not a regression** (`core/src/server.test.ts:249`,
+"POST /chat runs a real turn through Hermes"). It fails after **exactly the configured
+120 s chat timeout** (observed 120,041–120,152 ms across runs) because a real Hermes chat
+turn never answers on this machine — see the diagnosis below. It failed identically on
+the pre-change baseline, so it is pre-existing. Left visible on purpose — not skipped,
+not hidden, not relabelled.
 
-New suites added by this work (all passing): `orch-supervisor-trust` (32 tests — the
-17-case suite plus retry-budget, offline-worker, supervisor-failure and redaction
-cases), `summary-daily` (11), `summary-audit-commands` (7).
+New suites added by the earlier work (all passing): `orch-supervisor-trust` (**39
+tests** — the 17-case suite, 9 retry-policy cases, offline-worker, supervisor-failure
+and redaction cases), `summary-daily` (11), `summary-audit-commands` (7).
+
+## Hermes diagnosis (2026-10-09) — externally blocked, not a KAI defect
+
+`worker-honesty` H3 fails with `AGENT_TIMEOUT` and the Hermes relay test fails after the
+120 s chat timeout. Both were traced to the same cause with direct, bounded probes
+against `http://127.0.0.1:8642` (read-only; no live Core configuration changed):
+
+| Probe | Result |
+|---|---|
+| `GET /health` | **200 in 16 ms** — `{"status":"ok","platform":"hermes-agent"}` |
+| `GET /v1/models` (with the same key the test runner loads) | **200 in 35 ms** — authorized |
+| `POST /api/sessions` | **201 in 17 ms** — a session is created |
+| `POST /api/sessions/:id/chat` | **never answers** — client timeout at 30,010 ms; KAI's configured budget is 120 s, which is exactly what the relay test hits |
+| `POST /v1/runs` | **accepted** (returns a `run_id`) but never completes inside KAI's configured 15-minute run deadline; `worker-honesty` H3 recorded `startedAt 17:33:10.061Z → completedAt 17:48:10.468Z` = 900.4 s |
+
+**Conclusion:** Hermes' control plane is up and authorized, and it *accepts* work, but
+its execution path (the model/agent turn) never completes. KAI behaves correctly and
+honestly in both cases — the chat turn falls back to `presentWorkerFailure`
+(`core/src/chat/relay.ts`) and the run ends `timed_out` / `AGENT_TIMEOUT` after
+`bestEffortStop` (`core/src/agents/adapters/hermesAdapter.ts:205`, `runTimeoutMs`
+default `15 * 60_000`). **No KAI-side defect is demonstrated**, so nothing was mocked,
+skipped, given a longer timeout or relabelled: both checks stay failing and are reported
+as externally blocked. Fixing them requires fixing Hermes, which is outside this
+repository and was not touched.
 
 ### Desktop app (`app/`)
 
@@ -71,28 +101,26 @@ cd app && npm test
 proves the client puts the multiline `raw` argument on the wire and that the island
 summarizer renders the real supervision event shapes).
 
-## Live probes (all executed 2026-10-09 against the `160d94e` tree)
+## Live probes (all executed 2026-10-09 against the `2d2f4b9` tree)
 
 | Probe | Result |
 |---|---|
 | `core && node scripts/orch-e2e.mjs` | **21/21 PASS** (S1–S6, incl. S2 failure → breaker → switch → success) |
 | `core && node scripts/command-stream-probe.mjs` | **PASS** C1–C7 (real child stdout streamed before exit) |
 | `core && node scripts/torture.mjs` | **PASS** — completionRate 1, falseCompletionRate 0, orphanTasks 0, activeRuns 0 |
-| `core && node scripts/live-ux-probe.mjs` | **PASS** L1–L3 against a **rebuilt** UI (`npx vite build`) — first text 758 ms vs final 1357 ms, tool card 663 ms |
-| `core && node scripts/worker-honesty.mjs` | **H1, H2, H4 ×2 PASS; H3 FAIL** — see below |
+| `core && node scripts/live-ux-probe.mjs` | **PASS** L1–L3 against a **rebuilt** UI (`npx vite build`) — first text 677 ms vs final 1351 ms, tool card 677 ms |
+| `core && node scripts/worker-honesty.mjs` | **H1, H2, H4 ×2 PASS; H3 FAIL** — see the Hermes diagnosis above |
 
-`live-ux-probe` was run only after rebuilding `app/dist` (`npx vite build`), because this
-work changed UI source (`presence.ts` `runSlash`, `core-state.ts` summariser,
-`kai-core.ts` client); testing a stale bundle would have proven nothing.
+`live-ux-probe` was run after rebuilding `app/dist` (`npx vite build`). No app source
+changed in this session (the UI changes landed in `160d94e`), but rebuilding keeps the
+tested bundle provably current rather than assumed.
 
 **worker-honesty H3 FAILED, honestly.** H1 (opencode parks for approval), H2 (offline
 opencode fails with a named transport error, never a fabricated completion) and H4 ×2
 (denial executes nothing) all passed. **H3 did not:** a real Hermes task run ended
-`timed_out` / `AGENT_TIMEOUT` after ~15 minutes (`docs/evidence/worker-honesty.json`).
-This is consistent with the one core-suite failure above — Hermes answers the health
-probe (`reachable+authorized` on the live Core) but does not complete a turn on this
-machine. It is an external-worker limitation, reported rather than worked around. **Do
-not read this as "Hermes verified".**
+`timed_out` / `AGENT_TIMEOUT` after 900.4 s — exactly KAI's configured 15-minute run
+deadline (`docs/evidence/worker-honesty.json`). The cause is the one diagnosed above:
+Hermes accepts the run and never finishes it. **Do not read this as "Hermes verified".**
 
 Raw evidence: `docs/evidence/orch-e2e.json`, `command-stream-probe.json`, `torture.json`,
 `live-ux-probe.json`, `worker-honesty.json`.
@@ -103,8 +131,9 @@ Raw evidence: `docs/evidence/orch-e2e.json`, `command-stream-probe.json`, `tortu
 cd core && npm run build && npm run bundle
 ```
 
-- `dist/build-info.json`: buildId `220087d9e43f77a3`, gitCommit `160d94ec` — the identity
-  matches the tested source.
+- `dist/build-info.json`: buildId `c39f55de6f9765e7`, gitCommit `2d2f4b9e526f23275457967d10ca866c4fa5e223`
+  — the identity matches the tested source (the build id is content-derived, so it
+  changed with the orchestration modules; it is re-stamped after every commit).
 - `core/bundle/server.js` is ready to run with `node`.
 
 **No Windows installer was built this session.** `app && npm run pack` runs `tauri build`,
@@ -135,7 +164,8 @@ only — they are not deployed.**
   prose and permissive text matching can never satisfy a requirement.
 - **Truthful lifecycle.** `work.planned` ≠ `delegation.routed`; a durable item is never
   reported as a started worker.
-- **Retry budget at the orchestration boundary**, per (item, worker); duplicate
+- **Retry ceiling at the orchestration boundary, per ITEM**, from a durable dispatch
+  ledger (`initial` / `retry` / `reassign`); rotating workers cannot exceed it, duplicate
   deliveries and settled items are refused re-execution.
 - **Approvals are final and idempotent**; an expired or spent approval authorizes nothing.
 - **Evidence is split.** `kai-observed` satisfies; `worker-reported` is displayed and
@@ -151,8 +181,10 @@ only — they are not deployed.**
 - **No real JEV shipped** (plug-in point only; deterministic is the supported path).
 - **OpenCode offline on this machine** (`:4096` unreachable); KAI reports it honestly and
   never fabricates a worker result.
-- **Retry budget is per (item, worker), not per item** — a caller rotating through many
-  distinct worker ids gets `1 + maxRetries` attempts each (bounded, but not a per-item cap).
+- **Retry ceiling is per item**, `1 + maxRetries + maxReassignments` dispatches
+  (`maxReassignments` defaults to `maxRetries`). Reassignments have their own allowance
+  because a worker switch is the breaker's sanctioned recovery; they never reset the
+  retry count. Raise the autonomy budget or create a new item to go further.
 - **External audits need a working directory** to check file claims; without one they
   report the limitation and verify nothing.
 - **One environmental test failure** (`server.test.ts` live Hermes relay) — see above.
