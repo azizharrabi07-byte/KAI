@@ -1,13 +1,13 @@
 {
-  "at": "2026-10-07T23:54:19.272Z",
+  "at": "2026-10-09T17:12:36.299Z",
   "scenarios": {
     "T1: 100 sequential missions complete": {
       "pass": true,
-      "detail": "100/100 in 7803ms"
+      "detail": "100/100 in 11739ms"
     },
     "T2: 25 concurrent missions, no collision": {
       "pass": true,
-      "detail": "25/25 in 1918ms"
+      "detail": "25/25 in 3476ms"
     },
     "T3: 10 concurrent multi-child missions created": {
       "pass": true,
@@ -67,12 +67,12 @@
     },
     "M: memory growth bounded": {
       "pass": true,
-      "detail": "+17MB"
+      "detail": "+40MB"
     }
   },
   "metrics": {
-    "t1Ms": 7803,
-    "t2Ms": 1918,
+    "t1Ms": 11739,
+    "t2Ms": 3476,
     "activityEvents": 100,
     "created": 171,
     "attempted": 131,
@@ -83,7 +83,7 @@
     "retried": 0,
     "benchmarkedWorkers": 2,
     "activeRuns": 0,
-    "memDeltaMB": 17,
+    "memDeltaMB": 40,
     "needsContinue": 0
   },
   "verdict": "PASS"

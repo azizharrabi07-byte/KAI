@@ -1,10 +1,10 @@
 {
-  "at": "2026-10-09T02:59:55.551Z",
+  "at": "2026-10-09T17:12:12.780Z",
   "events": [
     {
       "check": "C1: command.started emitted",
       "pass": true,
-      "detail": "at 16ms"
+      "detail": "at 18ms"
     },
     {
       "check": "C2: stdout arrived in multiple chunks",
@@ -19,7 +19,7 @@
     {
       "check": "C4: output streamed BEFORE exit",
       "pass": true,
-      "detail": "last stdout 977ms vs exit 1302ms"
+      "detail": "last stdout 995ms vs exit 1307ms"
     },
     {
       "check": "C5: ordering preserved (line-1 before line-3)",
@@ -40,35 +40,35 @@
   "verdict": "PASS",
   "timeline": [
     {
-      "at": 16,
+      "at": 18,
       "type": "command.started"
     },
     {
-      "at": 57,
+      "at": 77,
       "type": "command.stdout",
       "stream": "stdout",
       "chunk": "line-1\n"
     },
     {
-      "at": 372,
+      "at": 377,
       "type": "command.stdout",
       "stream": "stdout",
       "chunk": "line-2\n"
     },
     {
-      "at": 673,
+      "at": 680,
       "type": "command.stderr",
       "stream": "stderr",
       "chunk": "warn-x\n"
     },
     {
-      "at": 977,
+      "at": 995,
       "type": "command.stdout",
       "stream": "stdout",
       "chunk": "line-3\n"
     },
     {
-      "at": 1302,
+      "at": 1307,
       "type": "command.exit",
       "exitCode": 0
     }
@@ -76,8 +76,8 @@
   "timelineSummary": {
     "stdoutChunks": 3,
     "stderrChunks": 1,
-    "firstMs": 57,
-    "lastMs": 977,
-    "exitMs": 1302
+    "firstMs": 77,
+    "lastMs": 995,
+    "exitMs": 1307
   }
 }

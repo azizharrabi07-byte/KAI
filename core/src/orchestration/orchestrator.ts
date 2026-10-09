@@ -26,6 +26,7 @@ import type {
   AutonomyPolicy,
   ReviewVerdict,
   RoutingDecision,
+  SkillReceipt,
   TaskDomain,
   VerificationRecord,
   WorkBudget,
@@ -42,14 +43,17 @@ import { buildWorkerPrompt, recordPatternOutcome, selectPattern } from "./prompt
 import type { PromptPatternStore } from "../shared/contracts.ts";
 import { buildReviewerPrompt, requestReview, runReviewLoop } from "./review.ts";
 import { autoVerdict } from "./autonomy.ts";
+import { redactText } from "../redact/index.ts";
 import { estimateDifficulty } from "./bench.ts";
 import {
   createOutcomeContract,
+  criterionMet,
   evaluateOutcome,
   type KernelAction,
   type Observation,
   type OutcomeContract,
 } from "./outcome.ts";
+import type { VerifiedEvidence } from "./types.ts";
 import { decideAction, type DecisionProvider, type JevBudget } from "./decision.ts";
 
 /** The corrective actions a provider may rank (all legal by construction). */
@@ -78,6 +82,30 @@ export interface ApprovalPorts {
 export interface SkillPorts {
   relevant(query: string, limit: number): { id: string }[];
   load(id: string): { ok: boolean; name?: string; body?: string; reason?: string };
+  /** Version + content hash for usage receipts (Phase 6). Optional; absent → receipts carry id only. */
+  inspect?(id: string): { version?: string; hash?: string } | null;
+}
+
+/**
+ * Bounded evidence collection through KAI's OWN tools. The registry boundary
+ * still validates + policy-checks every call — this port adds no trust, it
+ * only lets supervision inspect the workspace itself instead of taking a
+ * worker's word. Callers restrict themselves to the READ allowlist
+ * (filesystem.read/list/search/metadata, git.status/log/diff); anything else
+ * is refused at the call site, and policy may still park or deny.
+ */
+export interface SupervisorToolsPort {
+  invoke(
+    id: string,
+    input: unknown,
+    opts?: { missionId?: string; turnId?: string; source?: string; approvalId?: string },
+  ): Promise<{
+    ok: boolean;
+    result?: unknown;
+    error?: { code: string; message: string };
+    /** Registry-created approval when the call parked (resume via onApprovalDecided). */
+    approvalId?: string;
+  }>;
 }
 
 export interface OrchestratorDeps {
@@ -95,6 +123,13 @@ export interface OrchestratorDeps {
   autonomy: () => AutonomyPolicy;
   publish(type: string, payload: unknown, opts?: { source?: string }): void;
   now?(): string;
+  /** KAI's own tools for evidence collection (absent → supervision degrades honestly, never invents). */
+  tools?: SupervisorToolsPort;
+  /**
+   * Record a supervision lesson with provenance (wired to mission-scoped
+   * memory). Absent → lessons are traced but not persisted. Never throws.
+   */
+  rememberLesson?: (input: { scopeId: string; content: string; verified: string }) => { ok: boolean; refusal?: { reason?: string } };
   /**
    * OPTIONAL decision accelerator (JEV). Absent → deterministic only. KAI is
    * never dependent on it: correctness lives in the Outcome Gate, Guard and the
@@ -110,8 +145,11 @@ export interface ObjectiveInput {
   constraints?: string[];
   forbidden?: string[];
   successCriteria?: string[];
+  requiredEvidence?: string[];
+  evidenceLinks?: Record<string, string[]>;
   risk?: string;
   budget?: WorkBudget;
+  workingDir?: string;
   taskId?: string;
   missionId?: string;
   subtasks?: string[];
@@ -122,7 +160,14 @@ export interface StartOutcome {
   workItemId: string;
   childIds: string[];
   decision: RoutingDecision;
+  /**
+   * TRUE only once a worker was ACTUALLY dispatched through the
+   * policy-governed path. Planning/queueing alone is `planned`, never
+   * delegated — the old `delegated: true`-on-plan lie is gone.
+   */
   delegated: boolean;
+  /** A durable work item exists for this objective (planned, not necessarily running). */
+  planned: boolean;
   note: string;
 }
 
@@ -137,12 +182,66 @@ export interface RunOutcome {
   note: string;
 }
 
+export interface PendingEvidenceCheck {
+  label: string;
+  command: string;
+  args: string[];
+  cwd?: string;
+  reason: string;
+}
+
+export interface EvidenceGathered {
+  /** KAI-observed records (affirmative ones carry supports:[label]). */
+  observed: VerifiedEvidence[];
+  /** Checks parked for approval (durable; resume with the approval id). */
+  pending: PendingEvidenceCheck[];
+  /** Labels with no safe check (reason recorded, never invented). */
+  blocked: { label: string; reason: string }[];
+}
+
+/** Input to the external-report audit: what to audit and where to look. */
+export interface ExternalAuditInput {
+  reportText: string;
+  objective?: string;
+  workingDir?: string;
+  missionId?: string;
+  taskId?: string;
+  workerId?: string;
+}
+
+/**
+ * The audit's answer. `claims` are the worker's UNTRUSTED assertions, `observed`
+ * are the facts KAI established itself; `nextPrompt` is the concrete correction
+ * prompt, and `launched` says whether KAI auto-delegated it (only when autonomy
+ * permits) or left it for the user.
+ */
+export interface ExternalAuditResult {
+  workItemId: string;
+  claims: string[];
+  observed: VerifiedEvidence[];
+  unmetCriteria: string[];
+  missingEvidence: string[];
+  blockers: string[];
+  reviewNotes: string[];
+  limitation?: string;
+  nextPrompt: string;
+  launched: { started: boolean; workItemId?: string; reason: string };
+}
+
 export interface RunOpts {
   workerId?: string;
   approvalId?: string;
   candidates?: string[];
   role?: string;
   configVersion?: string;
+  /** Delegation depth for corrective children (0 = root objective). */
+  depth?: number;
+  /**
+   * Idempotency key for event-driven resumes (completion/approval event id).
+   * A resume carrying a key already recorded in outputs is a no-op — duplicate
+   * delivery can never double-execute.
+   */
+  resumeEventId?: string;
 }
 
 const HANDOFF_FORMAT = [
@@ -198,11 +297,17 @@ export function handoffFromText(text: string): WorkerHandoff {
   };
 }
 
-/** Structural verification: deliverable present, evidence cited, criteria met. */
+/**
+ * Structural verification ONLY: deliverable present, evidence CITED (counted,
+ * never trusted — worker `EVIDENCE:` text stays worker-reported), no blockers.
+ * Per-criterion truth is NOT decided here: every criterion is recorded
+ * UNVERIFIED until KAI-observed evidence or an independent review settles it
+ * at the Gate. The old substring/token match ("first 24 characters") is gone.
+ */
 export function verifyHandoff(handoff: WorkerHandoff, criteria: string[]): VerificationRecord {
   const checks: { name: string; met: boolean; detail?: string }[] = [
     { name: "deliverable present", met: handoff.result.trim().length > 0 },
-    { name: "evidence cited", met: handoff.evidence.length > 0, detail: `${handoff.evidence.length} item(s)` },
+    { name: "evidence cited", met: handoff.evidence.length > 0, detail: `${handoff.evidence.length} item(s) worker-reported` },
     {
       name: "no unresolved blockers",
       met: handoff.blockers.length === 0,
@@ -210,8 +315,12 @@ export function verifyHandoff(handoff: WorkerHandoff, criteria: string[]): Verif
     },
   ];
   for (const criterion of criteria) {
-    const hit = criterion.trim().length === 0 || handoff.result.toLowerCase().includes(criterion.toLowerCase().slice(0, 24));
-    checks.push({ name: `criterion: ${criterion.slice(0, 80)}`, met: hit });
+    const label = criterion.trim();
+    checks.push({
+      name: `criterion: ${label.slice(0, 80)}`,
+      met: false,
+      detail: label.length === 0 ? "empty criterion" : "unverified: needs KAI-observed evidence or independent review",
+    });
   }
   return { passed: checks.every((c) => c.met), criteria: checks, at: new Date().toISOString() };
 }
@@ -264,6 +373,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       childIds: [],
       decision: { decision: kind, workerIds: [], rationale, taskType: "general", difficulty: 0, alternatives: [] },
       delegated: false,
+      planned: false,
       note: rationale,
     });
     if (policy.level === 0) {
@@ -283,17 +393,36 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       {},
     );
     if (decision.decision === "DO_IT_SELF" || decision.decision === "ASK_USER") {
-      return { workItemId: "", childIds: [], decision, delegated: false, note: decision.rationale };
+      return { workItemId: "", childIds: [], decision, delegated: false, planned: false, note: decision.rationale };
     }
+    // Skill auto-selection (Phase 6): when the caller names none, ask the
+    // REAL registry for the top matches on the objective. Bodies load later
+    // (buildPrompt), capped; selection is recorded on the item either way.
+    let skillIds = input.skills ?? [];
+    if (skillIds.length === 0) {
+      try {
+        skillIds = deps.skills.relevant(input.objective, 3).map((s) => s.id).slice(0, 3);
+      } catch {
+        skillIds = [];
+      }
+    }
+    // Every supported requirement rides the item to the Gate (Phase 5).
     const created = deps.board.create({
       objective: input.objective,
       ...(input.deliverable !== undefined ? { deliverable: input.deliverable } : {}),
       ...(input.missionId !== undefined ? { missionId: input.missionId } : {}),
       ...(input.taskId !== undefined ? { taskId: input.taskId } : {}),
-      ...(input.skills !== undefined ? { skills: input.skills } : {}),
+      ...(skillIds.length > 0 ? { skills: skillIds } : {}),
+      ...(input.successCriteria !== undefined ? { criteria: input.successCriteria } : {}),
+      ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
+      ...(input.forbidden !== undefined ? { forbiddenOutcomes: input.forbidden } : {}),
+      ...(input.requiredEvidence !== undefined ? { requiredEvidence: input.requiredEvidence } : {}),
+      ...(input.evidenceLinks !== undefined ? { evidenceLinks: input.evidenceLinks } : {}),
+      ...(input.budget !== undefined ? { budget: input.budget } : {}),
+      ...(input.workingDir !== undefined ? { workingDir: input.workingDir } : {}),
     });
     if (!created.ok) {
-      return { workItemId: "", childIds: [], decision, delegated: false, note: `Work item refused: ${created.reason}` };
+      return { workItemId: "", childIds: [], decision, delegated: false, planned: false, note: `Work item refused: ${created.reason}` };
     }
     const childIds: string[] = [];
     for (const sub of input.subtasks ?? []) {
@@ -304,9 +433,21 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       );
       if (child.ok) childIds.push(child.value.id);
     }
-    deps.trace.record(ref(created.value), "plan", `Planned: ${input.objective.slice(0, 120)}`);
-    emit("delegation.routed", { workItemId: created.value.id, decision: decision.decision, rationale: decision.rationale });
-    return { workItemId: created.value.id, childIds, decision, delegated: true, note: decision.rationale };
+    deps.trace.record(
+      ref(created.value),
+      "plan",
+      `Planned: ${input.objective.slice(0, 120)}${skillIds.length > 0 ? ` (skills: ${skillIds.join(", ")})` : ""}`,
+    );
+    // Truthful lifecycle (Phase 2B): planning is PLANNED, not delegated. The
+    // item is durable and runnable; `delegated` flips only when a worker is
+    // actually dispatched through the policy-governed path in runWorkItem.
+    emit("work.planned", {
+      workItemId: created.value.id,
+      decision: decision.decision,
+      rationale: decision.rationale,
+      ...(skillIds.length > 0 ? { skills: skillIds } : {}),
+    });
+    return { workItemId: created.value.id, childIds, decision, delegated: false, planned: true, note: `${decision.rationale} — planned, awaiting dispatch (run to execute)` };
   }
 
   /** Evaluate state and select the next move. Pure decision, no execution. */
@@ -337,17 +478,85 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     }
   }
 
-  function buildPrompt(item: WorkItem, workerId: string, whySelected: string, previousAttempts: string[]): string {
+  function nowIso(): string {
+    try {
+      return deps.now?.() ?? new Date().toISOString();
+    } catch {
+      return new Date().toISOString();
+    }
+  }
+
+  /**
+   * Load the item's skill bodies once for this delegation and record RECEIPTS
+   * (Phase 6): id + version + content hash + bytes handed over. The receipts
+   * persist on the item, so "skill X was followed" is checkable against what
+   * actually loaded — never claimed from a list appearance.
+   */
+  function loadSkillReceipts(item: WorkItem): { bodies: Map<string, string>; receipts: SkillReceipt[] } {
+    const bodies = new Map<string, string>();
+    const receipts: SkillReceipt[] = [];
+    for (const sid of item.skills.slice(0, 5)) {
+      try {
+        const loaded = deps.skills.load(sid);
+        if (!loaded.ok || loaded.body === undefined) {
+          deps.trace.record(ref(item), "skill", `Skill ${sid} selected but unloadable: ${loaded.reason ?? "unknown"}`);
+          continue;
+        }
+        bodies.set(sid, loaded.body);
+        let version: string | undefined;
+        let hash: string | undefined;
+        try {
+          const inspected = deps.skills.inspect?.(sid);
+          version = inspected?.version;
+          hash = inspected?.hash;
+        } catch {
+          // Receipts never break delegation.
+        }
+        receipts.push({
+          id: sid,
+          ...(version !== undefined ? { version } : {}),
+          ...(hash !== undefined ? { hash } : {}),
+          bodyLength: loaded.body.length,
+          at: nowIso(),
+        });
+      } catch {
+        deps.trace.record(ref(item), "skill", `Skill ${sid} load threw; skipped`);
+      }
+    }
+    return { bodies, receipts };
+  }
+
+  function buildPrompt(
+    item: WorkItem,
+    workerId: string,
+    whySelected: string,
+    previousAttempts: string[],
+    preloaded?: Map<string, string>,
+  ): string {
     const skillContext = item.skills.length > 0
       ? item.skills
         .map((sid) => {
-          const loaded = deps.skills.load(sid);
-          return loaded.ok && loaded.body !== undefined ? `## ${sid}\n${loaded.body.slice(0, 1500)}` : null;
+          const body = preloaded?.get(sid) ?? (() => {
+            try {
+              const loaded = deps.skills.load(sid);
+              return loaded.ok ? loaded.body : undefined;
+            } catch {
+              return undefined;
+            }
+          })();
+          return body !== undefined ? `## ${sid}\n${body.slice(0, 1500)}` : null;
         })
         .filter((s): s is string => s !== null)
         .join("\n\n")
         .slice(0, 3000)
       : undefined;
+    // Full contract threading (Phase 5): criteria, constraints, forbidden
+    // outcomes, and evidence requirements reach the worker verbatim.
+    const criteria = item.criteria.length > 0
+      ? [...item.criteria]
+      : item.deliverable !== undefined
+        ? [`deliverable present: ${item.deliverable}`]
+        : [];
     return buildWorkerPrompt({
       mission: item.missionId ?? item.taskId ?? "direct objective",
       role: workerId,
@@ -356,14 +565,316 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       context: [],
       knownState: [],
       previousAttempts,
-      constraints: ["Stay inside the allowed scope.", "Return the HANDOFF FORMAT exactly."],
+      constraints: [...item.constraints, "Stay inside the allowed scope.", "Return the HANDOFF FORMAT exactly."],
       scope: item.tools.length > 0 ? `tools: ${item.tools.join(", ")}` : "read-only inspection",
       requiredOutput: item.deliverable ?? item.objective,
-      successCriteria: item.deliverable !== undefined ? [item.deliverable] : [],
-      verification: ["cite evidence", "name blockers plainly"],
-      budget: `attempt ${item.attempts + 1}`,
+      successCriteria: criteria,
+      verification: [
+        ...item.requiredEvidence.map((e) => `evidence required: ${e}`),
+        "cite evidence",
+        "name blockers plainly",
+      ],
+      budget: `attempt ${item.attempts + 1}${item.budget?.maxRetries !== undefined ? ` of ${item.budget.maxRetries} retries` : ""}`,
       handoffFormat: HANDOFF_FORMAT,
       ...(skillContext !== undefined && skillContext.length > 0 ? { skillContext } : {}),
+    });
+  }
+
+  // ── Evidence collection (Phase 3A/4): KAI inspects the workspace ITSELF ──
+
+  /** READ-only tools supervision may call directly (policy still gates each call). */
+  const EVIDENCE_READ_TOOLS = new Set([
+    "filesystem.read",
+    "filesystem.list",
+    "filesystem.search",
+    "filesystem.metadata",
+    "git.status",
+    "git.log",
+    "git.diff",
+  ]);
+
+  function clipPreview(value: string, budget = 2000): string {
+    const redacted = redactText(value);
+    return redacted.length <= budget ? redacted : `${redacted.slice(0, budget)}…(truncated)`;
+  }
+
+  /** Ground a requirement label in a claimed artifact (exact/suffix match only). */
+  function matchArtifact(label: string, artifacts: string[]): string | null {
+    const norm = (s: string): string => s.replace(/\\/g, "/").toLowerCase();
+    const want = norm(label);
+    for (const artifact of artifacts) {
+      const have = norm(artifact);
+      if (have.length === 0) continue;
+      if (want === have || want.includes(have)) return artifact;
+      const base = have.split("/").pop() ?? "";
+      if (base.length > 3 && want.includes(base)) return artifact;
+    }
+    return null;
+  }
+
+  /**
+   * Parse an explicit, safely-runnable test/build command from a requirement
+   * label. STRICT allowlist shapes only (program + constrained args, no shell
+   * metacharacters — the executor runs argv without a shell anyway). This is
+   * ROUTING, not adjudication: the real exit code decides. Anything else
+   * returns null (recorded unsupported, never guessed).
+   */
+  function testCommandFor(label: string): { command: string; args: string[] } | null {
+    if (/[;&|><$`(){}\[\]!*?]/.test(label)) return null;
+    const m = /\b((?:npm|npx|node|cargo|pytest|python|go|tsc)(?:\s+[A-Za-z0-9_./:=-]+)*)/i.exec(label);
+    if (m === null || m[1] === undefined) return null;
+    const parts = m[1].trim().split(/\s+/);
+    const command = parts[0]?.toLowerCase();
+    const args = parts.slice(1);
+    if (command === undefined) return null;
+    if (command === "npm" && (args[0] === "test" || (args[0] === "run" && args[1] !== undefined))) {
+      return { command, args };
+    }
+    if (command === "npx" && args[0] === "tsc" && args.includes("--noEmit")) return { command, args };
+    if (command === "node" && args[0] === "--test") return { command, args };
+    if (command === "cargo" && args[0] === "test") return { command, args };
+    if (command === "pytest" && args.every((a) => !a.startsWith("-") || a === "-q")) return { command, args };
+    if (command === "go" && args[0] === "test") return { command, args };
+    if (command === "tsc" && args.includes("--noEmit")) return { command, args };
+    return null;
+  }
+
+  /**
+   * Run the safe checks behind required-evidence labels and return typed
+   * records. READ inspection runs immediately through the policy-governed
+   * tools port; test/build commands run only when autonomy permits
+   * (AUTO → execute, ASK → pending approval linkage, OFF → blocked). A
+   * negative finding is recorded with EMPTY supports — it informs, it never
+   * satisfies. Throws nothing; every label lands in exactly one bucket.
+   */
+  async function gatherEvidence(
+    item: WorkItem,
+    handoff: WorkerHandoff,
+    entries: string[],
+    opts?: { approvalId?: string },
+  ): Promise<EvidenceGathered> {
+    const observed: VerifiedEvidence[] = [];
+    const pending: PendingEvidenceCheck[] = [];
+    const blocked: { label: string; reason: string }[] = [];
+    const base = (item.evidence ?? []).length;
+    let seq = 0;
+    const mkId = (): string => `ev_${item.id}_${base + (seq += 1)}`;
+    const at = nowIso();
+    const cwd = item.workingDir;
+    const invokeOpts = {
+      ...(item.missionId !== undefined ? { missionId: item.missionId } : {}),
+      turnId: `supervise:${item.id}`,
+      source: "orchestrator:verify",
+      ...(opts?.approvalId !== undefined ? { approvalId: opts.approvalId } : {}),
+    };
+    if (deps.tools === undefined) {
+      return {
+        observed,
+        pending,
+        blocked: entries.map((label) => ({
+          label,
+          reason: "no tools port: supervision cannot inspect; worker claims stay unverified",
+        })),
+      };
+    }
+    const tools = deps.tools;
+    const policy = autonomy();
+    for (const label of entries) {
+      // 1. Claimed-artifact checks: existence + working-tree state.
+      const artifact = matchArtifact(label, handoff.changedArtifacts);
+      if (artifact !== null) {
+        try {
+          const meta = await tools.invoke("filesystem.metadata", { path: artifact }, invokeOpts);
+          const info = meta.ok && typeof meta.result === "object" && meta.result !== null
+            ? (meta.result as Record<string, unknown>)
+            : null;
+          const exists = meta.ok && info?.["exists"] === true;
+          let diffNote = "";
+          try {
+            const st = await tools.invoke(
+              "git.status",
+              { ...(cwd !== undefined ? { cwd } : {}) },
+              invokeOpts,
+            );
+            if (st.ok) diffNote = ` git: ${clipPreview(JSON.stringify(st.result)).slice(0, 300)}`;
+          } catch {
+            // Status is enrichment; existence is the verdict.
+          }
+          observed.push({
+            id: mkId(),
+            kind: "file state",
+            source: "kai-observed",
+            method: "filesystem.metadata + git.status",
+            detail: exists
+              ? `${artifact} exists${typeof info?.["size"] === "number" ? ` (${info["size"]} bytes)` : ""}.${diffNote}`
+              : `${artifact} ABSENT — claimed change not on disk.${diffNote}`,
+            path: artifact,
+            supports: exists ? [label] : [],
+            at,
+          });
+        } catch (error) {
+          blocked.push({ label, reason: `artifact check threw: ${error instanceof Error ? error.message : String(error)}`.slice(0, 200) });
+        }
+        continue;
+      }
+      // 2. Test/build commands: explicit shapes only, autonomy-gated.
+      const cmd = testCommandFor(label);
+      if (cmd !== null) {
+        const verdict = autoVerdict(policy, "verify", "DESTRUCTIVE");
+        if (verdict === "OFF") {
+          blocked.push({ label, reason: "verification OFF by autonomy policy" });
+          continue;
+        }
+        if (verdict === "ASK" && opts?.approvalId === undefined) {
+          pending.push({ label, ...cmd, ...(cwd !== undefined ? { cwd } : {}), reason: "shell execution needs approval" });
+          continue;
+        }
+        try {
+          const ran = await tools.invoke(
+            "shell.run",
+            { command: cmd.command, args: cmd.args, ...(cwd !== undefined ? { cwd } : {}), timeoutMs: 120000 },
+            invokeOpts,
+          );
+          if (!ran.ok && ran.error?.code === "APPROVAL_REQUIRED") {
+            pending.push({
+              label,
+              ...cmd,
+              ...(cwd !== undefined ? { cwd } : {}),
+              reason: `parked for approval ${ran.approvalId ?? "(registry)"}`,
+            });
+            continue;
+          }
+          if (!ran.ok) {
+            blocked.push({ label, reason: `check refused: ${ran.error?.code ?? "unknown"} — ${ran.error?.message ?? ""}`.slice(0, 200) });
+            continue;
+          }
+          const value = (ran.result ?? {}) as Record<string, unknown>;
+          const exitCode = typeof value["exitCode"] === "number" ? value["exitCode"] : null;
+          const out = clipPreview(
+            `${typeof value["stdout"] === "string" ? value["stdout"] : ""}\n${typeof value["stderr"] === "string" ? value["stderr"] : ""}`.trim(),
+          );
+          const passed = exitCode === 0;
+          observed.push({
+            id: mkId(),
+            kind: "test result",
+            source: "kai-observed",
+            method: "shell.run",
+            detail: passed
+              ? `${cmd.command} ${cmd.args.join(" ")} exited 0.`
+              : `${cmd.command} ${cmd.args.join(" ")} exited ${exitCode ?? "?"} — failing output retained.`,
+            command: `${cmd.command} ${cmd.args.join(" ")}${cwd !== undefined ? ` (cwd ${cwd})` : ""}`,
+            exitCode,
+            outputPreview: out,
+            supports: passed ? [label] : [],
+            at,
+          });
+        } catch (error) {
+          blocked.push({ label, reason: `test run threw: ${error instanceof Error ? error.message : String(error)}`.slice(0, 200) });
+        }
+        continue;
+      }
+      // 3. Nothing safe applies.
+      blocked.push({ label, reason: "no safe check available: name a claimed file path or an explicit test command" });
+    }
+    return { observed, pending, blocked };
+  }
+
+  /**
+   * Record a supervision lesson on verified completion (Phase 10): mission-
+   * scoped, provenance-carrying, gate verdict as the verified basis. A worker's
+   * assertion is never saved as trusted memory — only KAI's own verified
+   * outcome is. Refusals are surfaced in the trace, never swallowed; lessons
+   * never break completion.
+   */
+  function recordCompletionLesson(item: WorkItem, handoff: WorkerHandoff, gateResult: string): void {
+    if (deps.rememberLesson === undefined) return;
+    const missionId = item.missionId;
+    if (missionId === undefined || missionId.length === 0) return;
+    try {
+      const lines = [
+        `Work completed and verified: ${item.objective.slice(0, 200)}`,
+        `verified basis: outcome-gate ${gateResult}`,
+        `criteria: ${item.criteria.slice(0, 5).join("; ").slice(0, 300) || "(deliverable)"}`,
+        `evidence records: ${(item.evidence ?? []).filter((r) => r.source === "kai-observed").length} observed`,
+      ];
+      if (handoff.blockers.length > 0) lines.push(`residual risks: ${handoff.blockers.slice(0, 3).join("; ").slice(0, 200)}`);
+      if (handoff.risks.length > 0) lines.push(`noted risks: ${handoff.risks.slice(0, 3).join("; ").slice(0, 200)}`);
+      const outcome = deps.rememberLesson({ scopeId: missionId, content: lines.join("\n"), verified: `outcome-gate:${gateResult}` });
+      if (!outcome.ok) {
+        deps.trace.record(ref(item), "memory", `Supervision lesson refused: ${outcome.refusal?.reason ?? "unknown"}`);
+      }
+    } catch {
+      // Lessons never break completion.
+    }
+  }
+
+  /**
+   * Continue a WAITING/CHANGES_REQUESTED item's evidence collection (approval
+   * verdicts, restarts, supervisor resumes land here). Never restarts
+   * delegation: it gathers with the stored handoff, merges observations, and
+   * re-gates through finishComplete.
+   */
+  async function resumeEvidenceRun(
+    id: string,
+    item: WorkItem,
+    labels: string[],
+    opts: RunOpts,
+    dedupeKey?: string,
+  ): Promise<RunOutcome> {
+    const claimed = deps.board.claim(id, item.workerId ?? "supervisor");
+    if (!claimed.ok) return { workItemId: id, state: item.state, note: claimed.reason };
+    if (dedupeKey !== undefined) markResumeKey(id, dedupeKey);
+    deps.trace.record(ref(claimed.value), "verify", `Resuming evidence collection (${labels.length} label(s))`);
+    emit("worker.progress", { workItemId: id, phase: "evidence", result: "resumed" });
+    const handoff = item.handoff ?? emptyFailedHandoff("resume without prior handoff");
+    const gathered = await gatherEvidence(
+      claimed.value,
+      handoff,
+      labels.slice(0, 8),
+      { ...(opts.approvalId !== undefined ? { approvalId: opts.approvalId } : {}) },
+    );
+    mergeEvidence(id, gathered.observed);
+    if (gathered.pending.length > 0) {
+      const first = gathered.pending[0]!;
+      const approval = deps.approvals.request({
+        toolId: "orchestrator.verify",
+        action: `run evidence checks for work item ${id}`,
+        reason: `Evidence requires guarded execution: ${first.label.slice(0, 120)}`,
+        risk: "DESTRUCTIVE",
+      });
+      deps.board.wait(id, `evidence gathering parked for approval ${approval.id}`);
+      const cur = deps.board.get(id);
+      if (cur !== null) {
+        const outputs = readOutputs(cur);
+        deps.board.annotate(id, {
+          ...outputs,
+          parked: { approvalId: approval.id, workerId: item.workerId, kind: "evidence" },
+          pendingEvidence: { labels: gathered.pending.map((p) => p.label), requestedAt: nowIso() },
+        });
+      }
+      emit("worker.waiting", { workItemId: id, approvalId: approval.id, reason: "evidence checks need approval" });
+      emit("approval.requested", { approvalId: approval.id, workItemId: id, reason: "evidence checks need approval" });
+      const stored = deps.board.get(id);
+      return {
+        workItemId: id,
+        state: "WAITING",
+        handoff,
+        verification: stored?.verification ?? verifyHandoff(handoff, []),
+        parkedApprovalId: approval.id,
+        note: `Evidence gathering parked for approval ${approval.id}`,
+      };
+    }
+    const stored = deps.board.get(id) ?? claimed.value;
+    const verification = stored.verification ?? verifyHandoff(handoff, stored.deliverable !== undefined ? [stored.deliverable] : []);
+    const review = stored.review !== undefined
+      ? { verdict: stored.review.verdict, findings: stored.review.findings }
+      : null;
+    return finishComplete(id, stored.workerId ?? item.workerId ?? "supervisor", handoff, verification, review, {
+      latencyMs: 0,
+      role: "worker",
+      configVersion: "v1",
+      domain: "general",
+      ...(opts.approvalId !== undefined ? { approvalId: opts.approvalId } : {}),
     });
   }
 
@@ -372,6 +883,27 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     const item = deps.board.get(id);
     if (item === null) return { workItemId: id, state: "UNKNOWN", note: `unknown work item "${id}"` };
     const policy = autonomy();
+    // Duplicate-delivery guard (Phase 2C/12-10): a resume key (completion /
+    // approval event id) recorded on the item makes a redelivered trigger a
+    // no-op. External side effects are never blindly replayed.
+    const outputs0 = readOutputs(item);
+    const resumeKeys = Array.isArray(outputs0["resumeKeys"]) ? (outputs0["resumeKeys"] as string[]) : [];
+    const dedupeKey = opts.resumeEventId ?? (opts.approvalId !== undefined ? `approval:${opts.approvalId}` : undefined);
+    if (dedupeKey !== undefined && resumeKeys.includes(dedupeKey)) {
+      return { workItemId: id, state: item.state, note: `duplicate delivery ${dedupeKey} ignored — no double execution` };
+    }
+
+    // Resume path: a WAITING/CHANGES_REQUESTED item with pending evidence
+    // continues gathering (e.g. after an approval verdict or a restart)
+    // instead of restarting delegation from scratch.
+    const pending = outputs0["pendingEvidence"] as { labels?: string[] } | undefined;
+    if (
+      (item.state === "WAITING" || item.state === "CHANGES_REQUESTED") &&
+      pending !== undefined && Array.isArray(pending.labels) && pending.labels.length > 0
+    ) {
+      return resumeEvidenceRun(id, item, pending.labels, opts, dedupeKey);
+    }
+
     const analysis = deps.dispatcher.analyze(item.objective);
 
     // Worker selection: explicit > ranked (avoiding repeat failures).
@@ -400,8 +932,32 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       }
     }
 
+    // ── RETRY BUDGET, ENFORCED AT THE BOUNDARY ───────────────────────────────
+    // The budget is per (item, worker): `1 + maxRetries` dispatches BY THE SAME
+    // WORKER. That is the retry this boundary must not let a caller bypass — the
+    // API, the UI's run control, or a supervisor resume hammering the same
+    // failed item — and it is checked HERE, from the durable per-worker count,
+    // before any claim or delegation.
+    //
+    // It is deliberately NOT a per-item cap: a switch to a DIFFERENT worker is
+    // the breaker's sanctioned "never blind retry" path (./bench.ts, and
+    // scripts/orch-e2e.mjs S2), so it starts with its own allowance instead of
+    // being refused for the previous worker's failures. A user who wants
+    // another attempt from an exhausted worker creates a new work item.
+    const maxRetries = item.budget?.maxRetries ?? policy.budgets.maxRetries ?? policy.maxDepth;
+    const dispatchBudget = 1 + Math.max(0, maxRetries);
+    const used = dispatchCountFor(item, workerId);
+    if (used >= dispatchBudget) {
+      const note = `retry budget spent for ${workerId} (${used}/${dispatchBudget} dispatches) — re-entry refused at the orchestration boundary; assign a different worker or create a new item`;
+      deps.trace.record(ref(item), "error", note);
+      emit("worker.progress", { workItemId: id, phase: "retry", result: "refused", workerId, attempts: used, max: dispatchBudget });
+      recordNextAction(id, "STOP", note, "blocked");
+      return { workItemId: id, state: item.state, note };
+    }
+
     const claimed = deps.board.claim(id, workerId);
     if (!claimed.ok) return { workItemId: id, state: item.state, note: claimed.reason };
+    markDispatch(id, workerId);
     deps.trace.record(ref(claimed.value), "worker", `${workerId} working`);
     emit("worker.started", { workItemId: id, workerId });
     deps.board.heartbeat(id, "started", workerId);
@@ -420,8 +976,15 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       return { workItemId: id, state: "BLOCKED", note: "Delegation is OFF." };
     }
 
-    const prompt = buildPrompt(claimed.value, workerId, whySelected, item.failures);
+    // Skill receipts: what was actually selected AND loaded for this run.
+    const { bodies: skillBodies, receipts } = loadSkillReceipts(claimed.value);
+    if (receipts.length > 0) deps.board.recordSkillReceipts(id, receipts);
+    const prompt = buildPrompt(claimed.value, workerId, whySelected, item.failures, skillBodies);
     const pattern = selectPattern(deps.patterns, analysis.taskType);
+    // The execution consumes the idempotency key (approval or resume event):
+    // a redelivered trigger after this point is a duplicate, never a rerun.
+    if (dedupeKey !== undefined) markResumeKey(id, dedupeKey);
+    emit("delegation.routed", { workItemId: id, workerId, decision: "DELEGATE_ONE", rationale: whySelected });
     let delegated: DelegateResult;
     try {
       delegated = await deps.delegate({
@@ -522,6 +1085,11 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     const item = deps.board.get(id);
     if (item === null) return { workItemId: id, state: "UNKNOWN", note: `unknown work item "${id}"` };
     const handoff = handoffFromText(reply);
+    // Persist what the worker actually said BEFORE any review or evidence
+    // gathering: a run that parks (review ASK, guarded check) must be
+    // resumable, and the resume re-gates on THIS handoff. Losing it here made
+    // a parked item unresolvable (an empty failed handoff blocked its own gate).
+    deps.board.recordHandoff(id, handoff);
     const criteria = item.deliverable !== undefined ? [item.deliverable] : [];
     const verification = verifyHandoff(handoff, criteria);
 
@@ -638,6 +1206,27 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     deps.board.heartbeat(id, "retry", `review round: ${loop.findings.length} finding(s)`);
     deps.trace.record(ref({ ...item, workerId }), "review", `Changes requested (${loop.findings.length} findings) — retrying`);
     recordBench(id, workerId, ctx, handoff, verification, "CHANGES_REQUESTED");
+    // The retry is a NEW delegation, not a continuation: it re-passes policy
+    // and needs a FRESH approval. Reusing the spent approvalId (or skipping
+    // the check) would execute a second action on one human answer.
+    const retryGate = await deps.policyCheck({ toolId: "agents.run_task", action: `retry ${workerId} after review`, risk: "EXTERNAL" });
+    if (retryGate.outcome === "deny") {
+      deps.board.block(id, `policy denied review retry: ${retryGate.reason}`);
+      return { workItemId: id, state: "BLOCKED", handoff, verification, note: `Policy denied review retry: ${retryGate.reason}` };
+    }
+    if (autoVerdict(policy, "retry", "EXTERNAL") === "ASK") {
+      const approval = deps.approvals.request({
+        toolId: "agents.run_task",
+        action: `retry ${workerId} after review`,
+        reason: "review retry needs a fresh approval (the prior one is spent)",
+        risk: "EXTERNAL",
+      });
+      deps.board.wait(id, `review retry waiting for approval ${approval.id}`);
+      deps.board.annotate(id, { parked: { approvalId: approval.id, workerId, kind: "review-retry" } });
+      deps.trace.record(ref({ ...item, workerId }), "approval", `Review retry waiting for approval ${approval.id}`);
+      emit("worker.waiting", { workItemId: id, workerId, approvalId: approval.id, reason: "review retry needs a fresh approval" });
+      return { workItemId: id, state: "WAITING", handoff, verification, parkedApprovalId: approval.id, note: `Review retry waiting for approval ${approval.id}` };
+    }
     // Retry now with the review findings as previous attempts.
     const retryItem = deps.board.get(id);
     const prompt = buildPrompt(retryItem ?? item, workerId, `retry after review: ${loop.findings.slice(0, 3).join("; ").slice(0, 300)}`, [
@@ -646,11 +1235,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     ]);
     let delegated: DelegateResult;
     try {
-      delegated = await deps.delegate({
-        agentId: workerId,
-        prompt,
-        ...(ctx.approvalId !== undefined ? { approvalId: ctx.approvalId } : {}),
-      });
+      delegated = await deps.delegate({ agentId: workerId, prompt });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       deps.board.fail(id, reason);
@@ -733,29 +1318,162 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     return profile.overallValue;
   }
 
-  /** The mission's Outcome Contract: the caller's, or one synthesized from the
-   * item — persisted on the item's `outputs` so a resume never forgets it. */
+  /** The mission's Outcome Contract: the caller's persisted fields, or one
+   * synthesized from the item — persisted on the item's `outputs` so a resume
+   * never forgets it. Every supported requirement rides the item (Phase 5). */
   function outcomeContractFor(item: WorkItem): OutcomeContract {
     const outputs = (item.outputs ?? {}) as { contract?: OutcomeContract };
     if (outputs.contract !== undefined && typeof outputs.contract === "object") return outputs.contract;
+    const criteria = item.criteria.length > 0
+      ? [...item.criteria]
+      : item.deliverable !== undefined
+        ? [`deliverable present: ${item.deliverable}`]
+        : [];
     const contract = createOutcomeContract({
       missionId: item.missionId ?? item.taskId ?? item.id,
       intent: item.objective,
       ...(item.deliverable !== undefined ? { deliverables: [item.deliverable] } : {}),
+      ...(item.constraints.length > 0 ? { constraints: [...item.constraints] } : {}),
+      ...(criteria.length > 0 ? { acceptanceCriteria: criteria } : {}),
+      ...(item.requiredEvidence.length > 0 ? { requiredEvidence: [...item.requiredEvidence] } : {}),
+      ...(item.evidenceLinks !== undefined ? { evidenceLinks: { ...item.evidenceLinks } } : {}),
+      ...(item.forbiddenOutcomes.length > 0 ? { forbiddenOutcomes: [...item.forbiddenOutcomes] } : {}),
+      ...(item.budget?.maxRetries !== undefined ? { maxRetries: item.budget.maxRetries } : {}),
     });
     deps.board.annotate(item.id, { ...outputs, contract });
     return contract;
   }
 
-  /** Does `criterion` appear satisfied by the observed result + evidence? */
-  function criterionMet(criterion: string, result: string, evidence: string, verificationPassed: boolean): boolean {
-    if (!verificationPassed) return false;
-    if (criterion.startsWith("deliverable present") || criterion === "a user-facing deliverable exists") {
-      return result.trim().length > 0;
+  /** Read the persisted outputs object safely (always an object for merging). */
+  function readOutputs(item: WorkItem): Record<string, unknown> {
+    const outputs = item.outputs as Record<string, unknown> | null | undefined;
+    return outputs !== null && typeof outputs === "object" && !Array.isArray(outputs) ? { ...outputs } : {};
+  }
+
+  function markResumeKey(id: string, key: string): void {
+    const cur = deps.board.get(id);
+    if (cur === null) return;
+    const outputs = readOutputs(cur);
+    const keys = Array.isArray(outputs["resumeKeys"]) ? (outputs["resumeKeys"] as string[]) : [];
+    if (!keys.includes(key)) {
+      deps.board.annotate(id, { ...outputs, resumeKeys: [...keys.slice(-19), key] });
     }
-    const tokens = criterion.toLowerCase().match(/[a-z0-9]+/g)?.filter((t) => t.length >= 4) ?? [];
-    const hay = `${result}\n${evidence}`.toLowerCase();
-    return tokens.length === 0 ? true : tokens.some((t) => hay.includes(t));
+  }
+
+  /** The durable dispatch count for one (item, worker) — the retry-budget basis. */
+  function dispatchCountFor(item: WorkItem, workerId: string): number {
+    const byWorker = readOutputs(item)["dispatchByWorker"];
+    if (byWorker === null || typeof byWorker !== "object" || Array.isArray(byWorker)) return 0;
+    const count = (byWorker as Record<string, unknown>)[workerId];
+    return typeof count === "number" && Number.isFinite(count) ? count : 0;
+  }
+
+  /** Record one dispatch by `workerId`; persisted so a restart cannot reset it. */
+  function markDispatch(id: string, workerId: string): void {
+    const cur = deps.board.get(id);
+    if (cur === null) return;
+    const outputs = readOutputs(cur);
+    const byWorker = outputs["dispatchByWorker"];
+    const counts: Record<string, number> =
+      byWorker !== null && typeof byWorker === "object" && !Array.isArray(byWorker)
+        ? { ...(byWorker as Record<string, number>) }
+        : {};
+    counts[workerId] = (typeof counts[workerId] === "number" ? counts[workerId] : 0) + 1;
+    deps.board.annotate(id, { ...outputs, dispatchByWorker: counts });
+  }
+
+  /** Merge observed records into the item (dedupe by evidence id). */
+  function mergeEvidence(id: string, records: VerifiedEvidence[]): void {
+    if (records.length === 0) return;
+    deps.board.recordEvidence(id, records);
+    const cur = deps.board.get(id);
+    if (cur === null) return;
+    const outputs = readOutputs(cur);
+    deps.board.annotate(id, {
+      ...outputs,
+      evidenceRounds: (typeof outputs["evidenceRounds"] === "number" ? outputs["evidenceRounds"] : 0) + 1,
+    });
+  }
+
+  function currentEvidence(item: WorkItem): VerifiedEvidence[] {
+    return [...(item.evidence ?? [])];
+  }
+
+  /** Record the supervisor's selected corrective step (durable + emitted). */
+  function recordNextAction(
+    id: string,
+    action: string,
+    reason: string,
+    state: "proposed" | "queued" | "running" | "done" | "blocked" | "waiting-approval",
+    extra?: { workItemId?: string; approvalId?: string },
+  ): void {
+    const cur = deps.board.get(id);
+    if (cur === null) return;
+    const outputs = readOutputs(cur);
+    const refItem = deps.board.get(id);
+    if (refItem !== null) {
+      deps.trace.record(
+        { taskId: refItem.taskId, workItemId: refItem.id, ...(refItem.workerId !== undefined ? { workerId: refItem.workerId } : {}) },
+        "verify",
+        `Next: ${action} — ${reason.slice(0, 160)}`,
+      );
+    }
+    deps.board.annotate(id, {
+      ...outputs,
+      nextAction: { action, reason: reason.slice(0, 500), state, ...(extra ?? {}), at: nowIso() },
+    });
+    emit("worker.progress", { workItemId: id, phase: "next_action", action, reason, state });
+  }
+
+  interface GateEvaluation {
+    contract: OutcomeContract;
+    observation: Observation;
+    gate: import("./outcome.ts").OutcomeGateDecision;
+    observed: VerifiedEvidence[];
+  }
+
+  /**
+   * THE OUTCOME GATE IS THE COMPLETION AUTHORITY — one evaluation helper used
+   * by every completion path. Structural verification and review are INPUTS.
+   * A worker's claim, a passing test, a PASS review, or "no actions left"
+   * never complete a mission — only OutcomeGate = PASS does.
+   */
+  function evaluateGate(
+    doneItem: WorkItem,
+    handoff: WorkerHandoff,
+    review: { verdict: ReviewVerdict; findings: string[] } | null,
+  ): GateEvaluation {
+    const contract = outcomeContractFor(doneItem);
+    // CLAIM vs OBSERVATION split (Phase 3A): the worker's EVIDENCE:/TESTS:
+    // sections ride along LABELED worker-reported for display — they NEVER
+    // satisfy a requirement. Only KAI-observed records collected by evidence
+    // gathering settle criteria, via exact-label links.
+    const observed: VerifiedEvidence[] = currentEvidence(doneItem).filter(
+      (record) => record.source === "kai-observed",
+    );
+    const reported: VerifiedEvidence[] = handoff.evidence.map((text, index) => ({
+      id: `ev_${doneItem.id}_worker_${index}`,
+      kind: "worker claim",
+      source: "worker-reported" as const,
+      method: "worker-handoff",
+      detail: text.slice(0, 500),
+      supports: [],
+      at: nowIso(),
+    }));
+    const compensated = review?.verdict === "PASS";
+    const deliverablePresent = handoff.result.trim().length > 0;
+    const criteriaMet: Record<string, boolean> = {};
+    for (const c of contract.acceptanceCriteria) {
+      criteriaMet[c] = criterionMet(contract, c, observed, { compensated, deliverablePresent });
+    }
+    const observation: Observation = {
+      deliverable: handoff.result,
+      evidence: [...observed, ...reported],
+      criteriaMet,
+      ...(handoff.changedArtifacts.length > 0 ? { changedArtifacts: handoff.changedArtifacts } : {}),
+      unresolvedBlockers: handoff.blockers,
+    };
+    return { contract, observation, gate: evaluateOutcome(contract, observation), observed };
   }
 
   async function finishComplete(
@@ -769,22 +1487,8 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     const doneItem = deps.board.get(id);
     if (doneItem === null) return { workItemId: id, state: "UNKNOWN", note: `unknown work item "${id}"` };
 
-    // ── THE OUTCOME GATE IS THE COMPLETION AUTHORITY ────────────────────────
-    // Structural verification and review are INPUTS. A worker's claim, a
-    // passing test, a PASS review, or "no actions left" never complete a
-    // mission — only OutcomeGate = PASS does.
-    const contract = outcomeContractFor(doneItem);
-    const evidenceText = [...handoff.evidence, ...verification.criteria.filter((c) => c.met).map((c) => c.name)].join("\n");
-    const criteriaMet: Record<string, boolean> = {};
-    for (const c of contract.acceptanceCriteria) criteriaMet[c] = criterionMet(c, handoff.result, evidenceText, verification.passed);
-    const observation: Observation = {
-      deliverable: handoff.result,
-      evidence: handoff.evidence,
-      criteriaMet,
-      ...(handoff.changedArtifacts.length > 0 ? { changedArtifacts: handoff.changedArtifacts } : {}),
-      unresolvedBlockers: handoff.blockers,
-    };
-    const gate = evaluateOutcome(contract, observation);
+    const first = evaluateGate(doneItem, handoff, review);
+    const gate = first.gate;
 
     if (gate.result !== "PASS") {
       // NOT complete. Route through the Decision Kernel (advisory) and apply
@@ -813,20 +1517,17 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       // Safe, operational trace — never private reasoning.
       deps.trace.record(ref(doneItem), "verify", `Outcome not met (${gate.result}): ${gate.reason}`);
       emit("worker.progress", { workItemId: id, phase: "evaluation", result: gate.result, reason: gate.reason });
-      emit("worker.progress", { workItemId: id, phase: "next_action", action: decision.action, reason: decision.reason });
-      const needsEvidence = decision.action === "RUN_TESTS" || decision.action === "VERIFY" || decision.action === "INSPECT";
-      // Evidence-gathering and corrective actions keep the mission OPEN
-      // (CHANGES_REQUESTED → the loop continues); only a hard RETRY/FAIL
-      // (deliverable genuinely absent) lands FAILED.
-      if (needsEvidence || decision.action === "ASK_USER" || decision.action === "REPLAN" || decision.action === "CHANGE_WORKER") {
-        deps.board.changesRequested(id, [`${gate.result}: ${gate.reason}`, `next: ${decision.action}`]);
-      } else {
-        deps.board.fail(id, `${gate.result}: ${gate.reason}`);
-      }
+      // Phase 4: the decision EXECUTES (bounded, policy-governed) instead of
+      // stalling in CHANGES_REQUESTED. Each branch below either gathers real
+      // evidence and re-gates, runs a bounded correction, or parks visibly.
+      const acted = await executeCorrective(id, workerId, handoff, verification, review, ctx, decision.action, decision.reason, gate);
+      if (acted !== null) return acted;
+      // No execution path applied (ASK_USER parks below; anything else here
+      // is a hard stop): record and settle honestly.
       recordBench(id, workerId, ctx, handoff, verification, review?.verdict ?? null);
       return {
         workItemId: id,
-        state: needsEvidence ? "CHANGES_REQUESTED" : "FAILED",
+        state: "FAILED",
         handoff,
         verification,
         ...(review !== null ? { review } : {}),
@@ -835,12 +1536,313 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     }
 
     // Gate PASSED: this is the ONLY route to COMPLETED.
-    for (const skillId of doneItem.skills) {
-      try {
-        deps.learning.recordSkillUsage(skillId, { success: true, ...(verification.passed ? { verified: true } : {}) });
-      } catch {
-        // Metrics never break completion.
+    return completeItem(id, workerId, handoff, verification, review, ctx, gate.result);
+  }
+
+  /**
+   * Execute one corrective round for a gate that did not pass, then re-gate.
+   * Returns a RunOutcome when the round settles the item, or null when the
+   * caller should fall through to the hard-stop path. Bounded everywhere:
+   * evidence rounds capped, children depth-capped, approvals never reused.
+   */
+  async function executeCorrective(
+    id: string,
+    workerId: string,
+    handoff: WorkerHandoff,
+    verification: VerificationRecord,
+    review: { verdict: ReviewVerdict; findings: string[] } | null,
+    ctx: CompletionCtx,
+    action: KernelAction,
+    reason: string,
+    gate: import("./outcome.ts").OutcomeGateDecision,
+  ): Promise<RunOutcome | null> {
+    const policy = autonomy();
+    const needsEvidence = action === "RUN_TESTS" || action === "VERIFY" || action === "INSPECT";
+
+    if (needsEvidence) {
+      // Which labels still need settling: unmet criteria links + missing entries.
+      const item = deps.board.get(id);
+      if (item === null) return null;
+      const contract = outcomeContractFor(item);
+      const wanted = new Set<string>();
+      for (const c of gate.unmetCriteria) {
+        const links = contract.evidenceLinks?.[c] ?? contract.requiredEvidence;
+        for (const entry of links) wanted.add(entry);
       }
+      for (const entry of gate.missingEvidence) wanted.add(entry);
+      const entries = [...wanted].slice(0, 8);
+      recordNextAction(id, action, reason, "running");
+      const round = await collectEvidenceRound(id, handoff, entries, ctx.approvalId);
+      if (round.parked !== undefined) {
+        // Policy wants a human for the shell checks: durable park with
+        // linkage; onApprovalDecided resumes exactly here, even restarted.
+        deps.board.wait(id, `evidence gathering parked for approval ${round.parked.approvalId}`);
+        const cur = deps.board.get(id);
+        if (cur !== null) {
+          const outputs = readOutputs(cur);
+          deps.board.annotate(id, {
+            ...outputs,
+            parked: { approvalId: round.parked.approvalId, workerId, kind: "evidence" },
+            pendingEvidence: { labels: round.parked.labels, requestedAt: nowIso() },
+          });
+        }
+        deps.trace.record(ref(item), "approval", `Evidence checks waiting for approval ${round.parked.approvalId}`);
+        emit("worker.waiting", { workItemId: id, workerId, approvalId: round.parked.approvalId, reason: "evidence checks need approval" });
+        recordNextAction(id, action, reason, "waiting-approval", { approvalId: round.parked.approvalId });
+        return { workItemId: id, state: "WAITING", handoff, verification, ...(review !== null ? { review } : {}), parkedApprovalId: round.parked.approvalId, note: `Evidence gathering parked for approval ${round.parked.approvalId}` };
+      }
+      // Re-gate with what KAI itself just established.
+      const re = evaluateGate(deps.board.get(id) ?? item, handoff, review);
+      if (re.gate.result === "PASS") {
+        recordNextAction(id, action, reason, "done");
+        return completeItem(id, workerId, handoff, verification, review, ctx, re.gate.result);
+      }
+      deps.board.changesRequested(id, [`${re.gate.result}: ${re.gate.reason}`, `next: ${action} (evidence round complete)`]);
+      recordNextAction(id, action, reason, re.gate.result === "FAIL" ? "blocked" : "done");
+      recordBench(id, workerId, ctx, handoff, verification, review?.verdict ?? null);
+      return {
+        workItemId: id,
+        state: "CHANGES_REQUESTED",
+        handoff,
+        verification,
+        ...(review !== null ? { review } : {}),
+        note: `Outcome gate ${re.gate.result} after evidence round — ${action}: ${reason}`,
+      };
+    }
+
+    if (action === "ASK_USER") {
+      // Park visibly with the specific missing decision — never a dead DRAFT,
+      // never silent execution of something unauthorized.
+      const question = gate.unmetCriteria.length > 0
+        ? `Decision needed for: ${gate.unmetCriteria.slice(0, 3).join("; ")} — ${reason}`
+        : `Decision needed: ${reason}`;
+      deps.board.wait(id, question);
+      deps.trace.record(ref(doneItemRef(id)), "approval", `Waiting on user: ${question.slice(0, 160)}`);
+      emit("worker.waiting", { workItemId: id, workerId, reason: question });
+      recordNextAction(id, action, reason, "blocked");
+      return {
+        workItemId: id,
+        state: "WAITING",
+        handoff,
+        verification,
+        ...(review !== null ? { review } : {}),
+        note: question,
+      };
+    }
+
+    if (action === "RETRY" || action === "REPLAN" || action === "CHANGE_WORKER") {
+      return runCorrectiveChild(id, workerId, handoff, verification, review, ctx, action, reason, gate);
+    }
+
+    return null;
+  }
+
+  function doneItemRef(id: string): WorkItem {
+    return deps.board.get(id) ?? ({ id } as WorkItem);
+  }
+
+  /**
+   * One bounded evidence round: cap, collect, merge. Returns what parked (if
+   * policy demanded approval) — the caller durably parks and resumes.
+   */
+  async function collectEvidenceRound(
+    id: string,
+    handoff: WorkerHandoff,
+    entries: string[],
+    approvalId?: string,
+  ): Promise<{ parked?: { approvalId: string; labels: string[] } }> {
+    const item = deps.board.get(id);
+    if (item === null) return {};
+    const outputs = readOutputs(item);
+    const rounds = typeof outputs["evidenceRounds"] === "number" ? outputs["evidenceRounds"] : 0;
+    if (rounds >= 3) {
+      deps.trace.record(ref(item), "verify", "Evidence budget spent (3 rounds) — parking for a human");
+      return {};
+    }
+    if (entries.length === 0) return {};
+    const gathered = await gatherEvidence(item, handoff, entries, { ...(approvalId !== undefined ? { approvalId } : {}) });
+    mergeEvidence(id, gathered.observed);
+    for (const blocked of gathered.blocked) {
+      deps.trace.record(ref(item), "verify", `Evidence unsupported for "${blocked.label.slice(0, 80)}": ${blocked.reason.slice(0, 160)}`);
+    }
+    if (gathered.pending.length > 0) {
+      // ONE approval covers the batch: request it here (orchestrator.verify
+      // toolId keeps the linkage attributable), park, resume on verdict.
+      const first = gathered.pending[0]!;
+      const approval = deps.approvals.request({
+        toolId: "orchestrator.verify",
+        action: `run evidence checks for work item ${id}`,
+        reason: `Evidence requires guarded execution: ${first.label.slice(0, 120)}${gathered.pending.length > 1 ? ` (+${gathered.pending.length - 1} more)` : ""}`,
+        risk: "DESTRUCTIVE",
+      });
+      emit("approval.requested", { approvalId: approval.id, workItemId: id, reason: "evidence checks need approval" });
+      return { parked: { approvalId: approval.id, labels: gathered.pending.map((p) => p.label) } };
+    }
+    return {};
+  }
+
+  /**
+   * Bounded corrective delegation: a CHILD work item carries the correction
+   * (never a blind re-run of the parent), executed through the SAME
+   * policy/approval path as any delegation, depth-capped. After it settles,
+   * the parent re-gathers (the workspace changed) and re-gates.
+   */
+  async function runCorrectiveChild(
+    id: string,
+    workerId: string,
+    handoff: WorkerHandoff,
+    verification: VerificationRecord,
+    review: { verdict: ReviewVerdict; findings: string[] } | null,
+    ctx: CompletionCtx,
+    action: KernelAction,
+    reason: string,
+    gate: import("./outcome.ts").OutcomeGateDecision,
+    depth?: number,
+  ): Promise<RunOutcome> {
+    const policy = autonomy();
+    const item = deps.board.get(id);
+    const itemDepth = depth ?? (item !== null ? deps.board.depthOf(id) : 0);
+    const maxDepth = policy.maxDepth;
+    if (item === null || itemDepth >= maxDepth) {
+      const why = item === null ? "parent gone" : `delegation depth ${itemDepth} reached the ceiling (${maxDepth})`;
+      deps.trace.record(ref(doneItemRef(id)), "verify", `Correction bounded: ${why} — parking for a human`);
+      emit("worker.progress", { workItemId: id, phase: "next_action", action: "ASK_USER", reason: why });
+      deps.board.wait(id, `Correction bounded (${why}). ${reason}`);
+      recordNextAction(id, action, reason, "blocked");
+      return {
+        workItemId: id, state: "WAITING", handoff, verification,
+        ...(review !== null ? { review } : {}),
+        note: `Correction bounded (${why}). ${reason}`,
+      };
+    }
+    // Worker choice: CHANGE_WORKER picks a different worker that has run on
+    // this board; RETRY/REPLAN keep the worker but change the instructions.
+    let childWorker = workerId;
+    if (action === "CHANGE_WORKER") {
+      const alternative = deps.board.list({ limit: 200 })
+        .map((w) => w.workerId)
+        .find((candidate) => candidate !== undefined && candidate !== workerId);
+      if (alternative === undefined) {
+        deps.board.wait(id, `No alternative worker for CHANGE_WORKER. ${reason}`);
+        recordNextAction(id, action, reason, "blocked");
+        return {
+          workItemId: id, state: "WAITING", handoff, verification,
+          ...(review !== null ? { review } : {}),
+          note: `No alternative worker for CHANGE_WORKER. ${reason}`,
+        };
+      }
+      childWorker = alternative;
+    }
+    const findings = [...gate.unmetCriteria, ...gate.missingEvidence].slice(0, 5);
+    const childObjective = action === "REPLAN"
+      ? `Replan and correct: ${item.objective}`
+      : `Correct and re-verify: ${item.objective}`;
+    const child = deps.board.createChild(
+      id,
+      {
+        objective: childObjective,
+        ...(item.deliverable !== undefined ? { deliverable: item.deliverable } : {}),
+        ...(item.missionId !== undefined ? { missionId: item.missionId } : {}),
+        criteria: [...item.criteria],
+        constraints: [...item.constraints, "Address ONLY the findings below; do not redo unrelated work."],
+        forbiddenOutcomes: [...item.forbiddenOutcomes],
+        requiredEvidence: [...item.requiredEvidence],
+        ...(item.budget !== undefined ? { budget: item.budget } : {}),
+        ...(item.workingDir !== undefined ? { workingDir: item.workingDir } : {}),
+        skills: [...item.skills],
+      },
+      { maxDepth: policy.maxDepth, maxChildren: policy.maxParallel },
+    );
+    if (!child.ok) {
+      deps.board.wait(id, `Correction refused: ${child.reason}. ${reason}`);
+      recordNextAction(id, action, reason, "blocked");
+      return {
+        workItemId: id, state: "WAITING", handoff, verification,
+        ...(review !== null ? { review } : {}),
+        note: `Correction refused: ${child.reason}. ${reason}`,
+      };
+    }
+    recordNextAction(id, action, reason, "running", { workItemId: child.value.id });
+    deps.trace.record(ref(item), "worker", `${action}: delegated correction to ${childWorker} as ${child.value.id}`);
+    const childOutcome = await runWorkItem(child.value.id, {
+      workerId: childWorker,
+      role: ctx.role,
+      configVersion: ctx.configVersion,
+      depth: itemDepth + 1,
+    });
+    // The workspace changed (or pointedly did not): re-gather and re-gate.
+    const parent = deps.board.get(id);
+    if (parent === null) return childOutcome;
+    const contract = outcomeContractFor(parent);
+    const wanted = new Set<string>();
+    for (const c of gate.unmetCriteria) {
+      for (const entry of contract.evidenceLinks?.[c] ?? contract.requiredEvidence) wanted.add(entry);
+    }
+    for (const entry of gate.missingEvidence) wanted.add(entry);
+    const round = await collectEvidenceRound(id, handoff, [...wanted].slice(0, 8), ctx.approvalId);
+    if (round.parked !== undefined) {
+      deps.board.wait(id, `evidence gathering parked for approval ${round.parked.approvalId}`);
+      const cur = deps.board.get(id);
+      if (cur !== null) {
+        const outputs = readOutputs(cur);
+        deps.board.annotate(id, {
+          ...outputs,
+          parked: { approvalId: round.parked.approvalId, workerId, kind: "evidence" },
+          pendingEvidence: { labels: round.parked.labels, requestedAt: nowIso() },
+        });
+      }
+      emit("worker.waiting", { workItemId: id, workerId, approvalId: round.parked.approvalId, reason: "evidence checks need approval" });
+      recordNextAction(id, action, reason, "waiting-approval", { approvalId: round.parked.approvalId });
+      return {
+        workItemId: id, state: "WAITING", handoff, verification,
+        ...(review !== null ? { review } : {}),
+        parkedApprovalId: round.parked.approvalId,
+        note: `Evidence gathering parked for approval ${round.parked.approvalId}`,
+      };
+    }
+    const re = evaluateGate(deps.board.get(id) ?? parent, handoff, review);
+    if (re.gate.result === "PASS") {
+      recordNextAction(id, action, reason, "done", { workItemId: child.value.id });
+      return completeItem(id, workerId, handoff, verification, review, ctx, re.gate.result);
+    }
+    deps.board.changesRequested(id, [`${re.gate.result}: ${re.gate.reason}`, `correction ${child.value.id} settled ${childOutcome.state}`]);
+    recordNextAction(id, action, reason, "done", { workItemId: child.value.id });
+    recordBench(id, workerId, ctx, handoff, verification, review?.verdict ?? null);
+    return {
+      workItemId: id,
+      state: "CHANGES_REQUESTED",
+      handoff,
+      verification,
+      ...(review !== null ? { review } : {}),
+      note: `Correction ${child.value.id} settled ${childOutcome.state}; gate ${re.gate.result}: ${re.gate.reason}`,
+    };
+  }
+
+  /**
+   * The ONLY route to COMPLETED (extracted so re-gated passes share it).
+   * Gate PASS was decided by the caller — this persists it.
+   */
+  async function completeItem(
+    id: string,
+    workerId: string,
+    handoff: WorkerHandoff,
+    verification: VerificationRecord,
+    review: { verdict: ReviewVerdict; findings: string[] } | null,
+    ctx: CompletionCtx,
+    gateResult: string,
+  ): Promise<RunOutcome> {
+    const doneItem = deps.board.get(id);
+    // Skill success metrics + supervision lesson (Phase 6/10): only on the
+    // verified path, with the gate verdict as the verified basis.
+    if (doneItem !== null) {
+      for (const skillId of doneItem.skills) {
+        try {
+          deps.learning.recordSkillUsage(skillId, { success: true, ...(verification.passed ? { verified: true } : {}) });
+        } catch {
+          // Metrics never break completion.
+        }
+      }
+      recordCompletionLesson(doneItem, handoff, gateResult);
     }
     const completed = deps.board.complete(id, handoff, {
       verification,
@@ -854,7 +1856,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     const valueScore = recordBench(id, workerId, ctx, handoff, verification, review?.verdict ?? null);
     const item = deps.board.get(id);
     deps.trace.record(ref({ ...(item ?? ({ id } as WorkItem)), workerId }), "done", "Outcome gate PASS");
-    emit("worker.completed", { workItemId: id, workerId, valueScore, gate: gate.result });
+    emit("worker.completed", { workItemId: id, workerId, valueScore, gate: gateResult });
     return {
       workItemId: id,
       state: "COMPLETED",
@@ -991,6 +1993,231 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     return deps.learning.submitProposal(candidate, markdown);
   }
 
+  /**
+   * Ingest an EXTERNAL worker report (Case B): the user pasted output from a
+   * worker KAI did not dispatch. The report is parsed into claims (labeled
+   * worker-reported), attached to the real project context when one can be
+   * resolved, audited against the actual workspace (file state, runnable
+   * checks), gated, and turned into a ready-to-copy correction prompt.
+   *
+   * Nothing is auto-executed here except through startObjective when autonomy
+   * permits (AUTO, level ≥ 2) — otherwise the audit returns waiting with the
+   * exact reason. An offline worker never produces a completion event; this
+   * path is the honest substitute, and it says which worker it audited.
+   */
+  async function auditExternalReport(input: ExternalAuditInput): Promise<ExternalAuditResult> {
+    const policy = autonomy();
+    const report = (input.reportText ?? "").trim();
+    if (report.length === 0) {
+      return {
+        workItemId: "", claims: [], observed: [], unmetCriteria: [], missingEvidence: [],
+        blockers: ["empty report: nothing to audit"], reviewNotes: [], nextPrompt: "",
+        launched: { started: false, reason: "empty report: nothing to audit" },
+      };
+    }
+    const handoff = handoffFromText(report);
+    const objective = (input.objective ?? "").trim().length > 0
+      ? (input.objective as string).trim()
+      : handoff.result.split("\n")[0]?.slice(0, 200) || "external worker report";
+    // Proposed checks grounded in the REPORT (not invented): one entry per
+    // claimed artifact, plus runnable test commands from the TESTS section.
+    const proposed: string[] = [];
+    for (const artifact of handoff.changedArtifacts.slice(0, 10)) {
+      proposed.push(`file present: ${artifact}`);
+    }
+    if (handoff.tests !== undefined) {
+      for (const line of handoff.tests.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0).slice(0, 5)) {
+        proposed.push(testCommandFor(line) !== null ? line : `verify: ${line.slice(0, 160)}`);
+      }
+    }
+    const created = deps.board.create({
+      objective,
+      deliverable: objective,
+      ...(input.missionId !== undefined ? { missionId: input.missionId } : {}),
+      ...(input.taskId !== undefined ? { taskId: input.taskId } : {}),
+      ...(input.workingDir !== undefined ? { workingDir: input.workingDir } : {}),
+      requiredEvidence: proposed,
+    });
+    if (!created.ok) {
+      return {
+        workItemId: "", claims: [], observed: [], unmetCriteria: [], missingEvidence: [],
+        blockers: [`audit work item refused: ${created.reason}`], reviewNotes: [], nextPrompt: "",
+        launched: { started: false, reason: `audit work item refused: ${created.reason}` },
+      };
+    }
+    const item = created.value;
+    deps.board.annotate(item.id, {
+      source: "external-report",
+      ...(input.workerId !== undefined ? { externalWorkerId: input.workerId } : {}),
+      reportedAt: nowIso(),
+    });
+    deps.trace.record(ref(item), "plan", `External report ingested (${handoff.status}) — auditing, not trusting`);
+    emit("worker.progress", { workItemId: item.id, phase: "audit", result: "report-ingested" });
+    const fresh = deps.board.get(item.id) ?? item;
+    // Auto-select skills for the correction prompt (same path as planned work).
+    let skillIds: string[] = [];
+    try {
+      skillIds = deps.skills.relevant(objective, 3).map((s) => s.id).slice(0, 3);
+    } catch {
+      skillIds = [];
+    }
+    // NO WORKSPACE, NO CHECKS. Without a working directory the claimed paths
+    // would resolve against KAI's OWN sandbox — evidence about the wrong tree,
+    // which is worse than none. Every requirement is recorded as unverifiable
+    // and the limitation says exactly that; nothing is claimed as checked.
+    const gathered = input.workingDir === undefined
+      ? {
+        observed: [],
+        pending: [],
+        blocked: proposed.slice(0, 8).map((label) => ({
+          label,
+          reason: "no working directory was supplied, so the report's workspace cannot be inspected",
+        })),
+      }
+      : await gatherEvidence(fresh, handoff, proposed.slice(0, 8));
+    mergeEvidence(item.id, gathered.observed);
+    const withEvidence = deps.board.get(item.id) ?? fresh;
+    const evaluation = evaluateGate(withEvidence, handoff, null);
+    const gate = evaluation.gate;
+    // Independent review when policy runs reviewers (bounded, one round).
+    const reviewNotes: string[] = [];
+    if (autoVerdict(policy, "review") === "AUTO") {
+      try {
+        const loop = await runReviewLoop(
+          { runner: deps.reviewRunner, buildPrompt: buildReviewerPrompt },
+          {
+            contract: {
+              objective,
+              deliverable: objective,
+              criteria: evaluation.contract.acceptanceCriteria.slice(0, 5),
+            },
+            artifact: handoff.result.slice(0, 4000),
+            evidence: handoff.evidence.slice(0, 10),
+          },
+          1,
+        );
+        emit("review.decided", { workItemId: item.id, verdict: loop.verdict, rounds: loop.rounds });
+        for (const finding of loop.findings.slice(0, 8)) reviewNotes.push(finding);
+      } catch {
+        reviewNotes.push("reviewer unavailable — findings rest on KAI-observed evidence only");
+      }
+    } else {
+      reviewNotes.push("review skipped by autonomy policy (ASK/OFF) — findings rest on KAI-observed evidence only");
+    }
+    const claims = [
+      `worker status: ${handoff.status}`,
+      `result: ${handoff.result.slice(0, 300)}`,
+      ...handoff.evidence.slice(0, 5).map((e) => `claimed evidence: ${e.slice(0, 160)}`),
+      ...(handoff.tests !== undefined ? [`claimed tests: ${handoff.tests.slice(0, 200)}`] : []),
+      ...handoff.blockers.slice(0, 3).map((b) => `claimed blocker: ${b.slice(0, 160)}`),
+    ];
+    const limitation = gathered.blocked.length > 0 || input.workingDir === undefined
+      ? `Workspace ${input.workingDir === undefined ? "not provided — file claims unverified" : "checked"}; ${gathered.blocked.length} requirement(s) have no safe check: ${gathered.blocked.slice(0, 3).map((b) => b.label.slice(0, 80)).join("; ") || "none"}. Unverified is reported, never passed.`
+      : undefined;
+    // The correction prompt: exact issues, exact files, exact commands.
+    const remaining = [
+      ...gate.unmetCriteria.map((c) => `unmet: ${c}`),
+      ...gate.missingEvidence.map((e) => `missing evidence: ${e}`),
+      ...reviewNotes.slice(0, 5).map((f) => `reviewer: ${f}`),
+      ...gathered.blocked.slice(0, 3).map((b) => `unverifiable: ${b.label} (${b.reason})`),
+    ];
+    const observedState = evaluation.observed.map(
+      (record) => `${record.kind}: ${record.detail.slice(0, 200)}${record.supports.length > 0 ? ` [settles: ${record.supports.join(", ").slice(0, 120)}]` : " [does not settle its requirement]"}`,
+    );
+    const nextPrompt = buildWorkerPrompt({
+      mission: withEvidence.missionId ?? withEvidence.taskId ?? "external correction",
+      role: input.workerId ?? "worker",
+      whySelected: `correction after independent audit of an external report (gate: ${gate.result})`,
+      objective: `Correct and complete: ${objective}`,
+      context: [`Original worker report (UNTRUSTED claims): ${report.slice(0, 1500)}`],
+      knownState: observedState.length > 0 ? observedState.slice(0, 10) : ["no independent observations yet — inspect first, then change"],
+      previousAttempts: remaining.length > 0 ? remaining.slice(0, 10) : ["none recorded"],
+      constraints: ["Fix ONLY the listed issues; do not redo unrelated work.", "Return the HANDOFF FORMAT exactly."],
+      scope: withEvidence.workingDir !== undefined ? `repository: ${withEvidence.workingDir}` : "as instructed",
+      requiredOutput: objective,
+      successCriteria: evaluation.contract.acceptanceCriteria.slice(0, 8),
+      verification: [
+        ...evaluation.contract.requiredEvidence.slice(0, 8).map((e) => `evidence required: ${e}`),
+        "cite evidence",
+        "name blockers plainly",
+      ],
+      budget: "one correction round",
+      handoffFormat: HANDOFF_FORMAT,
+      ...(skillIds.length > 0
+        ? {
+          skillContext: skillIds.map((sid) => {
+            try {
+              const loaded = deps.skills.load(sid);
+              return loaded.ok && loaded.body !== undefined ? `## ${sid}\n${loaded.body.slice(0, 1500)}` : null;
+            } catch {
+              return null;
+            }
+          }).filter((s): s is string => s !== null).join("\n\n").slice(0, 3000) || undefined,
+        }
+        : {}),
+    });
+    const auditPrompt = nextPrompt.slice(0, 8000);
+    const cur = deps.board.get(item.id);
+    if (cur !== null) {
+      const outputs = readOutputs(cur);
+      deps.board.annotate(item.id, {
+        ...outputs,
+        audit: {
+          claims: claims.length,
+          observed: gathered.observed.length,
+          unmet: gate.unmetCriteria,
+          missing: gate.missingEvidence,
+          gate: gate.result,
+          at: nowIso(),
+        },
+        auditPrompt,
+      });
+    }
+    deps.trace.record(ref(withEvidence), "verify", `External audit: gate ${gate.result} — ${gate.reason.slice(0, 160)}`);
+    emit("worker.progress", { workItemId: item.id, phase: "evaluation", result: gate.result, reason: gate.reason });
+    // Launch ONLY when autonomy permits autonomous delegation. Anything else
+    // returns the prompt for the user to run — never forced execution.
+    if (remaining.length > 0 && policy.level >= 2 && policy.workerAuto === "AUTO") {
+      const started = startObjective(
+        {
+          objective: `Correct and complete: ${objective}`,
+          deliverable: objective,
+          constraints: ["Fix ONLY the listed issues; do not redo unrelated work."],
+          successCriteria: evaluation.contract.acceptanceCriteria.slice(0, 8),
+          requiredEvidence: evaluation.contract.requiredEvidence.slice(0, 8),
+          ...(withEvidence.missionId !== undefined ? { missionId: withEvidence.missionId } : {}),
+          ...(withEvidence.workingDir !== undefined ? { workingDir: withEvidence.workingDir } : {}),
+          skills: skillIds,
+        },
+        [],
+      );
+      if (started.workItemId.length > 0) {
+        void runWorkItem(started.workItemId).catch(() => undefined);
+        return {
+          workItemId: item.id, claims, observed: gathered.observed,
+          unmetCriteria: gate.unmetCriteria, missingEvidence: gate.missingEvidence,
+          blockers: handoff.blockers, reviewNotes,
+          ...(limitation !== undefined ? { limitation } : {}),
+          nextPrompt,
+          launched: { started: true, workItemId: started.workItemId, reason: "autonomy permits autonomous correction — launched" },
+        };
+      }
+    }
+    return {
+      workItemId: item.id, claims, observed: gathered.observed,
+      unmetCriteria: gate.unmetCriteria, missingEvidence: gate.missingEvidence,
+      blockers: handoff.blockers, reviewNotes,
+      ...(limitation !== undefined ? { limitation } : {}),
+      nextPrompt,
+      launched: {
+        started: false,
+        reason: remaining.length === 0
+          ? "nothing remaining: the report already satisfies every checkable requirement"
+          : `waiting: autonomy ${policy.workerAuto}/level ${policy.level} does not authorize auto-execution — run the prompt or approve`,
+      },
+    };
+  }
+
   /** Propose a reusable skill from a notable work item (no silent mutation). */
   function proposeSkill(workItemId: string): ReturnType<SkillLearning["proposeFromTask"]> {
     const item = deps.board.get(workItemId);
@@ -1013,7 +2240,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     });
   }
 
-  return { plan: planObjective, startObjective, nextMove, runWorkItem, reviewItem, inspect, benchList, activityList, heartbeat, proposeSkill, proposeTaskSkill, submitSkillProposal, ownsApproval, onApprovalDecided, handoffFromText, verifyHandoff };
+  return { plan: planObjective, startObjective, nextMove, runWorkItem, reviewItem, inspect, benchList, activityList, heartbeat, proposeSkill, proposeTaskSkill, submitSkillProposal, ownsApproval, onApprovalDecided, handoffFromText, verifyHandoff, auditExternalReport };
 }
 
 export type Orchestrator = ReturnType<typeof createOrchestrator>;

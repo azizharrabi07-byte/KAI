@@ -95,11 +95,18 @@ test("INVARIANT: all other signals green, but gate unmet → NOT COMPLETED", asy
   } finally { h.close(); }
 });
 
-test("POSITIVE: gate PASS → COMPLETED", async () => {
+test("POSITIVE: gate PASS → COMPLETED (only via KAI-observed evidence)", async () => {
   const h = harness(openSqliteStores({ path: ":memory:" }));
   try {
     const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE }, ["worker-1"]);
     seedContract(h, started.workItemId);
+    // The worker's words alone never satisfy: seed what evidence gathering
+    // would have established by inspecting the work itself.
+    h.board.recordEvidence(started.workItemId, [{
+      id: "ev_browser_verification", kind: "browser check", source: "kai-observed",
+      method: "test-fixture", detail: "production route renders the fix; no console errors",
+      supports: ["browser verification"], at: new Date().toISOString(),
+    }]);
     h.reply.current = okReply("browser verification passed");
     const out = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
     assert.equal(out.state, "COMPLETED", out.note);
@@ -166,7 +173,14 @@ test("RESUME: the Outcome Contract survives a new orchestrator over the same sto
     const persisted = h2.board.get(started.workItemId);
     assert.ok(persisted !== null && persisted.state !== "COMPLETED", "a resumed mission is still non-terminal");
     assert.ok((persisted?.outputs as { contract?: unknown } | undefined)?.contract !== undefined, "the contract persisted");
-    // Now provide the required evidence: only then may it complete.
+    // Now provide the required evidence as KAI-observed records (what evidence
+    // gathering would have established): only then may it complete. Words in
+    // the reply alone never satisfy — that is the whole invariant.
+    h2.board.recordEvidence(started.workItemId, [{
+      id: "ev_browser_verification", kind: "browser check", source: "kai-observed",
+      method: "test-fixture", detail: "production route renders the fix; no console errors",
+      supports: ["browser verification"], at: new Date().toISOString(),
+    }]);
     h2.reply.current = okReply("browser verification passed");
     const resumed = await h2.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
     assert.equal(resumed.state, "COMPLETED", resumed.note);

@@ -1,5 +1,5 @@
 {
-  "at": "2026-10-09T00:43:29.444Z",
+  "at": "2026-10-09T17:11:06.299Z",
   "scenarios": {
     "setup: autonomy level 3 + auto review applies": {
       "pass": true,
@@ -35,11 +35,11 @@
     },
     "S1: trace recorded real activity": {
       "pass": true,
-      "detail": "Outcome gate PASS | Reviewer checking | e2e-good-mv08s2si working | Planned: RC-ORCH-mv08s2si: analyze the workspace, name the three biggest risks, propose a pa"
+      "detail": "Outcome gate PASS | Reviewer checking | e2e-good-mv1825o9 working | Planned: RC-ORCH-mv1825o9: analyze the workspace, name the three biggest risks, propose a pa"
     },
     "S2: breaker recommends after repeated failure": {
       "pass": true,
-      "detail": "no available employee can handle \"subagent:e2e-bad-mv08s2si\" (role: subagent:e2e-bad-mv08s2si) — recommended: reassign (3 consecutive failur"
+      "detail": "no available employee can handle \"subagent:e2e-bad-mv1825o9\" (role: subagent:e2e-bad-mv1825o9) — recommended: reassign (3 consecutive failur"
     },
     "S2: switched worker completes": {
       "pass": true,
@@ -47,7 +47,7 @@
     },
     "S3: bench distinguishes failed cheap from verified dear": {
       "pass": true,
-      "detail": "bad=0.10297521793248242 good=0.4543722675182499"
+      "detail": "bad=0.10297435164884437 good=0.4418723643919473"
     },
     "S3: difficult routes differently than simple": {
       "pass": true,
@@ -55,7 +55,7 @@
     },
     "S4: retry prompt carried the failure context": {
       "pass": true,
-      "detail": "I'm e2e-good-mv08s2si, KAI's worker. hermes mock output: You are acting as KAI's subagent \"e2e-good-mv08s2si\" (worker). I help. ## MISSION direct objective ## YOUR ROLE Role: e2e-good-mv08s2si Selecte"
+      "detail": "I'm e2e-good-mv1825o9, KAI's worker. hermes mock output: You are acting as KAI's subagent \"e2e-good-mv1825o9\" (worker). I help. ## MISSION direct objective ## YOUR ROLE Role: e2e-good-mv1825o9 Selecte"
     },
     "S5: 10 parallel runs, no collisions": {
       "pass": true,

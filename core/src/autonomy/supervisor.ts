@@ -96,6 +96,11 @@ export interface MissionSupervisorOptions {
   }): Promise<Mission>;
   /** Tell the human, when a human is what is needed. */
   notify(input: { title: string; message: string; missionId: string }): void;
+  /**
+   * Record a supervision lesson with provenance (mission-scoped memory).
+   * Absent → verified in trace only. Never throws (the supervisor guards).
+   */
+  recordLesson?: (input: { scopeId: string; content: string; verified: string }) => { ok: boolean; refusal?: { reason?: string } };
   bounds?: AutonomyBounds;
   now?: () => Date;
   idFactory?: () => string;
@@ -151,16 +156,85 @@ export function createMissionSupervisor(options: MissionSupervisorOptions): Miss
 
   async function observe(missionId: string): Promise<AutonomyDecision> {
     const at = now().toISOString();
+    try {
+      return await observeInner(missionId, at);
+    } catch (error) {
+      // A supervisor failure is itself recorded and notified — never swallowed
+      // into silence (Phase 2A: failures visible in decisions + notification).
+      const reason = `supervisor evaluation threw: ${error instanceof Error ? error.message : String(error)}`;
+      try {
+        options.notify({ title: "KAI supervision failed", message: `Mission "${missionId}": ${reason}`.slice(0, 500), missionId });
+      } catch {
+        // Notifying must never break the record.
+      }
+      return record({ missionId, action: "stop", attempt: 0, reason, at });
+    }
+  }
+
+  /** Verify a COMPLETED mission's steps and record a provenanced lesson. */
+  function superviseCompleted(mission: Mission, at: string): AutonomyDecision {
+    const attempt = attemptOf(mission);
+    const steps = mission.steps ?? [];
+    const bad = steps.filter((step) => step.status !== "COMPLETED" && step.status !== "SKIPPED");
+    if (bad.length > 0) {
+      const reason = `mission is COMPLETED but ${bad.length} step(s) are not: ${bad.slice(0, 3).map((s) => `"${s.title}"=${s.status}`).join("; ")} — a human must look`;
+      options.notify({ title: "KAI found an inconsistent mission", message: `Mission "${mission.title}": ${reason}`.slice(0, 500), missionId: mission.id });
+      return record({ missionId: mission.id, action: "escalate", attempt, reason, at });
+    }
+    // Every step settled: record what was actually established as a
+    // mission-scoped lesson with a verified basis — never a worker assertion.
+    if (options.recordLesson !== undefined) {
+      try {
+        const outcome = options.recordLesson({
+          scopeId: mission.id,
+          content: [
+            `Mission completed and supervised: ${mission.title.slice(0, 200)}`,
+            `verified basis: every step settled (${steps.length} step(s) COMPLETED/SKIPPED)`,
+            `steps: ${steps.slice(0, 8).map((s) => s.title.slice(0, 80)).join("; ") || "(no steps)"}`,
+          ].join("\n"),
+          verified: "supervisor:steps-settled",
+        });
+        if (!outcome.ok) {
+          return record({
+            missionId: mission.id, action: "stop", attempt,
+            reason: `steps settled but the supervision lesson was refused (${outcome.refusal?.reason ?? "unknown"}) — surfaced, not silently dropped`,
+            at,
+          });
+        }
+      } catch {
+        return record({ missionId: mission.id, action: "stop", attempt, reason: "steps settled but lesson recording threw — surfaced, not silently dropped", at });
+      }
+    }
+    return record({
+      missionId: mission.id,
+      action: "stop",
+      attempt,
+      reason: `mission completed with all ${steps.length} step(s) settled; supervision lesson recorded`,
+      at,
+    });
+  }
+
+  async function observeInner(missionId: string, at: string): Promise<AutonomyDecision> {
     const mission = options.getMission(missionId);
     if (mission === null) {
       return record({ missionId, action: "stop", attempt: 0, reason: "no such mission; nothing to supervise", at });
+    }
+    // Success is supervised too (Phase 2A): verify the settlement and record
+    // a provenanced lesson instead of walking away at COMPLETED.
+    if (mission.status === "COMPLETED") return superviseCompleted(mission, at);
+    if (mission.status === "CANCELLED") {
+      return record({
+        missionId, action: "stop", attempt: attemptOf(mission),
+        reason: "the mission was cancelled; cancellation is deliberate and is never retried",
+        at,
+      });
     }
     if (mission.status !== "FAILED") {
       return record({
         missionId,
         action: "stop",
         attempt: attemptOf(mission),
-        reason: `the mission is ${mission.status}, not FAILED; there is no failure to evaluate`,
+        reason: `the mission is ${mission.status}; supervision applies to settled missions (COMPLETED/FAILED/CANCELLED)`,
         at,
       });
     }

@@ -214,6 +214,9 @@ export type KaiEventType =
   | "scheduler.started"
   | "scheduler.stopped"
   | "scheduled_task.triggered"
+  // A housekeeping callback on the scheduler's tick seam threw. The tick keeps
+  // running; this records the failure so it is observable, not swallowed.
+  | "scheduler.tick_failed"
   // Phase 1 observability: one record per executable action, carrying the executor
   // identity, the deciding authority, the approval and the Core build.
   | "action.executed"
@@ -623,6 +626,17 @@ export interface WorkItemRecord {
   taskId?: string;
   objective: string;
   deliverable?: string;
+  /** Supervisor trust fields (schema v4; absent on older rows). */
+  criteria?: string[];
+  constraints?: string[];
+  forbiddenOutcomes?: string[];
+  requiredEvidence?: string[];
+  evidenceLinks?: unknown;
+  budget?: unknown;
+  workingDir?: string;
+  evidence?: unknown[];
+  skillReceipts?: unknown[];
+  nextAction?: unknown;
   workerId?: string;
   workerVersion?: string;
   skills: string[];

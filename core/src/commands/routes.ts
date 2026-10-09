@@ -116,6 +116,15 @@ function commandContext(runtime: CoreRuntime): CommandRuntime {
         ...(entry.detail !== undefined ? { detail: entry.detail } : {}),
       }));
     },
+    summary: {
+      report: (fromDay, toDay) => runtime.summary.reportFor(fromDay, toDay),
+      state: () => runtime.summary.state(),
+      offerMinutes: () => runtime.summary.offerMinutes(),
+      today: () => runtime.summary.today(),
+    },
+    audit: {
+      report: (input) => runtime.orchestrator.auditExternalReport(input),
+    },
     createPlan: async (goal: string) => {
       const subagents = runtime.subagents.list().map((persona) => persona.spec.id);
       const workers = (await runtime.registry.statusAll().catch(() => [] as Array<{ id: string }>)).map((w) => w.id);
@@ -169,7 +178,11 @@ export function buildCommandRoutes(runtime: CoreRuntime): Array<{
         const rawArgs = body["args"];
         const args =
           typeof rawArgs === "string" ? splitArgs(rawArgs) : Array.isArray(rawArgs) ? rawArgs.filter((entry) => typeof entry === "string") : [];
-        return runCommand(id, args, commandContext(runtime)).then((outcome) => {
+        // `raw` is the argument text EXACTLY as typed (newlines intact). It is
+        // optional and additive: commands that take free-form multiline input
+        // (a pasted external report for /audit) read it; the rest ignore it.
+        const raw = typeof body["raw"] === "string" ? body["raw"] : undefined;
+        return runCommand(id, args, commandContext(runtime), raw).then((outcome) => {
           if (!outcome.ok) {
             // Unknown command: 404. A command that RAN and failed is 200 with
             // ok:false — the failure is data the UI renders, not a transport error.

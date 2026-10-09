@@ -181,20 +181,24 @@ function harness(autonomyLevel: AutonomyPolicy["level"] = 2): Harness {
 
 // ── startObjective ────────────────────────────────────────────────────────────
 
-test("startObjective creates a READY item plus children and emits delegation.routed", () => {
+test("startObjective plans (not delegates): READY item, children, work.planned", () => {
   const h = harness();
   try {
     const out = h.orch.startObjective({ objective: OBJ, subtasks: ["Book the venue", "Order the food"] });
-    assert.equal(out.delegated, true);
+    // Truthful dispatch: planning alone is planned, never delegated. No worker
+    // was dispatched, so `delegated` is false and no delegation.routed fires.
+    assert.equal(out.delegated, false);
+    assert.equal(out.planned, true);
     assert.ok(out.workItemId.length > 0);
     assert.equal(out.childIds.length, 2);
     assert.equal(h.board.get(out.workItemId)?.state, "READY");
     for (const childId of out.childIds) {
       assert.equal(h.board.get(childId)?.parentId, out.workItemId);
     }
-    const routed = h.published.find((p) => p.type === "delegation.routed");
-    assert.ok(routed, "expected a delegation.routed publish");
-    assert.equal((routed.payload as { workItemId: string }).workItemId, out.workItemId);
+    const planned = h.published.find((p) => p.type === "work.planned");
+    assert.ok(planned, "expected a work.planned publish");
+    assert.equal((planned.payload as { workItemId: string }).workItemId, out.workItemId);
+    assert.equal(h.published.some((p) => p.type === "delegation.routed"), false, "planning must not emit delegation.routed");
     const activity = h.orch.activityList({ workItemId: out.workItemId }, "VERBOSE");
     assert.ok(activity.some((e) => e.kind === "plan"), "expected a plan trace entry");
   } finally {
@@ -211,14 +215,17 @@ test("runWorkItem full PASS loop completes with handoff, verification, review, a
     h.state.reviewQueue.push({ verdict: "PASS", findings: [] });
     h.state.delegateQueue.push({ ok: true, reply: okReply(DELIVERABLE) });
     const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE });
-    assert.equal(started.delegated, true);
+    assert.equal(started.delegated, false, "planning alone never delegates");
+    assert.equal(started.planned, true);
 
     const out = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
     assert.equal(out.state, "COMPLETED");
     assert.ok(out.handoff, "expected a handoff");
     assert.equal(out.handoff.status, "ok");
     assert.ok(out.verification, "expected a verification record");
-    assert.equal(out.verification.passed, true);
+    // Structural verification records criteria as UNVERIFIED (substring
+    // matching is gone); the Gate passed via the independent review PASS.
+    assert.ok(out.verification.criteria.some((c) => c.name.startsWith("criterion:") && !c.met), "criteria stay honestly unverified in the structural record");
     assert.ok(out.review, "expected a review verdict");
     assert.equal(out.review.verdict, "PASS");
     assert.equal(typeof out.valueScore, "number");
@@ -282,7 +289,7 @@ test("rejected approval cancels the parked work item", async () => {
 
 // ── Review retry paths ────────────────────────────────────────────────────────
 
-test("CHANGES_REQUESTED retries once with findings then completes", async () => {
+test("CHANGES_REQUESTED parks the retry for a FRESH approval, then completes", async () => {
   const h = harness(3);
   try {
     h.state.reviewQueue.push(
@@ -296,9 +303,15 @@ test("CHANGES_REQUESTED retries once with findings then completes", async () => 
     );
     const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE });
 
-    const out = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
-    assert.equal(out.state, "COMPLETED");
-    assert.equal(out.review?.verdict, "PASS");
+    // The review asks for changes; the retry is a NEW external execution, so
+    // it parks for a fresh approval instead of spending the old one twice.
+    const parked = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
+    assert.equal(parked.state, "WAITING");
+    assert.ok(parked.parkedApprovalId !== undefined && parked.parkedApprovalId.length > 0, "a fresh approval linkage is recorded");
+
+    const decided = await h.orch.onApprovalDecided(parked.parkedApprovalId as string, true);
+    assert.ok(decided.handled >= 1);
+    assert.equal(h.board.get(started.workItemId)?.state, "COMPLETED");
     assert.equal(h.state.delegateCalls.length, 2, "expected exactly one retry delegation");
     assert.equal(h.board.get(started.workItemId)?.retries, 1);
   } finally {
@@ -406,13 +419,18 @@ test("handoffFromText parses full, partial, and garbage replies", () => {
   }
 });
 
-test("verifyHandoff checks deliverable, evidence, blockers, and criteria", () => {
+test("verifyHandoff is structural: criteria stay unverified, never substring-matched", () => {
   const h = harness();
   try {
     const good = h.orch.handoffFromText(okReply(DELIVERABLE));
-    const pass = h.orch.verifyHandoff(good, [DELIVERABLE]);
-    assert.equal(pass.passed, true);
-    assert.ok(pass.criteria.every((c) => c.met));
+    const structural = h.orch.verifyHandoff(good, [DELIVERABLE]);
+    // Structural checks pass; the criterion is recorded UNVERIFIED — the old
+    // substring hit ("deliverable" appearing in the result) is gone.
+    assert.ok(structural.criteria.some((c) => c.name === "deliverable present" && c.met));
+    assert.ok(structural.criteria.some((c) => c.name === "evidence cited" && c.met));
+    const crit = structural.criteria.find((c) => c.name.startsWith("criterion:"));
+    assert.ok(crit !== undefined && !crit.met, "criteria are never substring-matched");
+    assert.match(crit?.detail ?? "", /unverified/);
 
     const noEvidence = h.orch.verifyHandoff({ ...good, evidence: [] }, [DELIVERABLE]);
     assert.equal(noEvidence.passed, false);
@@ -421,9 +439,6 @@ test("verifyHandoff checks deliverable, evidence, blockers, and criteria", () =>
     const blocked = h.orch.verifyHandoff({ ...good, blockers: ["waiting on API"] }, [DELIVERABLE]);
     assert.equal(blocked.passed, false);
     assert.ok(blocked.criteria.some((c) => c.name === "no unresolved blockers" && !c.met));
-
-    const critMiss = h.orch.verifyHandoff(good, ["something entirely absent xyz"]);
-    assert.equal(critMiss.passed, false);
   } finally {
     h.close();
   }

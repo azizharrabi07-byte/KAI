@@ -389,11 +389,14 @@ export interface CoreWorkItemDetail {
   benchmark: CoreBenchEntry | null;
 }
 
-/** Outcome of `POST /work-items` — the routing decision, delegated or not. */
+/** Outcome of `POST /work-items` — planned vs actually dispatched. */
 export interface CoreWorkStartOutcome {
   workItemId: string;
   childIds: string[];
+  /** True only once a worker was actually dispatched (planning alone: false). */
   delegated: boolean;
+  /** A durable work item exists (planned, not necessarily running). */
+  planned?: boolean;
   note?: string;
   decision?: unknown;
 }
@@ -606,9 +609,11 @@ export interface CoreClient {
   /**
    * `POST /commands/:id/run` — execute one command for real. A command that
    * ran and failed returns `ok: true` with `ok: false` inside, because the
-   * failure is the RESULT the UI renders, not a transport fault.
+   * failure is the RESULT the UI renders, not a transport fault. `raw` is the
+   * argument text exactly as typed (newlines intact) for commands that take
+   * multiline input, e.g. a pasted report for `/audit`.
    */
-  runCommand(id: string, args?: string[] | string): Promise<CoreResult<CoreCommandOutcome>>;
+  runCommand(id: string, args?: string[] | string, raw?: string): Promise<CoreResult<CoreCommandOutcome>>;
   /** `GET /skills` — the installed catalogue (metadata only, never bodies). */
   skills(): Promise<CoreResult<CoreSkillSummary[]>>;
   /** `GET /skills/:id` — full metadata record for one skill. */
@@ -1840,10 +1845,10 @@ export function createCoreClient(options: CoreClientOptions = {}): CoreClient {
       return ok(out);
     },
 
-    async runCommand(id, args) {
+    async runCommand(id, args, raw) {
       const res = await request(`/commands/${encodeURIComponent(id)}/run`, {
         method: "POST",
-        body: { args: args ?? [] },
+        body: { args: args ?? [], ...(raw !== undefined ? { raw } : {}) },
       });
       if (!res.ok) return res;
       const result = res.value["result"];

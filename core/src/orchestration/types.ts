@@ -27,6 +27,64 @@ export type WorkItemState =
   | "FAILED"
   | "CANCELLED";
 
+/**
+ * One evidence record in the CLAIM / OBSERVATION / EVIDENCE split.
+ *
+ * - `reportedClaims` live on the handoff (worker's words, never trusted).
+ * - `observations` are facts KAI obtained itself (workspace inspection or an
+ *   authorized check it ran) — this array, `source: "kai-observed"`.
+ * - A worker's `EVIDENCE:` section stays `source: "worker-reported"`: counted
+ *   for display, NEVER sufficient to satisfy a requirement.
+ * - `supports` names the exact required-evidence labels this record settles
+ *   (exact string equality — no token/substring matching anywhere).
+ */
+export interface VerifiedEvidence {
+  /** Stable id: `ev_<workItem>_<seq>` (idempotency key for duplicate delivery). */
+  id: string;
+  /** What was established: file state, diff, test result, build result, etc. */
+  kind: string;
+  source: "kai-observed" | "worker-reported";
+  /** How KAI obtained it: tool id + inputs, or "worker-handoff". */
+  method: string;
+  /** Human-readable finding (bounded, redacted at collection). */
+  detail: string;
+  /** File path / line range this record is about, when applicable. */
+  path?: string;
+  /** Command + cwd, for executed checks. */
+  command?: string;
+  /** Exit code for executed checks (null = killed/cancelled). */
+  exitCode?: number | null;
+  /** Bounded stdout/stderr capture for executed checks. */
+  outputPreview?: string;
+  /** Exact required-evidence labels this record settles. */
+  supports: string[];
+  /** ISO-8601 collection time. */
+  at: string;
+}
+
+/** A corrective step the supervisor selected, and where it stands. */
+export interface NextActionRecord {
+  action: string;
+  reason: string;
+  /** Proposed, queued, running, done, blocked, or waiting-approval. */
+  state: "proposed" | "queued" | "running" | "done" | "blocked" | "waiting-approval";
+  /** Child work item carrying the action, when one was created. */
+  workItemId?: string;
+  /** Approval this action waits on, when parked. */
+  approvalId?: string;
+  at: string;
+}
+
+/** Which skills the supervisor actually selected/loaded for this work. */
+export interface SkillReceipt {
+  id: string;
+  version?: string;
+  hash?: string;
+  /** Length of the body handed to the worker (bytes). */
+  bodyLength: number;
+  at: string;
+}
+
 /** A unit of delegated work on the KAI work board. Survives restarts. */
 export interface WorkItem {
   id: string;
@@ -35,10 +93,37 @@ export interface WorkItem {
   taskId?: string;
   objective: string;
   deliverable?: string;
+  /**
+   * Acceptance criteria that MUST each be met (all_criteria). Threaded from
+   * the creation input through the Outcome Contract to the Gate — never
+   * silently dropped. Default: derived from the deliverable.
+   */
+  criteria: string[];
+  /** Constraints the worker must respect (also fed to its prompt). */
+  constraints: string[];
+  /** Outcomes that must not happen (also enforced by the Gate). */
+  forbiddenOutcomes: string[];
+  /** Required-evidence labels; each needs a kai-observed record to pass. */
+  requiredEvidence: string[];
+  /**
+   * Criterion label -> required-evidence labels supporting it. Absent entries
+   * default to ALL required evidence (strict). Additive; old rows lack it.
+   */
+  evidenceLinks?: Record<string, string[]>;
+  /** Budgets binding this item (retries, depth, runtime, cost). */
+  budget?: WorkBudget;
+  /** Repository working directory evidence checks run in. */
+  workingDir?: string;
   workerId?: string;
   workerVersion?: string;
   skills: string[];
+  /** Skill selection/loading receipts (Phase 6: what ACTUALLY happened). */
+  skillReceipts: SkillReceipt[];
   tools: string[];
+  /** KAI-observed + worker-reported evidence records (the trust split). */
+  evidence: VerifiedEvidence[];
+  /** The latest corrective step and where it stands. */
+  nextAction?: NextActionRecord;
   state: WorkItemState;
   attempts: number;
   heartbeats: { at: string; step?: string; note?: string }[];

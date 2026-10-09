@@ -238,6 +238,16 @@ export function createScheduler(opts: {
    * Defaults to `tickMs`, so ordinary jitter is not mistaken for downtime.
    */
   missedGraceMs?: number;
+  /**
+   * Called once at the end of every tick with the tick's own timestamp. This is
+   * the single seam for Core-internal, self-rescheduling work that is NOT a
+   * user-configured scheduled task (the daily work-summary offer). It is called
+   * after the due tasks have run, and a throw from it is contained here so a
+   * misbehaving housekeeping callback can never take the scheduler loop down or
+   * stop the remaining ticks. Exactly one scheduler exists; this adds no second
+   * one.
+   */
+  onTick?: (at: Date) => void;
 }): Scheduler {
   const { store, onFire } = opts;
   const publish: Publish = opts.publish ?? (() => {});
@@ -692,6 +702,18 @@ export function createScheduler(opts: {
 
       for (const { task, dueAt } of dueList) {
         await runOne(task, new Date(dueAt), at, atMs, graceMs, result);
+      }
+
+      // Housekeeping seam (daily work-summary offer). Contained: a throw here
+      // must never stop the loop or lose the tick's own results.
+      if (opts.onTick !== undefined) {
+        try {
+          opts.onTick(at);
+        } catch (error) {
+          emit("scheduler.tick_failed", {
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     } finally {
       ticking = false;

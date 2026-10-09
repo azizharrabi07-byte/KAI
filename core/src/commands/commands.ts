@@ -28,6 +28,8 @@ import type { ProposeInput, SkillCandidate, SubmitResult } from "../orchestratio
 import { parseReviewVerdict, REVIEWER_SYSTEM } from "../orchestration/review.ts";
 import type { ModelProvider } from "../model/types.ts";
 import type { SubagentRegistry } from "../workforce/subagent.ts";
+import type { SummaryReportResult } from "../summary/daily.ts";
+import type { ExternalAuditInput, ExternalAuditResult } from "../orchestration/orchestrator.ts";
 
 /** The live runtime surface commands may read (structural, never the whole Core). */
 export interface CommandRuntime {
@@ -123,6 +125,25 @@ export interface CommandRuntime {
   capabilities?: { list(): Array<{ id: string; name?: string; availability?: string; provider?: string }> };
   /** Start an objective as an autonomous work item (Work Mode). */
   startWork?(goal: string): Promise<{ ok: true; workItemId: string; note: string } | { ok: false; reason: string }>;
+  /**
+   * The daily work summary: an evidence-backed report over a local-day range,
+   * plus the durable offer state. `/summary` renders exactly this.
+   */
+  summary?: {
+    report(fromDay?: string, toDay?: string): SummaryReportResult;
+    state(): { lastOfferLocalDate?: string; lastOfferedAt?: string };
+    offerMinutes(): number;
+    today(): string;
+  };
+  /**
+   * External worker-report audit. `/audit` hands a pasted report here; the
+   * report is treated as UNTRUSTED claims and checked against the real
+   * workspace. Auto-launch happens only through the orchestrator's own policy
+   * gate; otherwise the audit returns the correction prompt to run.
+   */
+  audit?: {
+    report(input: ExternalAuditInput): Promise<ExternalAuditResult>;
+  };
 }
 
 /** What a command run returns: a title plus markdown the UI renders. */
@@ -156,7 +177,13 @@ export interface KaiCommand {
   usage: string;
   /** Positional arguments, in order. Absent means the command takes none. */
   args?: CommandArg[];
-  run(args: string[], ctx: CommandRuntime): Promise<CommandResult>;
+  /**
+   * Run the command. `args` are the whitespace-split arguments; `raw` is the
+   * argument text EXACTLY as typed (after the command name), newlines intact.
+   * Commands that accept free-form multiline input (a pasted worker report)
+   * read `raw`; everything else can ignore it.
+   */
+  run(args: string[], ctx: CommandRuntime, raw?: string): Promise<CommandResult>;
 }
 
 /** Split an argument string on whitespace, honouring "double quotes". */
@@ -1020,6 +1047,139 @@ const COMMANDS: KaiCommand[] = [
     },
   },
   {
+    id: "summary",
+    title: "Work summary",
+    description: "The evidence-backed work report for a day (default: today), separating work KAI verified from worker-reported claims.",
+    usage: "/summary [YYYY-MM-DD [YYYY-MM-DD]]",
+    args: [
+      { name: "from", description: "First day (default: today)", source: "free" },
+      { name: "to", description: "Last day (default: the first day)", source: "free" },
+    ],
+    async run(args, ctx) {
+      const port = ctx.summary;
+      if (port === undefined) {
+        return { command: "summary", title: "Summary is unavailable here", text: "This command context has no daily-summary service." };
+      }
+      const out = port.report(args[0], args[1]);
+      const minutes = port.offerMinutes();
+      const hhmm = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+      const last = port.state().lastOfferLocalDate;
+      const offerLine = last !== undefined
+        ? `Daily offer: last sent for ${last}; next at ${hhmm} local — at most once per local day, and only when work happened.`
+        : `Daily offer: none sent yet; it fires at ${hhmm} local — at most once per local day, and only when work happened.`;
+      return {
+        command: "summary",
+        title: `Work summary ${out.from}${out.to !== out.from ? ` → ${out.to}` : ""}`,
+        text: `${out.text}\n\n---\n\n_${offerLine}_`,
+        data: out.report,
+      };
+    },
+  },
+  {
+    id: "audit",
+    title: "Audit an external worker report",
+    description: "Paste a worker's report (or name a file) and KAI audits it against the real workspace instead of trusting it: claims, what KAI observed, and the exact next-worker prompt.",
+    usage: "/audit <report text> [--file path] [--dir working-dir]",
+    args: [{ name: "report", description: "The worker's report (multiline paste is fine)", source: "free" }],
+    async run(args, ctx, raw) {
+      const port = ctx.audit;
+      if (port === undefined) {
+        return { command: "audit", title: "Audit is unavailable here", text: "This command context has no orchestrator audit port." };
+      }
+      let text = (raw ?? args.join(" ")).trim();
+      // `--dir`/`--file` take one path each; unquoted paths must have no spaces.
+      let workingDir: string | undefined;
+      const dirMatch = /--dir\s+("([^"]*)"|'([^']*)'|(\S+))/.exec(text);
+      if (dirMatch !== null) {
+        workingDir = dirMatch[2] ?? dirMatch[3] ?? dirMatch[4];
+        text = text.replace(dirMatch[0], " ").trim();
+      }
+      let source = "pasted text";
+      const fileMatch = /--file\s+("([^"]*)"|'([^']*)'|(\S+))/.exec(text);
+      if (fileMatch !== null) {
+        const path = fileMatch[2] ?? fileMatch[3] ?? fileMatch[4];
+        text = text.replace(fileMatch[0], " ").trim();
+        if (path !== undefined) {
+          const read = await ctx.tools.invoke("filesystem.read", { path });
+          if (!read.ok) {
+            return {
+              command: "audit",
+              title: "Report file not readable",
+              text: `Could not read \`${path}\`: ${read.error.code} — ${read.error.message}. Nothing was audited.`,
+            };
+          }
+          const file = read.result as { content?: string; truncated?: boolean; bytes?: number } | null;
+          const content = typeof file?.content === "string" ? file.content : "";
+          if (content.trim().length === 0) {
+            return { command: "audit", title: "Report file is empty", text: `\`${path}\` held no text. Nothing was audited.` };
+          }
+          text = content;
+          source = file?.truncated === true
+            ? `file ${path} — READ TRUNCATED at the read limit (paste the remainder if findings look partial)`
+            : `file ${path}`;
+        }
+      }
+      if (text.trim().length === 0) {
+        return {
+          command: "audit",
+          title: "Audit needs a report",
+          text: [
+            "Give KAI the worker's report to audit. Nothing was audited.",
+            "",
+            "- `/audit <report text>` — a multiline paste is fine",
+            "- `/audit --file path/to/report.md`",
+            "- add `--dir /path/to/repo` so the claims can be checked against that workspace",
+          ].join("\n"),
+        };
+      }
+      const result = await port.report({
+        reportText: text,
+        ...(workingDir !== undefined ? { workingDir } : {}),
+      });
+      const lines: string[] = [];
+      lines.push(
+        `Source: ${source}${workingDir !== undefined ? ` · workspace: ${workingDir}` : " · no workspace given — file claims cannot be checked"}`,
+      );
+      lines.push("", "### What the worker claimed (UNTRUSTED)");
+      lines.push(...(result.claims.length > 0 ? result.claims.map((c) => `- ${c}`) : ["- (nothing parsed as a claim)"]));
+      lines.push("", "### What KAI observed itself");
+      lines.push(...(result.observed.length > 0
+        ? result.observed.map(
+          (o) => `- ${o.kind}: ${o.detail.slice(0, 240)}${o.supports.length > 0 ? ` [settles: ${o.supports.join(", ").slice(0, 120)}]` : " [does not settle its requirement]"}`,
+        )
+        : ["- nothing: no safe check could be run (see the limitation)"]));
+      if (result.unmetCriteria.length > 0) {
+        lines.push("", "### Unmet acceptance criteria", ...result.unmetCriteria.map((c) => `- ${c}`));
+      }
+      if (result.missingEvidence.length > 0) {
+        lines.push("", "### Missing required evidence", ...result.missingEvidence.map((e) => `- ${e}`));
+      }
+      if (result.reviewNotes.length > 0) {
+        lines.push("", "### Reviewer findings", ...result.reviewNotes.map((f) => `- ${f}`));
+      }
+      if (result.blockers.length > 0) {
+        lines.push("", "### Blockers the worker reported", ...result.blockers.map((b) => `- ${b}`));
+      }
+      if (result.limitation !== undefined) lines.push("", "### Limitation", result.limitation);
+      lines.push(
+        "",
+        "### Launch",
+        result.launched.started
+          ? `KAI launched the correction as \`${result.launched.workItemId ?? "?"}\` — ${result.launched.reason}.`
+          : `Not launched: ${result.launched.reason}`,
+      );
+      if (result.nextPrompt.length > 0) {
+        lines.push("", "### Next-worker prompt (copy or edit)", "", "```", result.nextPrompt, "```");
+      }
+      return {
+        command: "audit",
+        title: result.launched.started ? "Audit complete — correction launched" : "Audit complete — findings ready",
+        text: lines.join("\n"),
+        data: result,
+      };
+    },
+  },
+  {
     id: "help",
     title: "Help",
     description: "Show the actual registered commands.",
@@ -1081,13 +1241,14 @@ export async function runCommand(
   id: string,
   args: string[],
   ctx: CommandRuntime,
+  raw?: string,
 ): Promise<{ ok: true; result: CommandResult } | { ok: false; reason: string }> {
   const command = BY_ID.get(id);
   if (command === undefined) {
     return { ok: false, reason: `no command "/${id}" — try /help` };
   }
   try {
-    return { ok: true, result: await command.run(args, ctx) };
+    return { ok: true, result: await command.run(args, ctx, raw) };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     return { ok: false, reason: `/${id} failed: ${detail}` };

@@ -330,8 +330,10 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
     upsertWorkItem: db.prepare(
       `INSERT INTO work_items (id, parentId, missionId, taskId, objective, deliverable, workerId, workerVersion,
         skills, tools, state, attempts, heartbeats, outputs, handoff, verification, review, cost,
-        tokensIn, tokensOut, latencyMs, failures, retries, valueScore, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        tokensIn, tokensOut, latencyMs, failures, retries, valueScore, createdAt, updatedAt,
+        criteria, constraints, forbiddenOutcomes, requiredEvidence, evidenceLinks, budget, workingDir,
+        evidence, skillReceipts, nextAction)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET parentId = excluded.parentId, missionId = excluded.missionId,
         taskId = excluded.taskId, objective = excluded.objective, deliverable = excluded.deliverable,
         workerId = excluded.workerId, workerVersion = excluded.workerVersion, skills = excluded.skills,
@@ -340,6 +342,10 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
         verification = excluded.verification, review = excluded.review, cost = excluded.cost,
         tokensIn = excluded.tokensIn, tokensOut = excluded.tokensOut, latencyMs = excluded.latencyMs,
         failures = excluded.failures, retries = excluded.retries, valueScore = excluded.valueScore,
+        criteria = excluded.criteria, constraints = excluded.constraints, forbiddenOutcomes = excluded.forbiddenOutcomes,
+        requiredEvidence = excluded.requiredEvidence, evidenceLinks = excluded.evidenceLinks, budget = excluded.budget,
+        workingDir = excluded.workingDir, evidence = excluded.evidence, skillReceipts = excluded.skillReceipts,
+        nextAction = excluded.nextAction,
         updatedAt = excluded.updatedAt`,
     ),
     getWorkItem: db.prepare(`SELECT * FROM work_items WHERE id = ?`),
@@ -929,6 +935,18 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
       ...(optNum(row.valueScore) !== undefined ? { valueScore: optNum(row.valueScore) as number } : {}),
       createdAt: toStr(row.createdAt),
       updatedAt: toStr(row.updatedAt),
+      // Schema v4 trust fields: absent (null) on pre-migration rows — the
+      // board normalizes them to empty, so old work reads back intact.
+      ...(row.criteria !== null && row.criteria !== undefined ? { criteria: jsonArr<string>(row.criteria) } : {}),
+      ...(row.constraints !== null && row.constraints !== undefined ? { constraints: jsonArr<string>(row.constraints) } : {}),
+      ...(row.forbiddenOutcomes !== null && row.forbiddenOutcomes !== undefined ? { forbiddenOutcomes: jsonArr<string>(row.forbiddenOutcomes) } : {}),
+      ...(row.requiredEvidence !== null && row.requiredEvidence !== undefined ? { requiredEvidence: jsonArr<string>(row.requiredEvidence) } : {}),
+      ...(row.evidenceLinks !== null && row.evidenceLinks !== undefined ? { evidenceLinks: fromJson(row.evidenceLinks) } : {}),
+      ...(row.budget !== null && row.budget !== undefined ? { budget: fromJson(row.budget) } : {}),
+      ...(optStr(row.workingDir) !== null ? { workingDir: optStr(row.workingDir) as string } : {}),
+      ...(row.evidence !== null && row.evidence !== undefined ? { evidence: fromJson(row.evidence) } : {}),
+      ...(row.skillReceipts !== null && row.skillReceipts !== undefined ? { skillReceipts: fromJson(row.skillReceipts) } : {}),
+      ...(row.nextAction !== null && row.nextAction !== undefined ? { nextAction: fromJson(row.nextAction) } : {}),
     };
   }
 
@@ -961,6 +979,16 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
         item.valueScore ?? null,
         item.createdAt,
         item.updatedAt,
+        item.criteria !== undefined ? jsonText(item.criteria) : null,
+        item.constraints !== undefined ? jsonText(item.constraints) : null,
+        item.forbiddenOutcomes !== undefined ? jsonText(item.forbiddenOutcomes) : null,
+        item.requiredEvidence !== undefined ? jsonText(item.requiredEvidence) : null,
+        item.evidenceLinks !== undefined ? jsonText(item.evidenceLinks) : null,
+        item.budget !== undefined ? jsonText(item.budget) : null,
+        item.workingDir ?? null,
+        item.evidence !== undefined ? jsonText(item.evidence) : null,
+        item.skillReceipts !== undefined ? jsonText(item.skillReceipts) : null,
+        item.nextAction !== undefined ? jsonText(item.nextAction) : null,
       );
     },
     get(id: string): WorkItemRecord | null {
