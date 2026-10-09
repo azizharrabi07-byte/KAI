@@ -473,6 +473,10 @@ export interface CoreToolEvent {
   startedAt: string;
   completedAt?: string;
   error?: { code: string; message: string };
+  /** Bounded, secret-redacted result preview (present on terminal events). */
+  resultPreview?: string;
+  /** True when the real value continued past the preview budget. */
+  resultTruncated?: boolean;
 }
 
 /** A completed streamed turn. */
@@ -483,7 +487,9 @@ export interface CoreStreamedTurn {
   toolBudgetExhausted: boolean;
   /** True when the closing text came from the synthesis guard. */
   synthesized?: boolean;
-  /** Task lifecycle state after the turn (COMPLETED, PAUSED, …). */
+  /** True when the run's AbortSignal stopped the turn: report ABORTED, never completion. */
+  cancelled?: boolean;
+  /** Task lifecycle state after the turn (COMPLETED, PAUSED, CANCELLED, …). */
   taskState?: string;
   invocation?: { agents: string[]; skills: string[] };
   agentRun?: CoreAgentRun;
@@ -550,7 +556,7 @@ export interface CoreClientOptions {
 
 export interface CoreClient {
   readonly baseUrl: string;
-  health(): Promise<CoreResult<{ status: string; version?: string }>>;
+  health(): Promise<CoreResult<{ status: string; version?: string; workers?: CoreWorkerHealth }>>;
   state(): Promise<CoreResult<CoreStateSummary>>;
   agents(): Promise<CoreResult<CoreAgentSummary[]>>;
   agent(id: string): Promise<CoreResult<CoreAgentSummary>>;
@@ -760,6 +766,40 @@ function asBoolean(value: unknown): boolean | undefined {
 
 function ok<T>(value: T): CoreResult<T> {
   return { ok: true, value };
+}
+
+/** One worker's reachability as Core's own probe reported it. */
+export interface CoreWorkerProbe {
+  reachable: boolean;
+  authorized?: boolean;
+  reason?: string;
+}
+
+export interface CoreWorkerHealth {
+  hermes?: CoreWorkerProbe;
+  opencode?: CoreWorkerProbe;
+}
+
+function parseProbe(raw: unknown): CoreWorkerProbe | undefined {
+  if (!isObject(raw)) return undefined;
+  const reachable = asBoolean(raw["reachable"]);
+  if (reachable === undefined) return undefined;
+  const probe: CoreWorkerProbe = { reachable };
+  const authorized = asBoolean(raw["authorized"]);
+  if (authorized !== undefined) probe.authorized = authorized;
+  const reason = asString(raw["reason"]);
+  if (reason !== undefined && reason.length > 0) probe.reason = reason;
+  return probe;
+}
+
+function parseWorkerHealth(raw: unknown): CoreWorkerHealth | undefined {
+  if (!isObject(raw)) return undefined;
+  const out: CoreWorkerHealth = {};
+  const hermes = parseProbe(raw["hermes"]);
+  if (hermes !== undefined) out.hermes = hermes;
+  const opencode = parseProbe(raw["opencode"]);
+  if (opencode !== undefined) out.opencode = opencode;
+  return out.hermes !== undefined || out.opencode !== undefined ? out : undefined;
 }
 
 function fail<T>(
@@ -1463,9 +1503,13 @@ export function createCoreClient(options: CoreClientOptions = {}): CoreClient {
       if (status === undefined) {
         return fail("INVALID_RESPONSE", "health response had no status");
       }
-      const out: { status: string; version?: string } = { status };
+      const out: { status: string; version?: string; workers?: CoreWorkerHealth } = { status };
       const version = asString(res.value.version);
       if (version !== undefined) out.version = version;
+      // Worker reachability, straight from Core's own probes — the header
+      // renders THIS, never a guess. Absent fields stay absent, not "online".
+      const workers = parseWorkerHealth(res.value);
+      if (workers !== undefined) out.workers = workers;
       return ok(out);
     },
 
@@ -2227,6 +2271,7 @@ export function createCoreClient(options: CoreClientOptions = {}): CoreClient {
       let toolIterations = 0;
       let toolBudgetExhausted = false;
       let terminalSynthesized: boolean | undefined;
+      let terminalCancelled = false;
       let terminalTaskState: string | undefined;
       let terminalInvocation: CoreStreamedTurn["invocation"];
       let terminalAgentRun: CoreAgentRun | undefined;
@@ -2295,6 +2340,7 @@ export function createCoreClient(options: CoreClientOptions = {}): CoreClient {
               const exhausted = asBoolean(parsed["tool_budget_exhausted"]);
               if (exhausted !== undefined) toolBudgetExhausted = exhausted;
               if (asBoolean(parsed["synthesized"]) === true) terminalSynthesized = true;
+              if (parsed["cancelled"] === true) terminalCancelled = true;
               const taskState = asString(parsed["task_state"]);
               if (taskState !== undefined) terminalTaskState = taskState;
               if (isObject(parsed["invocation"])) {
@@ -2339,12 +2385,26 @@ export function createCoreClient(options: CoreClientOptions = {}): CoreClient {
           toolIterations,
           toolBudgetExhausted,
           ...(terminalSynthesized === true ? { synthesized: true } : {}),
+          ...(terminalCancelled ? { cancelled: true as const } : {}),
           ...(terminalTaskState !== undefined ? { taskState: terminalTaskState } : {}),
           ...(terminalInvocation !== undefined ? { invocation: terminalInvocation } : {}),
           ...(terminalAgentRun !== undefined ? { agentRun: terminalAgentRun } : {}),
         });
       } catch (err) {
-        if (controller.signal.aborted) return fail("TIMEOUT", "Core stream timed out");
+        // A user Stop aborts the fetch: report cancellation, NOT a timeout.
+        // Only the 180s timer expiring on its own is a TIMEOUT.
+        if (controller.signal.aborted) {
+          if (handlers.signal?.aborted === true) {
+            return ok({
+              text: full,
+              toolIterations,
+              toolBudgetExhausted,
+              cancelled: true as const,
+              ...(terminalTaskState !== undefined ? { taskState: terminalTaskState } : {}),
+            });
+          }
+          return fail("TIMEOUT", "Core stream timed out");
+        }
         if (err instanceof TypeError) return fail("CORE_OFFLINE", "Core is not reachable");
         return fail("UNKNOWN", describeThrown(err));
       } finally {

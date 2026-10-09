@@ -70,7 +70,7 @@ export interface ModelToolPlane {
   execute(
     name: string,
     argsJson: string,
-    opts?: { sessionId?: string; agentId?: string; source?: string; executionId?: string },
+    opts?: { sessionId?: string; agentId?: string; source?: string; executionId?: string; signal?: AbortSignal },
   ): Promise<ModelToolExecution>;
 }
 
@@ -236,6 +236,7 @@ export function createModelToolPlane(options: ModelToolPlaneOptions): ModelToolP
         ...(opts?.sessionId !== undefined ? { sessionId: opts.sessionId } : {}),
         ...(opts?.agentId !== undefined ? { agentId: opts.agentId } : {}),
         ...(opts?.executionId !== undefined ? { executionId: opts.executionId } : {}),
+        ...(opts?.signal !== undefined ? { signal: opts.signal } : {}),
       });
       if (invoked.ok) {
         return {

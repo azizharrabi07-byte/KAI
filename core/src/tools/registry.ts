@@ -91,6 +91,8 @@ export interface ToolDefinition {
       scheduleId?: string;
       /** The worker turn this action belonged to, when the caller knew it. */
       turnId?: string;
+      /** Cancellation for this attempt; long-running tools must honour it. */
+      signal?: AbortSignal;
     },
   ): Promise<unknown>;
 }
@@ -126,6 +128,12 @@ export interface ToolInvokeOptions {
    * ledger row join on ONE id instead of two lookalikes.
    */
   executionId?: string;
+  /**
+   * Cancellation for this attempt. Checked before the tool body runs (an
+   * already-aborted attempt settles CANCELLED without executing) and handed to
+   * the body via the execute ctx so long-running tools can stop mid-flight.
+   */
+  signal?: AbortSignal;
 }
 
 export interface ToolRegistry {
@@ -530,6 +538,18 @@ export function createToolRegistry(opts: {
       });
     }
 
+    // ── 0. cancellation ────────────────────────────────────────────────────
+    // Stopping before a start is still a stop: an already-aborted attempt
+    // settles CANCELLED without validation, policy, approval or execution.
+    // Cancellation wins over every other outcome for this attempt.
+    if (invokeOpts?.signal?.aborted === true) {
+      return settle(meta, {
+        status: "FAILED",
+        error: toolError("CANCELLED", `tool "${id}" was cancelled before it started`, now),
+        detail: "cancelled before execute",
+      });
+    }
+
     // ── 1. validate ──────────────────────────────────────────────────────────
     // First, and unconditionally: an input that does not parse must never reach
     // the policy engine or the tool body.
@@ -745,6 +765,7 @@ export function createToolRegistry(opts: {
         ...(invokeOpts?.stepId !== undefined ? { stepId: invokeOpts.stepId } : {}),
         ...(invokeOpts?.scheduleId !== undefined ? { scheduleId: invokeOpts.scheduleId } : {}),
         ...(invokeOpts?.turnId !== undefined ? { turnId: invokeOpts.turnId } : {}),
+        ...(invokeOpts?.signal !== undefined ? { signal: invokeOpts.signal } : {}),
       });
       // The result NAMES what was produced (a memory id, a skill id, …) — when
       // it really produced it. `settle` reads it through `deriveToolProvenance`,

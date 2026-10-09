@@ -131,6 +131,7 @@ import { readOrchestrationPrefs } from "./orchestration/prefs.ts";
 import { createSettingsService, isSettingKey, type SettingsService, type ValidatedSettingsInput } from "./settings/settings.ts";
 import { isOrchestrationKey, validateOrchestrationValue, type OrchestrationKey } from "./orchestration/prefs.ts";
 import type { StepRunner } from "./missions/executor.ts";
+import { isRecord } from "./shared/contracts.ts";
 
 import type {
   AgentStatus,
@@ -720,10 +721,28 @@ export function createStateMutationTools(deps: StateMutationToolDeps): ToolDefin
       id: MUTATION_TOOLS.memoryWrite,
       name: "Write a memory",
       description:
-        "Append a fact to KAI's canonical memory store, in a scope the runtime can genuinely honour. Refuses a scope with no producer.",
+        "Append a fact to KAI's canonical memory store, in a scope the runtime can genuinely honour. `scope` is REQUIRED (global, session, mission, employee, project); a private scope additionally needs its scopeId. Refuses a scope with no producer.",
       risk: "WRITE",
       validate(input) {
-        return entityOf(input, "memory write input");
+        const record = entityOf(input, "memory write input");
+        if (!record.ok) return record;
+        // scope is REQUIRED and validated HERE, at the boundary — not deep in
+        // the resolver. A missing scope used to fall through to
+        // "must be one of …", which read like the VALUE was wrong when the
+        // field was simply absent (the mission-step SCOPE_VIOLATION reports).
+        // Never default it: silently landing a fact in global would widen
+        // something the caller meant to keep private.
+        const scope = record.value.scope;
+        if (typeof scope !== "string" || scope.length === 0) {
+          return { ok: false, reason: `scope is required; must be one of ${MEMORY_SCOPES.join(", ")}` };
+        }
+        if (!(MEMORY_SCOPES as readonly string[]).includes(scope)) {
+          return {
+            ok: false,
+            reason: `scope must be one of ${MEMORY_SCOPES.join(", ")}; got ${JSON.stringify(scope)}`,
+          };
+        }
+        return { ok: true, value: record.value };
       },
       async execute(input) {
         return deps.writeCanonicalMemory(input);
@@ -2195,6 +2214,19 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
    * here), and "manual" is reported as satisfied with a note rather than being
    * silently skipped — an unattended step that claims success would be a lie.
    */
+  /**
+   * The canonical refusal VALUE ({ok:false, refusal:{reason, detail?…}})
+   * tools like memory.write answer with when they run but decline. Returns
+   * the human-readable reason, or undefined for any other value.
+   */
+  function refusalOfValue(value: unknown): string | undefined {
+    if (!isRecord(value) || value["ok"] !== false) return undefined;
+    const refusal = value["refusal"];
+    if (!isRecord(refusal) || typeof refusal["reason"] !== "string") return undefined;
+    const detail = typeof refusal["detail"] === "string" && refusal["detail"].length > 0 ? `: ${refusal["detail"]}` : "";
+    return `${refusal["reason"]}${detail}`;
+  }
+
   const rawRunner: StepRunner = async (step: MissionStep, mission: Mission, opts) => {
     // The schedule that created this mission (if any) is carried ON the mission,
     // so every step's action record can name its causal schedule. The step's own
@@ -2206,20 +2238,38 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       if (!step.target) {
         return { ok: false, error: kerr("VALIDATION_FAILED", "tool step without a target") };
       }
+      // A mission step that writes memory without naming a scope is writing
+      // MISSION context by definition: bind it to this mission rather than
+      // fail it. A step that names any scope (even a wrong one) is left alone
+      // so the tool's own validation judges it — the runner never silently
+      // rewrites an explicit choice, and never widens one to global.
+      const stepInput =
+        step.target === MUTATION_TOOLS.memoryWrite && isRecord(step.input) && step.input["scope"] === undefined
+          ? { ...step.input, scope: "mission", scopeId: mission.id }
+          : (step.input ?? {});
       // `opts.approvalId` is present only when a human already cleared this
       // step. Passing it through is what makes the resume actually resume: the
       // boundary sees an approval bound to this exact tool and executes instead
       // of asking a second time.
-      const result = await tools.invoke(step.target, step.input ?? {}, {
+      const result = await tools.invoke(step.target, stepInput, {
         missionId: mission.id,
         stepId: step.id,
         turnId,
         ...(originScheduleId !== undefined ? { scheduleId: originScheduleId } : {}),
         ...(opts?.approvalId !== undefined ? { approvalId: opts.approvalId } : {}),
       });
-      return result.ok
-        ? { ok: true, output: asRecord(result.result) }
-        : { ok: false, error: result.error };
+      if (!result.ok) return { ok: false, error: result.error };
+      // A tool VALUE shaped {ok:false, refusal} is an explicit refusal, not a
+      // result: the step did NOT do its work. Settling it COMPLETED would be
+      // the false-completion pathology (a refused memory.write once completed
+      // its mission). Narrow on purpose: only the canonical refusal shape
+      // flips the outcome; any other value — including {ok:false} WITHOUT a
+      // refusal — stays the tool's own data.
+      const refusal = refusalOfValue(result.result);
+      if (refusal !== undefined) {
+        return { ok: false, error: kerr("POLICY_DENIED", `step "${step.title}" refused: ${refusal}`) };
+      }
+      return { ok: true, output: asRecord(result.result) };
     }
 
     if (step.kind === "agent") {

@@ -100,6 +100,11 @@ export interface BrainTurnResult {
   toolCalls?: BrainToolCallRecord[];
   /** How many model→tool→model rounds this turn took. */
   toolIterations: number;
+  /**
+   * True when the run's AbortSignal stopped the turn: the records so far are
+   * what settled, and the caller must report ABORTED — never completion.
+   */
+  cancelled?: boolean;
   /** The budget that applied to this turn (runtime configuration, not a constant). */
   maxToolIterations: number;
   /**
@@ -202,10 +207,23 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
     return declarations.length > 0 ? declarations : undefined;
   }
 
-  function toolContext(input: BrainTurnInput): { sessionId?: string; agentId?: string } {
+  /**
+   * A call, not a property read: TypeScript narrows `input.signal?.aborted`
+   * across loop iterations after one check, so repeated inline comparisons
+   * miscompile to `false | undefined`. The closure re-reads every time.
+   */
+  function isAborted(input: BrainTurnInput): boolean {
+    return input.signal?.aborted === true;
+  }
+
+  function toolContext(input: BrainTurnInput): { sessionId?: string; agentId?: string; signal?: AbortSignal } {
     return {
       ...(input.sessionId !== undefined ? { sessionId: input.sessionId } : {}),
       ...(input.agentId !== undefined ? { agentId: input.agentId } : {}),
+      // The run's cancellation rides into every tool execution: a Stop that
+      // arrives mid-tool kills the attempt through the registry boundary,
+      // not just the text stream around it.
+      ...(input.signal !== undefined ? { signal: input.signal } : {}),
     };
   }
 
@@ -418,22 +436,63 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
       const messages = messagesFor(input);
       const declarations = toolDeclarations();
       const records: BrainToolCallRecord[] = [];
-      let result: ChatResult;
+      let result: ChatResult | undefined;
       let iterations = 0;
+      let cancelled = false;
 
       for (;;) {
-        result = await provider.chat({
-          messages,
-          purpose: input.purpose ?? purpose,
-          ...(declarations !== undefined ? { tools: declarations } : {}),
-          ...(input.model !== undefined ? { model: input.model } : {}),
-          ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
-          ...(input.signal !== undefined ? { signal: input.signal } : {}),
-        });
+        // A Stop that landed between rounds ends the turn before the next
+        // model call — no phantom round after the user cancelled.
+        if (isAborted(input)) {
+          cancelled = true;
+          break;
+        }
+        try {
+          result = await provider.chat({
+            messages,
+            purpose: input.purpose ?? purpose,
+            ...(declarations !== undefined ? { tools: declarations } : {}),
+            ...(input.model !== undefined ? { model: input.model } : {}),
+            ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+            ...(input.signal !== undefined ? { signal: input.signal } : {}),
+          });
+        } catch (error) {
+          // An aborted provider call is a cancellation, not a brain failure:
+          // report what settled instead of throwing.
+          if (isAborted(input)) {
+            cancelled = true;
+            break;
+          }
+          throw error;
+        }
         const calls = result.toolCalls ?? [];
         if (calls.length === 0 || plane === undefined || iterations >= maxToolIterations) break;
         iterations += 1;
         await runToolCalls(plane, messages, calls, input, records);
+        if (isAborted(input)) {
+          cancelled = true;
+          break;
+        }
+      }
+
+      if (cancelled) {
+        return {
+          text: result?.text ?? "",
+          model: result?.model ?? provider.model,
+          provider: result?.provider ?? provider.id,
+          ...(records.length > 0 ? { toolCalls: records } : {}),
+          toolIterations: iterations,
+          maxToolIterations,
+          toolBudgetExhausted: false,
+          synthesized: false,
+          cancelled: true,
+        };
+      }
+      if (result === undefined) {
+        // Unreachable: every non-cancelled loop exit assigns a model result
+        // before breaking. Kept as a throw (not a silent empty turn) so a
+        // future edit that breaks the invariant fails loudly in tests.
+        throw new Error("brain turn ended with no model result");
       }
 
       // The budget ran out while the model still wanted tools: the turn answers
@@ -495,7 +554,22 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
         const messages = messagesFor(input);
         // Every executed call across all rounds: the synthesis guard's evidence.
         const allRecords: BrainToolCallRecord[] = [];
+        const cancelledTerminal = (iteration: number): StreamChunk => ({
+          delta: "",
+          done: true,
+          toolIterations: iteration,
+          maxToolIterations,
+          toolBudgetExhausted: false,
+          cancelled: true,
+        });
         for (let iteration = 0; ; iteration += 1) {
+          // A Stop between rounds ends the turn before the next model call.
+          // (A provider that ignores the signal — or buffers — must not run
+          // on: the loop checks the run's own flag, not just the fetch.)
+          if (isAborted(input)) {
+            yield cancelledTerminal(iteration);
+            return;
+          }
           let content = "";
           let calls: ToolCall[] = [];
           let terminal: StreamChunk | undefined;
@@ -514,6 +588,12 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
             }
             content += chunk.delta;
             yield chunk;
+          }
+          // A Stop that landed mid-text ends the turn HERE with what
+          // streamed — no tool round, no synthesis pass, no completion.
+          if (isAborted(input)) {
+            yield cancelledTerminal(iteration);
+            return;
           }
           const exhausted = calls.length > 0 && iteration >= maxToolIterations;
           if (calls.length === 0 || iteration >= maxToolIterations) {
@@ -564,9 +644,11 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
             return;
           }
           // A tool-call round: each execution emits its lifecycle events, which
-          // are queued and yielded as chunks (result value stripped — rendering
-          // reads status, not values, off the wire). The streamed preamble was
-          // already sent; it rides on the assistant message for the next round.
+          // are queued and yielded as chunks WITH their result value — the
+          // server boundary attaches the bounded redacted wire preview, so the
+          // timeline renders real content instead of bare names. The streamed
+          // preamble was already sent; it rides on the assistant message for
+          // the next round.
           const round: BrainToolCallRecord[] = [];
           await runToolCalls(
             planeRef,
@@ -575,15 +657,29 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
             input,
             round,
             (event) => {
-              const { result, ...streamable } = event;
-              void result;
-              pendingEvents.push(streamable);
+              // The FULL event rides the chunk now — the server boundary
+              // attaches the bounded redacted preview for the wire. Stripping
+              // here is what starved the timeline of result content.
+              pendingEvents.push(event);
             },
             content,
           );
           for (const record of round) allRecords.push(record);
           for (const event of pendingEvents.splice(0)) {
             yield { delta: "", done: false, toolEvent: event };
+          }
+          // A Stop that landed mid-tool ends the turn HERE: no next model
+          // round, no synthesis pass — the settled state says cancelled.
+          if (isAborted(input)) {
+            yield {
+              delta: "",
+              done: true,
+              toolIterations: iteration + 1,
+              maxToolIterations,
+              toolBudgetExhausted: false,
+              cancelled: true,
+            };
+            return;
           }
         }
       }
@@ -620,3 +716,4 @@ export function brainFailureReason(error: unknown): string {
   if (error instanceof Error) return error.message;
   return "unknown";
 }
+

@@ -46,6 +46,19 @@ const MARKDOWN_CASES: Array<{ name: string; input: string }> = [
   { name: "long-word", input: "a".repeat(10000) },
   { name: "many-blocks", input: Array.from({ length: 500 }, (_, i) => `# H${i}\ntext ${i}`).join("\n") },
   { name: "live-partial-fence", input: "text\n```ts\nconst x = " },
+  { name: "js-link", input: "[click](javascript:alert(1))" },
+  { name: "data-link", input: "[img](data:text/html,<script>alert(1)</script>)" },
+  { name: "vbscript-link", input: "[x](vbscript:msgbox(1))" },
+  { name: "autolink-js", input: "javascript:alert(1)" },
+  { name: "unclosed-link", input: "[half](https://example.com" },
+  { name: "unclosed-bold", input: "this is **bold without end" },
+  { name: "unclosed-table", input: "| a | b |\n| 1 | 2" },
+  { name: "nested-fence", input: "````\n```\ninner\n```\n````" },
+  { name: "fence-info-xss", input: '```<img src=x onerror=y>\ncode\n```' },
+  { name: "math-unclosed", input: "value $x^2 and more" },
+  { name: "math-evil", input: "$\\htmlData{<img src=x onerror=y>}$" },
+  { name: "checklist", input: "- [ ] todo\n- [x] done" },
+  { name: "visual-marker", input: "▦ diagram\n{\"kind\":\"x\"}" },
 ];
 
 test("markdown blocks: every corpus case renders without throwing", () => {
@@ -92,6 +105,50 @@ test("markdown inline: formatting renders, hostile input escapes", () => {
   const evil = inline('<script>alert(1)</script>');
   assert.ok(!evil.includes("<script"));
   assert.ok(!inline('<img src=x onerror="y">').includes("<img"));
+});
+
+test("markdown blocks: malicious link schemes degrade to text, never href", () => {
+  for (const name of ["js-link", "data-link", "vbscript-link"]) {
+    const html = blocks(MARKDOWN_CASES.find((c) => c.name === name)!.input).join("");
+    // Escaped literal text may still NAME the scheme inertly — what must never
+    // exist is a live href carrying one, or a live tag/handler.
+    assert.ok(!/href\s*=\s*"[^"]*javascript:/i.test(html), `${name}: no js href`);
+    assert.ok(!/href\s*=\s*"data:/i.test(html), `${name}: no data href`);
+    assert.ok(!/href\s*=\s*"vbscript:/i.test(html), `${name}: no vbscript href`);
+    assert.ok(!html.includes("<script"), `${name}: no script tag`);
+    assert.ok(!html.includes("<img"), `${name}: no raw img tag`);
+  }
+  // Safe links still link.
+  const ok = blocks("[kai](https://example.com)").join("");
+  assert.ok(ok.includes('href="https://example.com"'), "https links survive");
+});
+
+test("markdown blocks: malformed + incomplete streaming input never throws or leaks", () => {
+  for (const name of ["unclosed-link", "unclosed-bold", "unclosed-table", "nested-fence", "fence-info-xss", "math-unclosed", "math-evil", "live-partial-fence"]) {
+    const input = MARKDOWN_CASES.find((c) => c.name === name)!.input;
+    for (const live of [false, true]) {
+      const html = blocks(input, { live }).join("");
+      assert.ok(!html.includes("<script"), `${name}/live=${live}: no script tag`);
+      assert.ok(!html.includes("<img"), `${name}/live=${live}: no raw img tag`);
+      assert.ok(!/on\w+\s*=\s*"/.test(html), `${name}/live=${live}: no event handler`);
+    }
+  }
+  // An incomplete fence still renders its code block live (streaming must not
+  // swallow it). Syntax highlighting inserts spans mid-text, so assert on the
+  // code-block structure + the escaped code words, not a raw substring.
+  const partial = blocks("text\n```ts\nconst x = ", { live: true }).join("");
+  assert.ok(partial.includes("md-code"), "partial fence renders its code block live");
+  assert.ok(partial.includes("const") && partial.includes("x ="), "partial fence code stays visible");
+});
+
+test("markdown blocks: checklists, markers and math shapes render", () => {
+  const checks = blocks("- [ ] todo\n- [x] done").join("");
+  assert.ok(checks.includes("md-task"), "checklist items marked");
+  assert.ok(checks.includes("is-done"), "completed item marked");
+  const marker = blocks("▦ diagram\nplain").join("");
+  assert.ok(!marker.includes("<script"), "marker line is inert text");
+  const math = blocks("inline $x^2$ end").join("");
+  assert.ok(math.includes("md-imath"), "inline math renders");
 });
 
 // ── tool cards ──────────────────────────────────────────────────────────────

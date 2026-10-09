@@ -1,0 +1,57 @@
+{
+  "at": "2026-10-09T02:42:47.277Z",
+  "scenarios": {
+    "A headings/lists/code/table/quote/link render richly": {
+      "pass": true,
+      "detail": "{\"h1\":1,\"h2\":1,\"ul\":1,\"task\":2,\"code\":1,\"table\":1,\"quote\":1,\"link\":1,\"scriptTags\":0}"
+    },
+    "A no script tags in rendered answer": {
+      "pass": true,
+      "detail": "{\"h1\":1,\"h2\":1,\"ul\":1,\"task\":2,\"code\":1,\"table\":1,\"quote\":1,\"link\":1,\"scriptTags\":0}"
+    },
+    "B tool card carries a real result body": {
+      "pass": true,
+      "detail": "{\"cards\":2,\"all\":[\"action.executedKAI is researching…just now\",\"✓ filesystem.searchEXECUTED · “lighthouse” in C:\\\\Users\\\\DELL\\\\AppData\\\\Local\\\\Temp\\\\kai-browser\"],\"summary\":\"✓ filesystem.searchEXECUTED · “lighthouse” in C:\\\\Users\\\\DELL\\\\AppData\\\\Local\\\\Temp\\\\kai-browser-prod-w0Bj8A\\\\workspace\",\"hasB"
+    },
+    "C search card, then read card, then the final answer — in DOM order": {
+      "pass": true,
+      "detail": "{\"searchIdx\":3,\"readIdx\":4,\"finalIdx\":6,\"n\":7}"
+    },
+    "D command streams live and stamps exit last": {
+      "pass": true,
+      "detail": "{\"runningSeen\":\"exit 0 · 1728ms\",\"st\":\"exit 0 · 1728ms\"}"
+    },
+    "E scrolled-away view is not yanked; jump appears": {
+      "pass": true,
+      "detail": "{\"top\":0,\"jumpVisible\":true}"
+    },
+    "E jump-to-latest returns to bottom": {
+      "pass": true,
+      "detail": "gap=99"
+    },
+    "F 1200-chunk flood stays bounded + UI responsive": {
+      "pass": true,
+      "detail": "{\"spans\":7,\"chars\":62493,\"rafMs\":15.4}"
+    },
+    "G stop leaves no failure card": {
+      "pass": true,
+      "detail": "{\"badAfter\":0,\"thinkGone\":0}"
+    },
+    "G stopped run settles CANCELLED in-process (never completes into the void)": {
+      "pass": true,
+      "detail": "terminal=CANCELLED"
+    },
+    "G composer usable after stop": {
+      "pass": true,
+      "detail": "follow-up turn rendered"
+    }
+  },
+  "perf": {
+    "flood": {
+      "spans": 7,
+      "chars": 62493,
+      "rafMs": 15.4
+    }
+  },
+  "verdict": "pass"
+}

@@ -37,6 +37,8 @@ export interface TurnBrainResult {
   toolBudgetExhausted: boolean;
   synthesized: boolean;
   pendingTools?: string[];
+  /** True when the run's AbortSignal stopped the turn: settle CANCELLED, never verify as complete. */
+  cancelled?: boolean;
 }
 
 export interface TurnBegin {
@@ -96,6 +98,24 @@ export function finishTurn(
     return { replyText: result.text, state: "COMPLETED", resumed: begin.resumed };
   }
   const taskId = begin.taskId;
+  // A cancelled turn is NEVER verified as complete: the text so far settles
+  // as the visible record and the task lands CANCELLED so a resume continues
+  // it instead of assuming it finished.
+  if (result.cancelled === true) {
+    tracker.move(taskId, "VERIFYING");
+    tracker.track(taskId, {
+      verification: JSON.stringify({
+        at: new Date().toISOString(),
+        deliverable: false,
+        pending: false,
+        synthesized: false,
+        budgetExhausted: false,
+        cancelled: true,
+      }),
+    });
+    tracker.move(taskId, "CANCELLED");
+    return { replyText: result.text, state: "CANCELLED", resumed: begin.resumed };
+  }
   tracker.move(taskId, "VERIFYING");
   const steps = (result.toolCalls ?? []).map((call) => ({
     label: call.toolId ?? call.name,

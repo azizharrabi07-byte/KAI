@@ -134,6 +134,12 @@ export interface StreamChunk {
   maxToolIterations?: number;
   toolBudgetExhausted?: boolean;
   /**
+   * Present and true on the terminal chunk when the run's AbortSignal stopped
+   * the turn: the text/tool record so far is what settled, and the caller must
+   * report ABORTED — never completion — for this turn.
+   */
+  cancelled?: boolean;
+  /**
    * Present on the terminal chunk when the brain's final-synthesis guard ran:
    * the closing text was produced by the tools-disabled final pass over the
    * turn's evidence, not by the last tool round.
@@ -169,6 +175,14 @@ export interface ToolStreamEvent {
   approvalId?: string;
   /** The tool's value (or refusal value), server-side listener only. */
   result?: unknown;
+  /**
+   * Bounded, secret-redacted preview of `result`, safe to stream to the UI
+   * (see `chat/result-preview.ts`). Present on terminal events when there is
+   * something to show; the full value never leaves the Core on this frame.
+   */
+  resultPreview?: string;
+  /** True when the real value continued past the preview budget. */
+  resultTruncated?: boolean;
 }
 
 export interface StructuredRequest<T> extends ChatRequest {

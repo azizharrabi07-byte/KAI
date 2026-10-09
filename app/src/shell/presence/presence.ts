@@ -41,9 +41,17 @@ import type {
   CoreOrchestrationPrefs,
   CoreSessionSummary,
   CoreToolCall,
+  CoreWorkerHealth,
   CoreWorkItemSummary,
 } from "../../core/kai-core";
 import { conversationVisible } from "./conversation";
+import {
+  createLiveAssistant,
+  installCodeCopy,
+  previewCardValue,
+  renderAssistantStatic,
+  type LiveAssistant,
+} from "../../chat/render-assistant";
 import { createPalette, type PaletteHandle } from "../commands/palette";
 import type { CommandContext } from "../commands/registry";
 import { readMode, writeMode, type ModeId } from "../modes";
@@ -388,6 +396,43 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
   let threadEl: HTMLElement;
   let chatInput: HTMLTextAreaElement;
 
+  // ── Scroll manager (mountPresence scope so every timeline writer shares
+  // it): follow-tail ONLY while the user is already near the bottom. Stream
+  // appends never smooth-scroll (a queued smooth animation per delta is pure
+  // jank); at most one instant jump per frame. Scrolled away → a Jump control
+  // appears and nothing yanks the view.
+  const reducedMotion = (): boolean =>
+    typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function nearBottom(px = 96): boolean {
+    if (threadEl === undefined) return true;
+    return threadEl.scrollHeight - threadEl.scrollTop - threadEl.clientHeight < px;
+  }
+  let followQueued = false;
+  function requestFollow(): void {
+    if (threadEl === undefined || !nearBottom()) return;
+    if (followQueued) return;
+    followQueued = true;
+    const jump = (): void => {
+      followQueued = false;
+      // Instant during a stream (smooth would queue an animation per chunk);
+      // smooth only for the explicit user-initiated jump below.
+      threadEl.scrollTop = threadEl.scrollHeight;
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(jump);
+    else jump();
+  }
+  /** Thread chrome that needs the built thread: Jump-to-latest control. */
+  function initThreadChrome(): void {
+    const jumpBtn = h("button", { class: "jump", type: "button", text: "↓ latest", hidden: true });
+    jumpBtn.addEventListener("click", () => {
+      threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: reducedMotion() ? "auto" : "smooth" });
+    });
+    threadEl.append(jumpBtn);
+    threadEl.addEventListener("scroll", () => {
+      jumpBtn.hidden = nearBottom();
+    }, { passive: true });
+  }
+
   function buildChat(v: HTMLElement): void {
     const proj = h("div", { class: "proj" }, h("span", { class: "mono", text: "KAI" }), h("small", { id: "kp-proj-sub", text: "no session yet" }));
     // Operator identity: the REAL KAI character engine (orbs.who) is the main
@@ -421,6 +466,11 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
     actStrip = h("div", { class: "actstrip", id: "kp-actstrip" });
     threadCol = h("div", { class: "col" });
     threadEl = h("section", { class: "thread" }, threadCol);
+
+    // Code-copy for every `.md-copy` button the rich renderer emits, live or
+    // settled: exactly one delegated listener for the whole thread.
+    installCodeCopy(threadCol, toast);
+    initThreadChrome();
 
     const hero = h("div", { class: "hero" }, h("div", { class: "float" }, orbs.hero), h("h1", { id: "kp-greet", text: greetTitle() }), h("p", { id: "kp-greet-s", text: greetSub() }));
     chatInput = h("textarea", { rows: "1", id: "kp-in", placeholder: "Describe a task, / for commands, @ for agents and skills" });
@@ -598,7 +648,7 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
     box.append(btns);
     card.append(box);
     threadCol.append(card);
-    threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: "smooth" });
+    requestFollow();
   }
 
   /**
@@ -636,14 +686,27 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
     for (const card of settled) wrap.append(card);
   }
 
-  /** One tool call as a thread card, in the event-card shape. */
+  /**
+   * One tool call as a thread card, in the event-card shape — WITH its real
+   * content. The summary names the tool + status; the body carries the actual
+   * bounded result (the live wire preview when streaming, a clipped preview
+   * of the persisted value for history), the error, the approval, and the
+   * duration. Raw payloads stay collapsed; useful details are inspectable.
+   */
   function toolCard(t: {
     toolName: string;
     toolId?: string;
     status: string;
     arguments?: string;
+    /** Persisted raw value (history path). */
     result?: unknown;
+    /** Live bounded redacted preview (stream path). Wins over `result`. */
+    resultPreview?: string;
+    resultTruncated?: boolean;
+    error?: { code: string; message: string };
     approvalId?: string;
+    startedAt?: string;
+    completedAt?: string;
   }): HTMLElement {
     const described = describeToolCall({ ...t, arguments: t.arguments ?? "" });
     const el = h("details", { class: "tc blk" });
@@ -652,6 +715,38 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
       `<span class="ti">${icon("plug")}</span><b>${esc(described.glyph)} ${esc(described.name)}</b>` +
       `<code>${esc(described.status)}${described.detail !== "" ? ` · ${esc(described.detail)}` : ""}</code>`;
     el.append(summary);
+    const body = h("div", { class: "tbody" });
+    if (t.arguments !== undefined && t.arguments !== "") {
+      const args = t.arguments.length > 500 ? `${t.arguments.slice(0, 500)}…` : t.arguments;
+      body.append(h("div", { class: "targs" }, h("code", { text: args })));
+    }
+    if (t.error !== undefined) {
+      body.append(h("div", { class: "terr" }, h("code", { text: t.error.code }), h("span", { text: ` ${t.error.message}` })));
+    }
+    if (t.approvalId !== undefined) {
+      body.append(h("div", { class: "t appr" }, h("span", { text: `waiting on approval ${t.approvalId}` })));
+    }
+    // Live preview first (already redacted + bounded by Core); history falls
+    // back to a clipped preview of the persisted value with honest truncation.
+    const live = t.resultPreview !== undefined ? { text: t.resultPreview, truncated: t.resultTruncated === true } : undefined;
+    const shown = live ?? previewCardValue(t.result);
+    if (shown.text !== undefined) {
+      body.append(h("pre", { class: "tout", text: shown.text }));
+      if (shown.truncated) body.append(h("div", { class: "ttrunc", text: "truncated — full value retained server-side" }));
+      const copy = h("button", { class: "mini", type: "button", text: "Copy" });
+      copy.addEventListener("click", () => {
+        void navigator.clipboard?.writeText(shown.text ?? "").then(
+          () => toast("Copied", "ok"),
+          () => toast("Copy failed", "err"),
+        );
+      });
+      body.append(copy);
+    }
+    if (t.startedAt !== undefined && t.completedAt !== undefined) {
+      const ms = Date.parse(t.completedAt) - Date.parse(t.startedAt);
+      if (Number.isFinite(ms) && ms >= 0) body.append(h("div", { class: "tdur", text: `${ms}ms` }));
+    }
+    if (body.childElementCount > 0) el.append(body);
     return el;
   }
 
@@ -673,7 +768,20 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
       return wrap;
     }
     const k = h("div", { class: "k" });
-    k.append(h("p", { class: "fade", text: t.text }));
+    // The production rich renderer (render-assistant.ts): headings, lists,
+    // tables, code, quotes, links and math through the safe Markdown
+    // boundary — never a plain paragraph, never raw model HTML.
+    const mdHost = h("div", { class: "kai-md fade" });
+    if (t.text.trim().length > 0) {
+      try {
+        renderAssistantStatic(mdHost, t.text);
+      } catch {
+        // A renderer failure must never blank a real answer: fall back to
+        // plain text rather than lose what Core said.
+        mdHost.textContent = t.text;
+      }
+    }
+    k.append(mdHost);
     // Copy every assistant message (operator §31): explicit, not selection-only.
     if (t.text.trim().length > 0) {
       const copy = h("button", { class: "mini", type: "button", text: "Copy" });
@@ -696,7 +804,7 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
     const node = bubbleTurn(t);
     if (t.role === "assistant") collapseTurnTools(node);
     threadCol.append(node);
-    threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: "smooth" });
+    requestFollow();
   }
   /**
    * Show the thread whenever there is a conversation OR a live turn — and never
@@ -740,7 +848,7 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
       el.append(h("pre", { text: JSON.stringify(row.payload, null, 2).slice(0, 2000) }));
     }
     turnCardHost.append(el);
-    threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: "smooth" });
+    requestFollow();
   }
 
   /**
@@ -783,7 +891,7 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
       chatInput.style.height = "auto";
       chatInput.style.height = `${Math.min(160, chatInput.scrollHeight)}px`;
     }
-    threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: "smooth" });
+    requestFollow();
   }
 
   function chatHeader(): void {
@@ -814,7 +922,7 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
     if (!res.ok) return;
     // `tools` ride along from Core's transcript — a reloaded session shows the
     // same tool cards the live turn showed. Nothing is reconstructed locally.
-    turns = res.value
+    const incoming = res.value
       .filter((t) => t.role === "user" || t.role === "assistant")
       .map((t) => ({
         id: chatSeq++,
@@ -822,18 +930,43 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
         text: t.text,
         ...(t.tools !== undefined && t.tools.length > 0 ? { tools: t.tools } : {}),
       }));
+    if (id !== loadedSessionId) {
+      // Switching sessions: the snapshot owns the surface, whatever its size.
+      turns = incoming;
+    } else if (incoming.length >= turns.length) {
+      // Same-session refresh that caught up: adopt it.
+      turns = incoming;
+    } else {
+      // Same-session snapshot that PREDATES local truth (a settle still
+      // landing, or one that failed server-side while the user already saw
+      // the streamed turn + its failure card): replacing would silently wipe
+      // visible history. Keep local turns; the next refresh reconciles.
+      chatHeader();
+      return;
+    }
     loadedSessionId = id;
     firstUserText = turns.find((t) => t.role === "user")?.text;
     chatHeader();
     renderTurns();
   }
+  // refreshActive is fired unawaited from many paths, so responses can resolve
+  // in EITHER order. A STALE null (requested before a session existed,
+  // resolving after the first turn settled) used to wipe the just-rendered
+  // answer back to the empty hero. Only the NEWEST response may write — the
+  // same generation rule loadHistory already honours.
+  let activeSeq = 0;
   async function refreshActive(): Promise<void> {
+    const seq = ++activeSeq;
     const res = await client.activeSession();
+    if (seq !== activeSeq) return;
     // Transport failure: keep showing what is loaded. Only an AUTHORITATIVE
     // answer changes the surface — a failed fetch must never blank it.
     if (!res.ok) { chatHeader(); return; }
     activeSession = res.value;
     if (activeSession === null) {
+      // A turn in flight may still be creating its session: never wipe under
+      // it. The settle path refreshes again once the session exists.
+      if (busy || streamLive) { chatHeader(); return; }
       // Core says there is no active conversation (e.g. the session was
       // deleted and nothing remained): drop the stale thread so a dead
       // session's transcript cannot linger, then show the genuine empty hero.
@@ -889,7 +1022,7 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
     const think = h("details", { class: "think blk", open: true }, h("summary", { html: "<i></i>KAI is planning" }), h("div", { text: "Drafting a structured plan — nothing will run." }));
     k.append(think);
     threadCol.append(k);
-    threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: "smooth" });
+    requestFollow();
     try {
       const res = await client.runCommand("plan", goal);
       think.remove();
@@ -921,7 +1054,7 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
         view.addEventListener("click", () => show("missions"));
         card.append(h("div", { class: "btns" }, approve, view));
         threadCol.append(card);
-        threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: "smooth" });
+        requestFollow();
       }
     } catch (err) {
       think.remove();
@@ -985,8 +1118,6 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
       turns.push(userTurn);
       appendTurn(userTurn);
     }
-    logEventsAt = workspace.getState().events.length;
-
     // The live host for real tool/approval/agent cards that arrive this turn.
     stopRequested = false;
     appendActStrip("Thinking…", "plan");
@@ -1007,7 +1138,7 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
     think.append(stop);
     k.append(think);
     threadCol.append(k);
-    threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: "smooth" });
+    requestFollow();
     turnCardHost = k;
 
     // Prefer the STREAM: deltas paint as they arrive and the brain's real
@@ -1024,14 +1155,26 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
     let liveAttached = false;
     let liveText = "";
     const liveNode = h("div", { class: "k" });
-    const liveBubble = h("p", { class: "fade", text: "" });
-    liveNode.append(liveBubble);
+    // The live answer renders through the SAME rich renderer as settled
+    // turns (render-assistant.ts): StreamView morphs incrementally on its own
+    // rAF loop, so a delta never rebuilds the thread.
+    const liveHost = h("div", { class: "kai-md fade" });
+    liveNode.append(liveHost);
+    let liveView: LiveAssistant | null = null;
+    // Read through a call: the view is assigned inside stream callbacks, so a
+    // direct read here would be narrowed to its `null` initializer.
+    const getLiveView = (): LiveAssistant | null => liveView;
+    // One card per tool attempt, keyed by the REAL toolCallId: the start
+    // opens a running card in timeline position, the terminal event replaces
+    // it IN PLACE with the outcome + result body. No duplicates, no
+    // post-hoc grouping under the final answer.
+    const liveToolCards = new Map<string, HTMLElement>();
     const thinkLabel = think.querySelector("summary");
     const settleStreamed = (sessionId: string | undefined): void => {
       think.remove();
-      // The live bubble is already in place with the full text; record the
-      // turn without touching the DOM again — except collapsing the turn's
-      // successful tool cards into one execution block.
+      // The live StreamView already painted the full answer in place; record
+      // the turn without touching the DOM again — except collapsing the
+      // turn's successful tool cards into one execution block.
       if (turnCardHost !== null) collapseTurnTools(turnCardHost);
       const assistant: Turn = { id: chatSeq++, role: "assistant", text: liveText };
       turns.push(assistant);
@@ -1048,10 +1191,16 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
           if (!liveAttached) {
             liveAttached = true;
             threadCol.append(liveNode);
+            liveView = createLiveAssistant(liveHost, requestFollow);
           }
           liveText += delta;
-          liveBubble.textContent = liveText;
-          threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: "smooth" });
+          try {
+            liveView?.push(liveText);
+          } catch {
+            // Renderer failure mid-stream must never lose the answer: the
+            // settled record below still carries the full text.
+          }
+          requestFollow();
         },
         onToolEvent: (event) => {
           streamActive = true;
@@ -1060,29 +1209,59 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
             if (thinkLabel !== null) {
               thinkLabel.innerHTML = `<i></i>KAI is ${esc(describeToolActivity(event.toolId, event.toolName))}…`;
             }
+            // The attempt opens its timeline card NOW (running), in arrival
+            // order — the result replaces it when the terminal event lands.
+            const running = toolCard({
+              toolName: event.toolName,
+              ...(event.toolId !== undefined ? { toolId: event.toolId } : {}),
+              status: "RUNNING",
+              ...(event.arguments !== undefined ? { arguments: event.arguments } : {}),
+              ...(event.startedAt !== undefined ? { startedAt: event.startedAt } : {}),
+            });
+            liveToolCards.set(event.toolCallId, running);
+            turnCardHost?.append(running);
+            appendActStrip(`${event.toolId ?? event.toolName} · started`.trim(), "tool");
+            requestFollow();
             return;
           }
-          // A terminal tool event lands as a card under the in-progress turn,
-          // from the ACTUAL execution — never synthesised.
+          // A terminal tool event replaces its running card IN PLACE with the
+          // ACTUAL outcome + bounded result body — never synthesised, never a
+          // second card, never deferred to the final answer.
           const card = toolCard({
             toolName: event.toolName,
             ...(event.toolId !== undefined ? { toolId: event.toolId } : {}),
             status: event.status ?? "UNKNOWN",
             ...(event.arguments !== undefined ? { arguments: event.arguments } : {}),
+            ...(event.resultPreview !== undefined ? { resultPreview: event.resultPreview } : {}),
+            ...(event.resultTruncated !== undefined ? { resultTruncated: event.resultTruncated } : {}),
+            ...(event.error !== undefined ? { error: event.error } : {}),
             ...(event.approvalId !== undefined ? { approvalId: event.approvalId } : {}),
+            ...(event.startedAt !== undefined ? { startedAt: event.startedAt } : {}),
+            ...(event.completedAt !== undefined ? { completedAt: event.completedAt } : {}),
           });
-          turnCardHost?.append(card);
+          const prior = liveToolCards.get(event.toolCallId);
+          if (prior !== undefined) {
+            prior.replaceWith(card);
+            liveToolCards.delete(event.toolCallId);
+          } else {
+            turnCardHost?.append(card);
+          }
           appendActStrip(`${event.toolId ?? event.toolName} · ${event.status ?? ""}`.trim(), "tool");
-          threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: "smooth" });
+          requestFollow();
         },
         signal: controller.signal,
       });
-      if (streamActive) appendActStrip(stopRequested ? "Stopped" : "Done", "done");
+      const cancelled = (res.ok && res.value.cancelled === true) || (res.ok && res.value.taskState === "CANCELLED");
+      if (streamActive) appendActStrip(cancelled || stopRequested ? "Stopped — run aborted" : "Done", "done");
       if (streamActive) {
+        void getLiveView()?.finish();
         settleStreamed(res.ok ? res.value.sessionId : undefined);
-        if (stopRequested) {
-          // The user stopped it: settle what streamed, say so plainly, no error.
-          toast("Stopped", "ok");
+        if (cancelled || stopRequested) {
+          // The user stopped it AND the run reports cancelled: the child
+          // processes are dead (server aborts the run on disconnect and the
+          // registry kills the tree). Settle what streamed, say ABORTED
+          // plainly — never Done, never a failure card.
+          toast("Stopped — work aborted", "ok");
           moods.turnResolved(true);
           void refreshActive();
         } else if (!res.ok) {
@@ -1093,6 +1272,14 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
           // it, and this card lets the user Allow it inline.
           appendAgentRunCard(res.value.agentRun, text);
         }
+      } else if (stopRequested) {
+        // Stopped before the first frame: settle quietly. Falling through to
+        // the plain path here would RE-SEND a turn the user just cancelled.
+        think.remove();
+        liveNode.remove();
+        toast("Stopped — work aborted", "ok");
+        moods.turnResolved(true);
+        void refreshActive();
       } else {
         // The stream never started: same turn over the plain path.
         think.remove();
@@ -1132,6 +1319,7 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
       activeAbort = null;
       streamLive = false;
       busy = false;
+      void refreshWorkerHealth();
       chatInput.focus();
       // Recompute — NOT remove. With the reply in `turns`, the conversation stays
       // in front instead of collapsing back to the greeting (the eject-to-Home bug).
@@ -3290,7 +3478,7 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
       card.append(btns);
       turnCardHost.append(card);
     }
-    threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: "smooth" });
+    requestFollow();
   }
   async function decide(id: string, approved: boolean): Promise<void> {
     const res = await client.decideApproval(id, approved);
@@ -3582,7 +3770,6 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
   })();
 
   // ══ real event stream → thread cards + drawer + activity ══════════════════
-  let logEventsAt = 0;
   // Every read that has no live event of its own is primed by `prime()`. It used
   // to run ONCE at boot; if Core was still starting then those reads failed and
   // NOTHING retried them, so the real launch → "Open KAI" flow painted an empty
@@ -3609,7 +3796,7 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
    * stdout/stderr appended AS CHUNKS ARRIVE (never a post-exit dump). Started
    * opens the card; chunks append; exit stamps status + duration.
    */
-  const commandCards = new Map<string, { el: HTMLElement; out: HTMLElement; status: HTMLElement }>();
+  const commandCards = new Map<string, { el: HTMLElement; out: HTMLElement; status: HTMLElement; outLen: number }>();
   const CMD_OUTPUT_CAP = 200_000;
   function renderCommandRow(row: WorkspaceEventRow): void {
     const p = (row.payload ?? {}) as Record<string, unknown>;
@@ -3626,8 +3813,8 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
       const out = h("pre", { class: "cmdout" });
       el.append(head, out);
       (turnCardHost ?? threadCol).append(el);
-      threadEl.scrollTo({ top: threadEl.scrollHeight, behavior: "smooth" });
-      commandCards.set(id, { el, out, status });
+      requestFollow();
+      commandCards.set(id, { el, out, status, outLen: 0 });
       return;
     }
     const card = commandCards.get(id);
@@ -3637,19 +3824,28 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
       if (chunk.length === 0) return;
       const line = h("span", { class: row.type === "command.stderr" ? "cmd-err" : "cmd-out", text: chunk });
       card.out.append(line);
-      while (card.out.textContent !== null && card.out.textContent.length > CMD_OUTPUT_CAP) {
-        card.out.firstChild?.remove();
+      // O(1) cap accounting: reading textContent per chunk rescans the whole
+      // output (quadratic on long streams). A running counter trims from the
+      // head without ever measuring the body.
+      card.outLen += chunk.length;
+      while (card.outLen > CMD_OUTPUT_CAP && card.out.firstChild !== null) {
+        const first = card.out.firstChild;
+        card.outLen -= (first.textContent ?? "").length;
+        first.remove();
       }
-      // Follow the tail only when the user is already at the bottom.
-      const nearBottom = card.el.scrollHeight - card.el.scrollTop - card.el.clientHeight < 40;
-      if (nearBottom) card.el.scrollTop = card.el.scrollHeight;
+      // Follow the tail on the SCROLLABLE element (the output pre), only when
+      // the user is already at the bottom of the THREAD.
+      if (nearBottom()) card.out.scrollTop = card.out.scrollHeight;
       return;
     }
     if (row.type === "command.exit") {
       const code = p["exitCode"];
       const ms = typeof p["durationMs"] === "number" ? Math.round(p["durationMs"]) : null;
-      const ok = code === 0;
-      card.status.textContent = `exit ${code === null || code === undefined ? "?" : String(code)}${ms !== null ? ` · ${ms}ms` : ""}`;
+      const aborted = p["cancelled"] === true;
+      const ok = code === 0 && !aborted;
+      card.status.textContent = aborted
+        ? `ABORTED${ms !== null ? ` · ${ms}ms` : ""}`
+        : `exit ${code === null || code === undefined ? "?" : String(code)}${ms !== null ? ` · ${ms}ms` : ""}`;
       card.status.classList.toggle("bad", !ok);
       const copy = h("button", { class: "mini", type: "button", text: "Copy" });
       copy.addEventListener("click", () => {
@@ -3664,6 +3860,17 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
    * Operator header state pills — from REAL state: the workspace connection,
    * the latest operator activity, and pending approvals. Nothing fabricated.
    */
+  /** Last known worker reachability from Core's OWN probes (GET /health). */
+  let workerHealth: CoreWorkerHealth | undefined;
+  async function refreshWorkerHealth(): Promise<void> {
+    try {
+      const res = await client.health();
+      if (res.ok && res.value.workers !== undefined) workerHealth = res.value.workers;
+    } catch {
+      // Keep last known; never fabricate a status from a failed fetch.
+    }
+    paintOperatorStatus();
+  }
   function paintOperatorStatus(): void {
     if (statePills === undefined) return;
     const slice = workspace.getState();
@@ -3672,42 +3879,127 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
       e.type.startsWith("worker") || e.type.startsWith("review") || e.type.startsWith("delegation") || e.type.startsWith("mission"));
     const bits: string[] = [];
     bits.push(`<span class="opill ${online ? "ok" : "bad"}"><i></i>${online ? "RUNTIME ACTIVE" : "OFFLINE"}</span>`);
+    // Worker pills render Core's measured probes — reachable/authorized or the
+    // real reason. Unknown stays unshown; an offline worker is never "idle".
+    const hermes = workerHealth?.hermes;
+    if (hermes !== undefined) {
+      const label = hermes.reachable ? (hermes.authorized === false ? "HERMES UNAUTH" : "HERMES OK") : "HERMES OFFLINE";
+      bits.push(`<span class="opill ${hermes.reachable && hermes.authorized !== false ? "ok" : "bad"}"><i></i>${esc(label)}</span>`);
+    }
+    const opencode = workerHealth?.opencode;
+    if (opencode !== undefined) {
+      const why = opencode.reachable
+        ? "OPENCODE OK"
+        : `OPENCODE OFFLINE${opencode.reason !== undefined ? ` · ${shortReason(opencode.reason)}` : ""}`;
+      bits.push(`<span class="opill ${opencode.reachable ? "ok" : "bad"}"><i></i>${esc(why)}</span>`);
+    }
     if (latestOp !== undefined) bits.push(`<span class="opill"><i></i>${esc(latestOp.text.slice(0, 40))}</span>`);
     bits.push(`<span class="opill ${approvals.length > 0 ? "warn" : ""}"><i></i>${approvals.length} APPROVAL${approvals.length === 1 ? "" : "S"}</span>`);
     statePills.innerHTML = bits.join("");
   }
+  function shortReason(reason: string): string {
+    const mapped: Record<string, string> = {
+      upstream_unreachable: "unreachable",
+      connection_refused: "refused",
+      timeout: "timeout",
+      unhealthy: "unhealthy",
+      malformed_response: "bad response",
+    };
+    return (mapped[reason] ?? reason).slice(0, 24);
+  }
 
+  // Fold cursor: ID-based, never length-based. The store ring is newest-first
+  // and CAPPED (CORE_EVENT_LIMIT): once full, its length stops growing, so a
+  // `slice(0, len - cursor)` cursor goes permanently blind — every event past
+  // the first ~20 (command output, exits, later turns) silently never folds.
+  // Rows are collected newest-first until the first already-seen row, marked
+  // immediately (even if a renderer throws), then rendered oldest-first.
+  const seenEventIds = new Set<string>();
+  const seenEventObjs = new WeakSet<object>();
+  function isFreshRow(e: WorkspaceEventRow): boolean {
+    if (e.id !== undefined) return !seenEventIds.has(e.id);
+    return !seenEventObjs.has(e);
+  }
+  function markRowSeen(e: WorkspaceEventRow): void {
+    if (e.id !== undefined) {
+      seenEventIds.add(e.id);
+      if (seenEventIds.size > 500) {
+        const it = seenEventIds.values();
+        for (let i = 0; i < 100; i += 1) {
+          const next = it.next();
+          if (next.done) break;
+          seenEventIds.delete(next.value);
+        }
+      }
+    } else {
+      seenEventObjs.add(e);
+    }
+  }
   const unsubscribe = workspace.subscribe(() => {
     const slice = workspace.getState();
-    // New events since the last fold.
-    const fresh = slice.events.slice(0, Math.max(0, slice.events.length - logEventsAt));
-    // Command output streams into its own live card, independent of a turn
-    // (a mission command runs outside chat too) — start/chunk/exit in order.
+    // New rows since the last fold, oldest-first for rendering.
+    const freshNewestFirst: WorkspaceEventRow[] = [];
+    for (const e of slice.events) {
+      if (!isFreshRow(e)) break;
+      freshNewestFirst.push(e);
+      markRowSeen(e);
+    }
+    const fresh = freshNewestFirst.reverse();
+    // One poison row must NEVER stall the timeline: every row folds in its
+    // own guard, and the cursor ALWAYS advances past what was seen — even
+    // when a renderer throws. (A swallowed throw here used to freeze the
+    // cursor and silently drop every later event, including command exits.)
+    const foldError = (where: string, error: unknown): void => {
+      try {
+        console.error(`[kai] event fold failed at ${where}: ${error instanceof Error ? error.message : String(error)}`);
+      } catch { /* logging never breaks the fold */ }
+    };
+    // `fresh` is already oldest-first (collected newest-first, reversed
+    // once): lifecycle order (start/chunks/exit) is preserved, so a command
+    // exit can never overtake its started card.
     if (fresh.length > 0) {
-      for (const e of [...fresh].reverse()) {
-        if (e.type.startsWith("command.")) renderCommandRow(e);
+      for (const e of fresh) {
+        // Command output streams into its own live card, independent of a
+        // turn (a mission command runs outside chat too).
+        if (!e.type.startsWith("command.")) continue;
+        try {
+          renderCommandRow(e);
+        } catch (error) {
+          foldError(`command:${e.type}`, error);
+        }
       }
     }
     if (turnCardHost !== null && fresh.length > 0) {
-      for (const e of fresh.reverse()) {
+      for (const e of fresh) {
         if (e.type.startsWith("command.")) continue;
-        appendEventCard(e, e.type.startsWith("mcp") || e.type.startsWith("tool"));
+        try {
+          appendEventCard(e, e.type.startsWith("mcp") || e.type.startsWith("tool"));
+        } catch (error) {
+          foldError(`event:${e.type}`, error);
+        }
       }
     }
     // The operator activity strip streams EVERY fresh operator event live
     // (worker/review/delegation/benchmark), independent of a turn (§8/§22).
     if (fresh.length > 0) {
-      for (const e of [...fresh].reverse()) {
+      for (const e of fresh) {
         if (e.type.startsWith("worker") || e.type.startsWith("review") || e.type.startsWith("delegation") || e.type.startsWith("benchmark")) {
-          appendActStrip(e.text, e.type);
+          try {
+            appendActStrip(e.text, e.type);
+          } catch (error) {
+            foldError(`strip:${e.type}`, error);
+          }
         }
       }
     }
-    logEventsAt = slice.events.length;
-    renderDrawer();
-    if (view === "activity") void renderActivity();
-    paintStatus();
-    paintOperatorStatus();
+    try {
+      renderDrawer();
+      if (view === "activity") void renderActivity();
+      paintStatus();
+      paintOperatorStatus();
+    } catch (error) {
+      foldError("chrome", error);
+    }
     if (slice.conn === "ONLINE" && lastConn !== "ONLINE") prime();
     lastConn = slice.conn;
   });
@@ -3718,6 +4010,7 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
   // page loaded is picked up without a manual reload.
   function prime(): void {
     paintOperatorStatus();
+    void refreshWorkerHealth();
     void workspace.routes.maintenance().then((res) => {
       if (res.ok) {
         identity = { buildId: res.value.identity.buildId, pid: res.value.identity.pid };
@@ -3777,3 +4070,4 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
     },
   };
 }
+
