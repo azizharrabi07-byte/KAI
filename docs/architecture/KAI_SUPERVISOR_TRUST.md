@@ -132,24 +132,65 @@ redaction case.
 
 ---
 
-## 6. Retry budget, enforced at the boundary
+## 6. Retry policy, enforced at the boundary (per ITEM)
 
 `runWorkItem` — the one entry point every caller uses (API, UI run control,
-supervisor resume) — enforces `1 + maxRetries` dispatches **per (item, worker)**
-from a durable per-worker counter (`outputs.dispatchByWorker`). Exceeding it is
-refused inside the orchestration boundary, with a durable `nextAction` and a
-trace entry; no caller can bypass it.
+supervisor resume, a corrective child) — enforces the item's attempt ceiling from
+a **durable per-item dispatch ledger** (`outputs.dispatches`), before any claim or
+delegation. No caller can exceed it, and rotating workers does not reset it.
 
-It is deliberately per-worker, not per-item: switching to a *different* worker is
-the breaker's sanctioned "never blind retry" path (`core/src/orchestration/bench.ts`,
-`scripts/orch-e2e.mjs` S2), and a legitimate switch must not be refused for the
-previous worker's failures. A user who wants another attempt from an exhausted
-worker creates a new item. Tests: trust-suite "retry budget…"; `orch-e2e.mjs` S2.
+### What counts as an attempt
 
-**Residual risk (stated, not hidden):** a caller that rotates through many
-distinct worker ids gets `1 + maxRetries` attempts per worker. The worker pool is
-finite and the board refuses settled items, so this is bounded, but it is not a
-per-item ceiling.
+Exactly one ledger entry per **worker dispatch**, classified against the previous
+entry so a caller cannot relabel a retry as something cheaper:
+
+| Kind | When | Bounded by |
+|---|---|---|
+| `initial` | the item's first dispatch | always allowed |
+| `retry` | the same worker as the previous dispatch | `maxRetries` |
+| `reassign` | a **different** worker than the previous dispatch | `maxReassignments` (defaults to `maxRetries`) |
+
+Not counted, deliberately: an evidence resume (no worker dispatch), an approval
+park (no dispatch), a refused claim, and a duplicate/redelivered event (the resume
+key makes it a no-op before the ledger is touched). The review-retry
+re-delegation **is** counted — it is a real dispatch.
+
+Ceiling: `1 + maxRetries + maxReassignments` dispatches. Exhausting it sets the
+item `BLOCKED` with a durable `nextAction` and a trace entry — a truthful parked
+result, never a false completion — and the board refuses further re-entry.
+
+### Why retries and reassignments are separate allowances
+
+Reassignment is the breaker's sanctioned "never blind retry" recovery after
+repeated failure (`core/src/orchestration/bench.ts`, `scripts/orch-e2e.mjs` S2:
+three failures by one worker, then a switch that succeeds). Counting a switch as a
+retry would refuse the sanctioned path; giving it no bound at all is the loophole
+this policy closes. So it has its own allowance **and never resets the retry
+count** — both ceilings bind the same item.
+
+### Corrective children
+
+A corrective child (`RETRY`/`REPLAN`/`CHANGE_WORKER`) is a **new work item**: it
+inherits the parent's contract and budget, starts with its own empty ledger, and
+is bounded by the same policy. The chain is bounded independently of the ceiling
+by `maxDepth` (children beyond it park) and `maxChildren` (`maxParallel`) per
+parent, so no retry chain is unbounded. Tests: trust-suite "retry policy…"
+(9 cases), `orch-orchestrator.test.ts` "spent retry budget fails instead of
+retrying forever", `orch-e2e.mjs` S2.
+
+### Durability
+
+The ledger lives in the persisted `outputs` JSON, so a restart, a duplicate
+event, a repeated API request and a concurrent dispatch cannot grant extra
+attempts. `board.annotate` is **additive by contract** — it merges into `outputs`
+instead of replacing them, because replacing silently dropped the ledger, the
+resume keys and the persisted Outcome Contract whenever a run parked for an
+approval.
+
+**Relationship to the old per-worker counter:** it is gone. `item.retries`
+(incremented by a review `changesRequested`) remains only as bench/rework
+bookkeeping and no longer governs any ceiling; the ledger is the single authority.
+
 
 ---
 
@@ -232,10 +273,22 @@ trust-suite "supervisor failure…", "a failed lesson write is surfaced…".
 
 ## 12. Known limitations
 
-- The retry budget is per (item, worker), not per item (§6).
 - Shell verification is limited to the allowlisted command shapes; anything else
   is recorded as unsupported rather than executed.
 - External audits require a working directory to check file claims; without one
   they report the limitation and verify nothing.
-- The live Hermes relay test (`core/src/server.test.ts`) needs a running Hermes
-  daemon; it fails honestly when the daemon is absent and is not skipped.
+- **Hermes is reachable but does not complete a turn on this machine.** Its
+  control plane answers quickly (`GET /health` 200 in 16 ms, `GET /v1/models` 200
+  in 35 ms, `POST /api/sessions` 201 in 17 ms) and it *accepts* work
+  (`POST /v1/runs` returns a `run_id`), but `POST /api/sessions/:id/chat` never
+  answers — measured ≥30 s against KAI's configured 120 s chat timeout, and a run
+  never finishes inside the configured 15-minute run timeout. KAI behaves
+  correctly and honestly in both cases: the chat turn falls back to
+  `presentWorkerFailure` (`core/src/chat/relay.ts`) and the run ends
+  `timed_out` / `AGENT_TIMEOUT` after `bestEffortStop`. No KAI-side defect is
+  demonstrated, so nothing is mocked, skipped or relabelled; the two affected
+  checks stay failing and are reported as externally blocked. Diagnosed
+  2026-10-09; see `docs/STATUS.md`.
+- The live Hermes relay test (`core/src/server.test.ts`) therefore fails after
+  exactly the 120 s chat timeout (observed 120,053–120,152 ms), which is the
+  configured `chatTimeoutMs`, not an arbitrary hang.

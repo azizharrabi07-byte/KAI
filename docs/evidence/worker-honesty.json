@@ -1,13 +1,13 @@
 {
-  "at": "2026-10-09T17:33:04.771Z",
+  "at": "2026-10-09T19:48:01.746Z",
   "scenarios": {
     "H1 opencode run_task parks for approval": {
       "pass": true,
-      "detail": "{\"ok\":false,\"status\":\"APPROVAL_REQUIRED\",\"approvalId\":\"apr_mv18uizj_0\"}"
+      "detail": "{\"ok\":false,\"status\":\"APPROVAL_REQUIRED\",\"approvalId\":\"apr_mv1do32l_0\"}"
     },
     "H4 denial is recorded": {
       "pass": true,
-      "detail": "{\"ok\":true,\"approval\":{\"id\":\"apr_mv18uizj_0\",\"toolId\":\"agents.run_task\",\"action\":\"Run a task on a worker agent\",\"reason\":\"tool \\\"agents.run_task\\\" acts outside "
+      "detail": "{\"ok\":true,\"approval\":{\"id\":\"apr_mv1do32l_0\",\"toolId\":\"agents.run_task\",\"action\":\"Run a task on a worker agent\",\"reason\":\"tool \\\"agents.run_task\\\" acts outside "
     },
     "H4 denied approval executes nothing": {
       "pass": true,
@@ -15,11 +15,11 @@
     },
     "H2 opencode-offline fails honestly, never fabricated": {
       "pass": true,
-      "detail": "{\"ok\":true,\"result\":{\"taskId\":\"task-mv18uj21\",\"state\":\"failed\",\"startedAt\":\"2026-10-09T17:33:10.009Z\",\"completedAt\":\"2026-10-09T17:33:10.013Z\",\"error\":{\"code\":\"INTERNAL\",\"message\":\"transport failure talking to http://127.0.0.1:4096\",\"retryable\":true,\"at\":\"2026-10-09T17:33:10.013Z\",\"detail\":\"TypeErro"
+      "detail": "{\"ok\":true,\"result\":{\"taskId\":\"task-mv1do352\",\"state\":\"failed\",\"startedAt\":\"2026-10-09T19:48:07.526Z\",\"completedAt\":\"2026-10-09T19:48:07.529Z\",\"error\":{\"code\":\"INTERNAL\",\"message\":\"transport failure talking to http://127.0.0.1:4096\",\"retryable\":true,\"at\":\"2026-10-09T19:48:07.529Z\",\"detail\":\"TypeErro"
     },
     "H3 hermes returns its real output": {
       "pass": false,
-      "detail": "{\"taskId\":\"task-mv18uj3g\",\"state\":\"timed_out\",\"startedAt\":\"2026-10-09T17:33:10.061Z\",\"completedAt\":\"2026-10-09T17:48:10.468Z\",\"error\":{\"code\":\"AGENT_TIMEOUT\",\"message\":\"run run_974f9cf1aaa540c5913809f"
+      "detail": "{\"taskId\":\"task-mv1do36c\",\"state\":\"timed_out\",\"startedAt\":\"2026-10-09T19:48:07.572Z\",\"completedAt\":\"2026-10-09T20:03:07.796Z\",\"error\":{\"code\":\"AGENT_TIMEOUT\",\"message\":\"run run_40ec70d200414889a52911e"
     }
   },
   "verdict": "fail"
