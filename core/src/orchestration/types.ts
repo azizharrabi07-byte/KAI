@@ -244,6 +244,14 @@ export interface WorkBudget {
   maxToolCalls?: number;
   maxRuntimeMs?: number;
   maxRetries?: number;
+  /**
+   * How many WORKER REASSIGNMENTS this item may make (a dispatch to a worker
+   * different from the one that ran last). Reassignment is the breaker's
+   * sanctioned recovery after repeated failure, so it has its own allowance
+   * instead of consuming `maxRetries`; it never resets `maxRetries` either.
+   * Defaults to `maxRetries`.
+   */
+  maxReassignments?: number;
   maxCostUsd?: number;
   maxChildren?: number;
   maxDepth?: number;

@@ -487,7 +487,24 @@ export function createWorkBoard(store: WorkItemStore, opts: WorkBoardOptions = {
     annotate(id: string, outputs: unknown): BoardResult<WorkItem> {
       const item = load(id);
       if (item === null) return unknownId(id);
-      item.outputs = outputs;
+      // ADDITIVE BY CONTRACT ("attach auxiliary outputs … additive only"), and
+      // now actually implemented that way. It used to REPLACE the whole outputs
+      // object, so parking a run for an approval silently dropped the persisted
+      // Outcome Contract, the resume keys and the dispatch ledger — which is
+      // exactly the durable state a resume, a duplicate event or the retry
+      // ceiling depends on.
+      const previous = item.outputs;
+      const base: Record<string, unknown> =
+        previous !== null && typeof previous === "object" && !Array.isArray(previous)
+          ? { ...(previous as Record<string, unknown>) }
+          : {};
+      if (outputs !== null && typeof outputs === "object" && !Array.isArray(outputs)) {
+        for (const [key, value] of Object.entries(outputs as Record<string, unknown>)) {
+          if (value === undefined) delete base[key];
+          else base[key] = value;
+        }
+      }
+      item.outputs = base;
       const saved = save(item);
       return { ok: true, value: saved };
     },

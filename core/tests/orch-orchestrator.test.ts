@@ -322,23 +322,31 @@ test("CHANGES_REQUESTED parks the retry for a FRESH approval, then completes", a
 test("spent retry budget fails instead of retrying forever", async () => {
   const h = harness(3);
   try {
-    h.state.reviewQueue.push(
-      { verdict: "CHANGES_REQUESTED", findings: ["still thin"] },
-      { verdict: "CHANGES_REQUESTED", findings: ["still thin"] },
-    );
-    h.state.delegateQueue.push({ ok: true, reply: okReply(DELIVERABLE) });
+    // The budget is the item's durable DISPATCH LEDGER, not `item.retries`:
+    // maxRetries = 2 means one initial dispatch plus two same-worker retries.
+    // A review retry is an EXTERNAL action, so each one parks for a fresh
+    // approval; the ceiling is what has to stop the loop in the end.
+    for (let i = 0; i < 6; i += 1) {
+      h.state.reviewQueue.push({ verdict: "CHANGES_REQUESTED", findings: ["still thin"] });
+      h.state.delegateQueue.push({ ok: true, reply: okReply(DELIVERABLE) });
+    }
     const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE });
 
-    // Spend the maxRetries=2 budget up front: two review/changes cycles.
-    must(h.board.review(started.workItemId, "r-1"));
-    must(h.board.changesRequested(started.workItemId, ["fix it"]));
-    must(h.board.review(started.workItemId, "r-1"));
-    must(h.board.changesRequested(started.workItemId, ["again"]));
-    assert.equal(h.board.get(started.workItemId)?.retries, 2);
+    const first = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
+    assert.equal(first.state, "WAITING", first.note);
+    const second = await h.orch.onApprovalDecided(first.parkedApprovalId as string, true);
+    assert.ok(second.handled >= 1);
+    const afterSecond = h.board.get(started.workItemId);
+    const parked2 = (afterSecond?.outputs as { parked?: { approvalId?: string } } | undefined)?.parked?.approvalId;
+    assert.ok(parked2 !== undefined, "the second retry also parks for a fresh approval");
+    await h.orch.onApprovalDecided(parked2 as string, true);
 
-    const out = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
-    assert.equal(out.state, "FAILED");
-    assert.match(out.note, /retry budget spent/);
+    const item = h.board.get(started.workItemId);
+    assert.equal(item?.state, "BLOCKED", "a spent ceiling terminates the review loop");
+    assert.equal(h.state.delegateCalls.length, 3, "one initial dispatch plus exactly two retries");
+    const ledger = (item?.outputs as { dispatches?: unknown[] } | undefined)?.dispatches ?? [];
+    assert.equal(ledger.length, 3, "the durable ledger records exactly the three dispatches made");
+    assert.match(String(item?.failures.length), /^\d+$/, "the item still records its failures honestly");
   } finally {
     h.close();
   }
