@@ -59,13 +59,17 @@ import { createMissionSupervisor } from "../src/autonomy/supervisor.ts";
 const OBJ = "Make the poller stop busy-waiting";
 const DELIVERABLE = "the patched poller";
 
-function baseAutonomy(level: AutonomyPolicy["level"] = 2, maxRetries = 2): AutonomyPolicy {
+function baseAutonomy(level: AutonomyPolicy["level"] = 2, maxRetries = 2, maxReassignments?: number): AutonomyPolicy {
   return {
     level,
     workerAuto: "AUTO",
     review: "AUTO",
     skillLearning: "PROPOSE",
-    budgets: { maxDepth: 2, maxRetries },
+    budgets: {
+      maxDepth: 2,
+      maxRetries,
+      ...(maxReassignments !== undefined ? { maxReassignments } : {}),
+    },
     maxDepth: 2,
     maxParallel: 3,
     taskRetentionDays: 30,
@@ -168,8 +172,8 @@ interface Harness {
   close(): void;
 }
 
-function harness(opts: { level?: AutonomyPolicy["level"]; maxRetries?: number } = {}): Harness {
-  const stores = openSqliteStores({ path: ":memory:" });
+function harness(opts: { level?: AutonomyPolicy["level"]; maxRetries?: number; maxReassignments?: number; dbPath?: string } = {}): Harness {
+  const stores = openSqliteStores({ path: opts.dbPath ?? ":memory:" });
   const board = createWorkBoard(stores.workItems);
   const bench = createBenchmark(stores.workerProfiles);
   const dispatcher = createDispatcher({
@@ -181,7 +185,7 @@ function harness(opts: { level?: AutonomyPolicy["level"]; maxRetries?: number } 
   const learning = createLearning({ metrics: stores.skillMetrics, validate: () => ({ ok: true }), stage: () => ({ ok: true }) });
   const published: { type: string; payload: unknown }[] = [];
   const state: HarnessState = {
-    autonomy: baseAutonomy(opts.level ?? 2, opts.maxRetries ?? 2),
+    autonomy: baseAutonomy(opts.level ?? 2, opts.maxRetries ?? 2, opts.maxReassignments),
     policyOutcome: "allow",
     delegateQueue: [],
     delegateCalls: [],
@@ -950,32 +954,256 @@ test("17b the completion event is NOT emitted when the gate refuses", async () =
   }
 });
 
-// ══ Focused: retry budget at the boundary ════════════════════════════════════
+// ══ Focused: the retry policy at the boundary ════════════════════════════════
 
-test("retry budget: an exhausted FAILED item refuses re-entry at the orchestration boundary", async () => {
-  const h = harness({ maxRetries: 1 });
+/** Read the durable dispatch ledger the ceiling is computed from. */
+function ledgerOf(h: Harness, id: string): { workerId: string; kind: string }[] {
+  const outputs = (h.board.get(id)?.outputs ?? {}) as { dispatches?: { workerId: string; kind: string }[] };
+  return outputs.dispatches ?? [];
+}
+
+/** Every delegate call fails, so each dispatch consumes one attempt. */
+function alwaysFails(h: Harness, times = 12): void {
+  h.state.delegateQueue = Array.from({ length: times }, (_, i) => ({ ok: false, error: `worker exploded (${i + 1})` }));
+}
+
+test("retry policy: the FIRST valid attempt is always allowed, and retries work within the budget", async () => {
+  const h = harness({ maxRetries: 2, maxReassignments: 0 });
   try {
-    // A delegate failure never produces a handoff, so the item FAILs each time.
-    h.state.delegateQueue = [
-      { ok: false, error: "worker exploded" },
-      { ok: false, error: "worker exploded again" },
-      { ok: false, error: "worker exploded a third time" },
-      { ok: false, error: "worker exploded a fourth time" },
-    ];
+    alwaysFails(h);
     const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE }, ["worker-1"]);
     const first = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
-    assert.equal(first.state, "FAILED");
+    assert.equal(first.state, "FAILED", "the initial attempt ran and failed honestly");
+    assert.deepEqual(ledgerOf(h, started.workItemId).map((d) => d.kind), ["initial"]);
+    // Two retries by the SAME worker are inside a maxRetries=2 budget.
     const second = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
-    assert.equal(second.state, "FAILED", "one bounded retry is allowed");
-    const dispatches = h.state.delegateCalls.length;
-    // Third entry: the budget (1 + maxRetries = 2 dispatches) is spent.
     const third = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
-    assert.match(third.note, /retry budget spent/, third.note);
+    assert.equal(second.state, "FAILED");
+    assert.equal(third.state, "FAILED");
+    assert.deepEqual(
+      ledgerOf(h, started.workItemId).map((d) => d.kind),
+      ["initial", "retry", "retry"],
+      "three dispatches: the initial attempt plus exactly two retries",
+    );
+    assert.equal(h.state.delegateCalls.length, 3, "every allowed attempt reached the worker");
+  } finally {
+    h.close();
+  }
+});
+
+test("retry policy: an exhausted SAME-worker item refuses re-entry at the orchestration boundary", async () => {
+  const h = harness({ maxRetries: 1, maxReassignments: 0 });
+  try {
+    alwaysFails(h);
+    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE }, ["worker-1"]);
+    assert.equal((await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" })).state, "FAILED");
+    assert.equal((await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" })).state, "FAILED", "one bounded retry is allowed");
+    const dispatches = h.state.delegateCalls.length;
+    const refused = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
+    assert.equal(refused.state, "BLOCKED", "an exhausted item parks truthfully — it is NOT reported complete");
+    assert.match(refused.note, /retry budget exhausted/, refused.note);
     assert.equal(h.state.delegateCalls.length, dispatches, "an exhausted item never reaches the worker again");
-    const item = h.board.get(started.workItemId);
-    assert.ok(item?.attempts !== undefined && item.attempts >= 2);
-    const outputs = (item?.outputs ?? {}) as { nextAction?: { action?: string } };
+    assert.equal(ledgerOf(h, started.workItemId).length, 2, "a refused re-entry consumes no attempt");
+    const outputs = (h.board.get(started.workItemId)?.outputs ?? {}) as { nextAction?: { action?: string; state?: string } };
     assert.equal(outputs.nextAction?.action, "STOP", "the refusal is recorded durably");
+    assert.equal(outputs.nextAction?.state, "blocked");
+    // And the board refuses re-entry outright once BLOCKED.
+    assert.equal((await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" })).state, "BLOCKED");
+  } finally {
+    h.close();
+  }
+});
+
+test("retry policy LOOPHOLE: rotating through workers cannot exceed the per-item maximum", async () => {
+  // The old policy was per (item, worker), so a caller that switched workers
+  // bought a fresh allowance each time. The ceiling is now per ITEM.
+  const h = harness({ maxRetries: 1, maxReassignments: 1 });
+  try {
+    alwaysFails(h);
+    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE }, ["worker-1"]);
+    const id = started.workItemId;
+    // initial (worker-1) + retry (worker-1) + reassign (worker-2) = 3 = 1 + 1 + 1.
+    assert.equal((await h.orch.runWorkItem(id, { workerId: "worker-1" })).state, "FAILED");
+    assert.equal((await h.orch.runWorkItem(id, { workerId: "worker-1" })).state, "FAILED");
+    assert.equal((await h.orch.runWorkItem(id, { workerId: "worker-2" })).state, "FAILED");
+    assert.deepEqual(ledgerOf(h, id).map((d) => d.kind), ["initial", "retry", "reassign"]);
+    const dispatches = h.state.delegateCalls.length;
+    assert.equal(dispatches, 3);
+    // A fourth worker is a SECOND reassignment: over the per-item ceiling.
+    const refused = await h.orch.runWorkItem(id, { workerId: "worker-3" });
+    assert.equal(refused.state, "BLOCKED", refused.note);
+    assert.match(refused.note, /budget exhausted/, refused.note);
+    // ...and so is going back to an earlier worker.
+    const refused2 = await h.orch.runWorkItem(id, { workerId: "worker-1" });
+    assert.equal(refused2.state, "BLOCKED");
+    assert.equal(h.state.delegateCalls.length, dispatches, "no worker rotation can buy another attempt");
+    assert.equal(ledgerOf(h, id).length, 3);
+  } finally {
+    h.close();
+  }
+});
+
+test("retry policy: a worker switch still succeeds when the policy permits it (S2 semantics)", async () => {
+  // The breaker's sanctioned path: three failures by one worker, then a switch
+  // that completes. This is exactly scripts/orch-e2e.mjs S2.
+  const h = harness({ maxRetries: 2, maxReassignments: 2 });
+  try {
+    h.state.delegateQueue = [
+      { ok: false, error: "bad worker 1" },
+      { ok: false, error: "bad worker 2" },
+      { ok: false, error: "bad worker 3" },
+      { ok: true, reply: okReply(DELIVERABLE) },
+    ];
+    h.state.toolHandlers["filesystem.metadata"] = metadataHandler(true);
+    const started = h.orch.startObjective(
+      { objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"] },
+      ["worker-1"],
+    );
+    const id = started.workItemId;
+    for (let i = 0; i < 3; i += 1) {
+      assert.equal((await h.orch.runWorkItem(id, { workerId: "worker-1" })).state, "FAILED", `failure ${i + 1}`);
+    }
+    assert.deepEqual(ledgerOf(h, id).map((d) => d.kind), ["initial", "retry", "retry"]);
+    // The switch: a different worker, permitted by the reassignment allowance.
+    const switched = await h.orch.runWorkItem(id, { workerId: "worker-2" });
+    assert.equal(switched.state, "COMPLETED", `a permitted switch must still complete: ${switched.note}`);
+    assert.deepEqual(ledgerOf(h, id).map((d) => d.kind), ["initial", "retry", "retry", "reassign"]);
+  } finally {
+    h.close();
+  }
+});
+
+test("retry policy: a duplicate delivery neither consumes nor grants an attempt", async () => {
+  const h = harness({ maxRetries: 1, maxReassignments: 1 });
+  try {
+    alwaysFails(h);
+    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE }, ["worker-1"]);
+    const id = started.workItemId;
+    await h.orch.runWorkItem(id, { workerId: "worker-1", resumeEventId: "evt_1" });
+    const afterFirst = ledgerOf(h, id).length;
+    // The same event redelivered: a no-op, so no attempt is consumed.
+    const dupe = await h.orch.runWorkItem(id, { workerId: "worker-1", resumeEventId: "evt_1" });
+    assert.match(dupe.note, /duplicate delivery/);
+    assert.equal(ledgerOf(h, id).length, afterFirst, "a duplicate event must not consume an attempt");
+    // Out of order: an OLD event id, then a new one. The old is a no-op; the
+    // new one consumes exactly one attempt.
+    const stale = await h.orch.runWorkItem(id, { workerId: "worker-1", resumeEventId: "evt_1" });
+    assert.match(stale.note, /duplicate delivery/);
+    await h.orch.runWorkItem(id, { workerId: "worker-1", resumeEventId: "evt_2" });
+    assert.equal(ledgerOf(h, id).length, afterFirst + 1, "a genuinely new event consumes exactly one attempt");
+    // The budget is still exactly 1 + 1 + 1 = 3 total.
+    assert.equal(ledgerOf(h, id).length, 2);
+  } finally {
+    h.close();
+  }
+});
+
+test("retry policy: concurrent retry requests cannot exceed the budget", async () => {
+  const h = harness({ maxRetries: 1, maxReassignments: 0 });
+  try {
+    alwaysFails(h);
+    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE }, ["worker-1"]);
+    const id = started.workItemId;
+    // Four simultaneous runs of a fresh item: the claim guard plus the ledger
+    // mean exactly ONE of them may dispatch.
+    const outcomes = await Promise.all([
+      h.orch.runWorkItem(id, { workerId: "worker-1" }),
+      h.orch.runWorkItem(id, { workerId: "worker-1" }),
+      h.orch.runWorkItem(id, { workerId: "worker-1" }),
+      h.orch.runWorkItem(id, { workerId: "worker-1" }),
+    ]);
+    assert.equal(h.state.delegateCalls.length, 1, `exactly one dispatch, got ${h.state.delegateCalls.length}`);
+    assert.equal(ledgerOf(h, id).length, 1, "exactly one attempt was consumed");
+    assert.ok(outcomes.some((o) => o.state === "FAILED"), "the one that won reports its real result");
+    // Concurrency on a nearly-exhausted item: still bounded.
+    await h.orch.runWorkItem(id, { workerId: "worker-1" });
+    const dispatches = h.state.delegateCalls.length;
+    await Promise.all([
+      h.orch.runWorkItem(id, { workerId: "worker-1" }),
+      h.orch.runWorkItem(id, { workerId: "worker-1" }),
+    ]);
+    assert.equal(h.state.delegateCalls.length, dispatches, "an exhausted item dispatches nothing, concurrently or not");
+  } finally {
+    h.close();
+  }
+});
+
+test("retry policy: the ceiling is durable — it survives a restart", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "kai-trust-retry-restart-"));
+  const dbPath = join(dir, "core.db");
+  try {
+    const h1 = harness({ maxRetries: 1, maxReassignments: 0, dbPath });
+    let id: string;
+    try {
+      alwaysFails(h1);
+      const started = h1.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE }, ["worker-1"]);
+      id = started.workItemId;
+      await h1.orch.runWorkItem(id, { workerId: "worker-1" });
+      await h1.orch.runWorkItem(id, { workerId: "worker-1" });
+      assert.equal(ledgerOf(h1, id).length, 2, "the budget is spent before the restart");
+    } finally {
+      h1.close();
+    }
+    // A NEW orchestrator over the same database = a Core restart.
+    const h2 = harness({ maxRetries: 1, maxReassignments: 0, dbPath });
+    try {
+      assert.equal(ledgerOf(h2, id).length, 2, "the ledger survived the restart");
+      const refused = await h2.orch.runWorkItem(id, { workerId: "worker-1" });
+      assert.equal(refused.state, "BLOCKED", "a restart must not grant a fresh budget");
+      assert.match(refused.note, /retry budget exhausted/);
+      assert.equal(h2.state.delegateCalls.length, 0, "the restarted orchestrator dispatched nothing");
+    } finally {
+      h2.close();
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
+});
+
+test("retry policy: corrective children cannot circumvent the bounded-recovery policy", async () => {
+  const h = harness({ maxRetries: 2, maxReassignments: 0 });
+  try {
+    // A deliverable that trips a FORBIDDEN OUTCOME is CONTRADICTED, which is
+    // what routes to a corrective child (REPLAN) without parking for review.
+    const forbiddenReply = [
+      "STATUS: ok",
+      "RESULT: I force-push the branch and delivered the patch.",
+      "CHANGED ARTIFACTS: src/a.ts",
+      "EVIDENCE: tests pass",
+      "BLOCKERS: (none)",
+      "RISKS: none noted",
+      "FOLLOW-UPS: none",
+      "RECOMMENDED NEXT STEP: ship it",
+      "TOOLS USED: read, edit",
+    ].join("\n");
+    h.state.delegateQueue = Array.from({ length: 20 }, () => ({ ok: true, reply: forbiddenReply }));
+    const started = h.orch.startObjective(
+      { objective: OBJ, deliverable: DELIVERABLE, forbidden: ["force-push"], budget: { maxRetries: 1, maxDepth: 2, maxReassignments: 0 } },
+      ["worker-1"],
+    );
+    await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
+    // The chain is bounded by maxDepth (2): parent + child + grandchild, and no
+    // further dispatch. No item in the chain is reported COMPLETED.
+    assert.equal(
+      h.state.delegateCalls.length,
+      3,
+      `the corrective chain must stop at depth 2, got ${h.state.delegateCalls.length} dispatches`,
+    );
+    const parent = h.board.get(started.workItemId);
+    assert.ok(parent !== null);
+    assert.notEqual(parent?.state, "COMPLETED", "a contradicted deliverable never completes");
+    // Every item in the chain has its OWN single dispatch: a child never resets
+    // the parent's ledger, and the parent's ceiling still binds the parent.
+    assert.equal(ledgerOf(h, started.workItemId).length, 1, "the parent made exactly one dispatch");
+    const children = h.board.children(started.workItemId);
+    assert.equal(children.length, 1, "exactly one corrective child was created for the parent");
+    for (const child of children) {
+      assert.equal(ledgerOf(h, child.id).length, 1, `child ${child.id} has its own single attempt`);
+      assert.equal(child.budget?.maxRetries, 1, "the child inherits the parent's retry budget (no reset)");
+      assert.deepEqual(child.forbiddenOutcomes, ["force-push"], "the child inherits the parent's contract");
+      // ...and the chain continues at most one more level.
+      assert.equal(h.board.children(child.id).length, 1, "the child made one bounded correction of its own");
+    }
   } finally {
     h.close();
   }

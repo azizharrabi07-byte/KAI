@@ -574,7 +574,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         "cite evidence",
         "name blockers plainly",
       ],
-      budget: `attempt ${item.attempts + 1}${item.budget?.maxRetries !== undefined ? ` of ${item.budget.maxRetries} retries` : ""}`,
+      budget: `attempt ${item.attempts}`,
       handoffFormat: HANDOFF_FORMAT,
       ...(skillContext !== undefined && skillContext.length > 0 ? { skillContext } : {}),
     });
@@ -834,6 +834,12 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       { ...(opts.approvalId !== undefined ? { approvalId: opts.approvalId } : {}) },
     );
     mergeEvidence(id, gathered.observed);
+    // The pending labels have now been consumed: clear them so a later re-entry
+    // re-delegates (subject to the ceiling) instead of silently re-gathering
+    // the same checks. `undefined` deletes the key on persist.
+    if (gathered.pending.length === 0) {
+      deps.board.annotate(id, { pendingEvidence: undefined });
+    }
     if (gathered.pending.length > 0) {
       const first = gathered.pending[0]!;
       const approval = deps.approvals.request({
@@ -932,32 +938,30 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       }
     }
 
-    // ── RETRY BUDGET, ENFORCED AT THE BOUNDARY ───────────────────────────────
-    // The budget is per (item, worker): `1 + maxRetries` dispatches BY THE SAME
-    // WORKER. That is the retry this boundary must not let a caller bypass — the
-    // API, the UI's run control, or a supervisor resume hammering the same
-    // failed item — and it is checked HERE, from the durable per-worker count,
-    // before any claim or delegation.
+    // ── RETRY BUDGET, ENFORCED AT THE BOUNDARY (per ITEM) ────────────────────
+    // The item's durable dispatch ledger is the authoritative attempt record,
+    // and the ceiling is checked HERE — before any claim or delegation — so no
+    // caller can exceed it: not the API, not the UI's run control, not a
+    // supervisor resume, not a caller that rotates through workers.
     //
-    // It is deliberately NOT a per-item cap: a switch to a DIFFERENT worker is
-    // the breaker's sanctioned "never blind retry" path (./bench.ts, and
-    // scripts/orch-e2e.mjs S2), so it starts with its own allowance instead of
-    // being refused for the previous worker's failures. A user who wants
-    // another attempt from an exhausted worker creates a new work item.
-    const maxRetries = item.budget?.maxRetries ?? policy.budgets.maxRetries ?? policy.maxDepth;
-    const dispatchBudget = 1 + Math.max(0, maxRetries);
-    const used = dispatchCountFor(item, workerId);
-    if (used >= dispatchBudget) {
-      const note = `retry budget spent for ${workerId} (${used}/${dispatchBudget} dispatches) — re-entry refused at the orchestration boundary; assign a different worker or create a new item`;
-      deps.trace.record(ref(item), "error", note);
-      emit("worker.progress", { workItemId: id, phase: "retry", result: "refused", workerId, attempts: used, max: dispatchBudget });
-      recordNextAction(id, "STOP", note, "blocked");
-      return { workItemId: id, state: item.state, note };
+    // Attempts are classified by the ledger, from the previous dispatch:
+    //   initial (1, free) · retry (same worker, ≤ maxRetries) ·
+    //   reassign (different worker, ≤ maxReassignments).
+    // Reassignment is the breaker's sanctioned "never blind retry" path
+    // (./bench.ts, scripts/orch-e2e.mjs S2), so it has its own allowance — but
+    // it never resets the retry count, and both ceilings bind the same item.
+    const refusal = retryRefusal(item, policy, workerId);
+    if (refusal !== null) {
+      deps.trace.record(ref(item), "error", refusal);
+      emit("worker.progress", { workItemId: id, phase: "retry", result: "refused", workerId });
+      deps.board.block(id, refusal);
+      recordNextAction(id, "STOP", refusal, "blocked");
+      return { workItemId: id, state: "BLOCKED", note: refusal };
     }
 
     const claimed = deps.board.claim(id, workerId);
     if (!claimed.ok) return { workItemId: id, state: item.state, note: claimed.reason };
-    markDispatch(id, workerId);
+    appendDispatch(id, workerId);
     deps.trace.record(ref(claimed.value), "worker", `${workerId} working`);
     emit("worker.started", { workItemId: id, workerId });
     deps.board.heartbeat(id, "started", workerId);
@@ -1017,7 +1021,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     if (!delegated.ok) {
       const reason = delegated.error ?? "delegation failed";
       const failure = deps.board.recordFailure(id, reason, workerId, analysis.taskType);
-      const retry = deps.board.checkRetry(id, policy.budgets.maxRetries ?? policy.maxDepth);
+      const budget = budgetNote(deps.board.get(id) ?? item, policy);
       deps.board.fail(id, reason);
       deps.trace.record(ref({ ...item, workerId }), "error", reason);
       emit("worker.failed", { workItemId: id, workerId, reason });
@@ -1027,8 +1031,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       const emptyVerification = verifyHandoff(emptyHandoff, []);
       recordBench(id, workerId, benchCtx(analysis, opts, Date.now() - started), emptyHandoff, emptyVerification, null);
       const rec = failure.ok ? failure.value.recommendation : null;
-      const retryNote = retry.ok ? ` — retry ${retry.value.retries}/${retry.value.maxRetries} available` : " — retry budget spent";
-      return { workItemId: id, state: "FAILED", handoff: emptyHandoff, verification: emptyVerification, note: rec !== null ? `${reason} — recommended: ${rec.action} (${rec.reason})` : `${reason}${retryNote}` };
+      return { workItemId: id, state: "FAILED", handoff: emptyHandoff, verification: emptyVerification, note: rec !== null ? `${reason} — recommended: ${rec.action} (${rec.reason})` : `${reason} — ${budget}` };
     }
 
     return completeFromReply(id, workerId, delegated.reply ?? "", {
@@ -1101,15 +1104,8 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       const reason = handoff.status !== "ok"
         ? `handoff ${handoff.status}: ${handoff.blockers.join("; ").slice(0, 200) || handoff.result.slice(0, 200)}`
         : "empty result: no deliverable to verify";
-      const retry = deps.board.checkRetry(id, policy.budgets.maxRetries ?? policy.maxDepth);
       const failure = deps.board.recordFailure(id, reason, workerId);
-      if (!retry.ok) {
-        deps.board.fail(id, `${reason} (retry budget spent)`);
-        deps.trace.record(ref({ ...item, workerId }), "error", reason);
-        emit("worker.failed", { workItemId: id, workerId, reason });
-        recordBench(id, workerId, ctx, handoff, verification, null);
-        return { workItemId: id, state: "FAILED", handoff, verification, note: reason };
-      }
+      const budget = budgetNote(deps.board.get(id) ?? item, policy);
       deps.board.fail(id, reason);
       const rec = failure.ok ? failure.value.recommendation : null;
       deps.trace.record(ref({ ...item, workerId }), "error", reason);
@@ -1120,7 +1116,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         state: "FAILED",
         handoff,
         verification,
-        note: rec !== null ? `${reason} — recommended: ${rec.action} (${rec.reason})` : `${reason} — retry ${retry.value.retries}/${retry.value.maxRetries} available`,
+        note: rec !== null ? `${reason} — recommended: ${rec.action} (${rec.reason})` : `${reason} — ${budget}`,
       };
     }
     // A deliverable exists but structural verification is thin (typically a
@@ -1191,13 +1187,22 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       return { workItemId: id, state: "BLOCKED", handoff, verification, review: { verdict: "BLOCKED", findings: loop.findings }, note: loop.findings.join("; ").slice(0, 300) };
     }
     // CHANGES_REQUESTED: bounded retry with the findings as the next prompt.
-    // The retry budget binds the whole work item (not per review round), so
-    // a stubborn loop terminates instead of cycling forever.
-    const retry = deps.board.checkRetry(id, policy.budgets.maxRetries ?? 2);
-    if (!retry.ok) {
-      deps.board.fail(id, "review changes unmet: retry budget spent");
+    // The retry is a real dispatch, so it must fit the item's durable ceiling —
+    // the SAME ceiling the entry guard enforces. A spent ceiling terminates the
+    // loop honestly instead of cycling.
+    const retryRefused = retryRefusal(deps.board.get(id) ?? item, policy, workerId);
+    if (retryRefused !== null) {
+      deps.board.block(id, `review changes unmet: ${retryRefused}`);
+      deps.trace.record(ref({ ...item, workerId }), "error", retryRefused);
       recordBench(id, workerId, ctx, handoff, verification, "CHANGES_REQUESTED");
-      return { workItemId: id, state: "FAILED", handoff, verification, review: { verdict: "CHANGES_REQUESTED", findings: loop.findings }, note: "Reviewer requested changes; retry budget spent." };
+      return {
+        workItemId: id,
+        state: "BLOCKED",
+        handoff,
+        verification,
+        review: { verdict: "CHANGES_REQUESTED", findings: loop.findings },
+        note: `Reviewer requested changes; ${retryRefused}`,
+      };
     }
     const changed = deps.board.changesRequested(id, loop.findings);
     if (!changed.ok) {
@@ -1227,7 +1232,10 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       emit("worker.waiting", { workItemId: id, workerId, approvalId: approval.id, reason: "review retry needs a fresh approval" });
       return { workItemId: id, state: "WAITING", handoff, verification, parkedApprovalId: approval.id, note: `Review retry waiting for approval ${approval.id}` };
     }
-    // Retry now with the review findings as previous attempts.
+    // Retry now with the review findings as previous attempts. The dispatch is
+    // recorded in the durable ledger BEFORE it runs, so an attempt is consumed
+    // exactly once whether it succeeds, fails or throws.
+    appendDispatch(id, workerId);
     const retryItem = deps.board.get(id);
     const prompt = buildPrompt(retryItem ?? item, workerId, `retry after review: ${loop.findings.slice(0, 3).join("; ").slice(0, 300)}`, [
       ...item.failures,
@@ -1360,26 +1368,117 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     }
   }
 
-  /** The durable dispatch count for one (item, worker) — the retry-budget basis. */
-  function dispatchCountFor(item: WorkItem, workerId: string): number {
-    const byWorker = readOutputs(item)["dispatchByWorker"];
-    if (byWorker === null || typeof byWorker !== "object" || Array.isArray(byWorker)) return 0;
-    const count = (byWorker as Record<string, unknown>)[workerId];
-    return typeof count === "number" && Number.isFinite(count) ? count : 0;
+  /**
+   * One worker dispatch against a work item. The LEDGER of these is the
+   * authoritative, durable attempt record: it is what makes the per-item retry
+   * ceiling enforceable at the boundary, immune to a restart, a duplicate event
+   * or a caller that rotates workers.
+   *
+   * `kind` is derived from the previous entry, so a caller cannot relabel a
+   * retry as a "reassignment" to buy extra attempts:
+   *   - `initial`  the item's first dispatch;
+   *   - `retry`    same worker as the previous dispatch;
+   *   - `reassign` a different worker than the previous dispatch.
+   */
+  interface DispatchRecord {
+    workerId: string;
+    kind: "initial" | "retry" | "reassign";
+    at: string;
   }
 
-  /** Record one dispatch by `workerId`; persisted so a restart cannot reset it. */
-  function markDispatch(id: string, workerId: string): void {
+  /** The durable dispatch ledger for an item (absent/older rows read as empty). */
+  function dispatchLedger(item: WorkItem): DispatchRecord[] {
+    const raw = readOutputs(item)["dispatches"];
+    if (!Array.isArray(raw)) return [];
+    const out: DispatchRecord[] = [];
+    for (const entry of raw) {
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) continue;
+      const record = entry as Record<string, unknown>;
+      const workerId = record["workerId"];
+      const kind = record["kind"];
+      if (typeof workerId !== "string") continue;
+      if (kind !== "initial" && kind !== "retry" && kind !== "reassign") continue;
+      out.push({ workerId, kind, at: typeof record["at"] === "string" ? record["at"] : nowIso() });
+    }
+    return out;
+  }
+
+  /** The item's effective ceilings, and what its ledger has already consumed. */
+  function retryBudget(item: WorkItem, policy: AutonomyPolicy): {
+    maxRetries: number;
+    maxReassignments: number;
+    retries: number;
+    reassignments: number;
+    total: number;
+    maxTotal: number;
+  } {
+    const maxRetries = Math.max(0, item.budget?.maxRetries ?? policy.budgets.maxRetries ?? policy.maxDepth);
+    const maxReassignments = Math.max(
+      0,
+      item.budget?.maxReassignments ?? policy.budgets.maxReassignments ?? policy.budgets.maxRetries ?? policy.maxDepth,
+    );
+    const ledger = dispatchLedger(item);
+    const retries = ledger.filter((d) => d.kind === "retry").length;
+    const reassignments = ledger.filter((d) => d.kind === "reassign").length;
+    return {
+      maxRetries,
+      maxReassignments,
+      retries,
+      reassignments,
+      total: ledger.length,
+      maxTotal: 1 + maxRetries + maxReassignments,
+    };
+  }
+
+  /**
+   * The refusal reason when the item has no attempt left for `workerId`, or
+   * null when the dispatch is allowed. Enforced BEFORE claim, from durable
+   * state, so no caller — API, UI control, supervisor resume — can exceed it.
+   */
+  function retryRefusal(item: WorkItem, policy: AutonomyPolicy, workerId: string): string | null {
+    const b = retryBudget(item, policy);
+    if (b.retries >= b.maxRetries && b.reassignments >= b.maxReassignments) {
+      return `retry budget exhausted for work item (${b.retries}/${b.maxRetries} retries, ${b.reassignments}/${b.maxReassignments} reassignments) — create a new work item or raise the autonomy budget`;
+    }
+    const ledger = dispatchLedger(item);
+    const last = ledger[ledger.length - 1];
+    const isReassign = last !== undefined && last.workerId !== workerId;
+    if (isReassign && b.reassignments >= b.maxReassignments) {
+      return `reassignment budget exhausted for work item (${b.reassignments}/${b.maxReassignments} reassignments) — create a new work item or raise the autonomy budget`;
+    }
+    if (!isReassign && b.retries >= b.maxRetries) {
+      return `retry budget exhausted for ${workerId} on this work item (${b.retries}/${b.maxRetries} retries) — reassign a different worker or create a new work item`;
+    }
+    return null;
+  }
+
+  /**
+   * What attempts remain, from the durable ledger — the honest replacement for
+   * the old `item.retries` arithmetic, which no longer governs anything.
+   */
+  function budgetNote(item: WorkItem, policy: AutonomyPolicy): string {
+    const b = retryBudget(item, policy);
+    return `retry ${Math.max(0, b.maxRetries - b.retries)}/${b.maxRetries} left, reassignment ${Math.max(0, b.maxReassignments - b.reassignments)}/${b.maxReassignments} left`;
+  }
+
+  /**
+   * Append one dispatch to the durable ledger and classify it against the
+   * previous entry. Called ONLY after a claim succeeds (so a refused claim,
+   * a duplicate delivery or an evidence resume never consumes an attempt) and
+   * before the review-retry re-delegation.
+   */
+  function appendDispatch(id: string, workerId: string): DispatchRecord | null {
     const cur = deps.board.get(id);
-    if (cur === null) return;
+    if (cur === null) return null;
     const outputs = readOutputs(cur);
-    const byWorker = outputs["dispatchByWorker"];
-    const counts: Record<string, number> =
-      byWorker !== null && typeof byWorker === "object" && !Array.isArray(byWorker)
-        ? { ...(byWorker as Record<string, number>) }
-        : {};
-    counts[workerId] = (typeof counts[workerId] === "number" ? counts[workerId] : 0) + 1;
-    deps.board.annotate(id, { ...outputs, dispatchByWorker: counts });
+    const ledger = dispatchLedger(cur);
+    const last = ledger[ledger.length - 1];
+    const kind: DispatchRecord["kind"] = last === undefined ? "initial" : last.workerId === workerId ? "retry" : "reassign";
+    const record: DispatchRecord = { workerId, kind, at: nowIso() };
+    // Bounded by construction: the ceilings cap the ledger's length, so this
+    // array can never grow without bound.
+    deps.board.annotate(id, { ...outputs, dispatches: [...ledger, record] });
+    return record;
   }
 
   /** Merge observed records into the item (dedupe by evidence id). */
