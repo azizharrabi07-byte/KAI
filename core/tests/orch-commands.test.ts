@@ -538,6 +538,51 @@ async function bootLive(t: { after: (fn: () => void | Promise<void>) => void }) 
   return { rt, base, post };
 }
 
+test("LIVE: the per-item retry ceiling holds over the real HTTP boundary", async (t) => {
+  const { rt, post } = await bootLive(t);
+
+  // A persona on a worker that cannot answer, so every dispatch fails fast.
+  const spawned = await rt.tools.invoke("workforce.subagent", {
+    id: "ghost-runner",
+    name: "Ghost",
+    role: "worker",
+    soul: "I fail on purpose.",
+    workerId: "ghost-worker",
+  });
+  assert.equal(spawned.ok, true, spawned.ok ? "" : spawned.error.message);
+
+  const createdRes = await post("/work-items", { objective: READ_OBJECTIVE, deliverable: "the answer" });
+  assert.equal(createdRes.status, 201);
+  // The API body is untrusted JSON: narrow, never assert a shape.
+  const createdBody: unknown = await createdRes.json();
+  const workItemId =
+    createdBody !== null && typeof createdBody === "object" && "workItemId" in createdBody && typeof createdBody.workItemId === "string"
+      ? createdBody.workItemId
+      : "";
+  assert.ok(workItemId.length > 0, "the API returned a work item id");
+
+  // Default policy is maxRetries 2 (maxReassignments defaults to it), so the
+  // SAME worker gets one initial dispatch plus two retries; the fourth entry is
+  // refused at the boundary. Driven entirely over HTTP.
+  const states: string[] = [];
+  for (let i = 0; i < 4; i += 1) {
+    const res = await post(`/work-items/${workItemId}/run`, { workerId: "ghost-runner" });
+    const body: unknown = await res.json();
+    states.push(body !== null && typeof body === "object" && "state" in body && typeof body.state === "string" ? body.state : "?");
+  }
+  assert.deepEqual(states, ["FAILED", "FAILED", "FAILED", "BLOCKED"], `states=${JSON.stringify(states)}`);
+
+  // And the ceiling holds on further attempts — it is durable, not per-call.
+  const againRes = await post(`/work-items/${workItemId}/run`, { workerId: "ghost-runner" });
+  const againBody: unknown = await againRes.json();
+  const againState =
+    againBody !== null && typeof againBody === "object" && "state" in againBody && typeof againBody.state === "string" ? againBody.state : "?";
+  const againNote =
+    againBody !== null && typeof againBody === "object" && "note" in againBody && typeof againBody.note === "string" ? againBody.note : "";
+  assert.equal(againState, "BLOCKED");
+  assert.match(againNote, /budget exhausted/);
+});
+
 test("LIVE: work board, bench, and activity answer over real HTTP", async (t) => {
   const { rt, base, post } = await bootLive(t);
 

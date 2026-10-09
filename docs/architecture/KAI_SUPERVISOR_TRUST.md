@@ -277,18 +277,12 @@ trust-suite "supervisor failure…", "a failed lesson write is surfaced…".
   is recorded as unsupported rather than executed.
 - External audits require a working directory to check file claims; without one
   they report the limitation and verify nothing.
-- **Hermes is reachable but does not complete a turn on this machine.** Its
-  control plane answers quickly (`GET /health` 200 in 16 ms, `GET /v1/models` 200
-  in 35 ms, `POST /api/sessions` 201 in 17 ms) and it *accepts* work
-  (`POST /v1/runs` returns a `run_id`), but `POST /api/sessions/:id/chat` never
-  answers — measured ≥30 s against KAI's configured 120 s chat timeout, and a run
-  never finishes inside the configured 15-minute run timeout. KAI behaves
-  correctly and honestly in both cases: the chat turn falls back to
-  `presentWorkerFailure` (`core/src/chat/relay.ts`) and the run ends
-  `timed_out` / `AGENT_TIMEOUT` after `bestEffortStop`. No KAI-side defect is
-  demonstrated, so nothing is mocked, skipped or relabelled; the two affected
-  checks stay failing and are reported as externally blocked. Diagnosed
-  2026-10-09; see `docs/STATUS.md`.
-- The live Hermes relay test (`core/src/server.test.ts`) therefore fails after
-  exactly the 120 s chat timeout (observed 120,053–120,152 ms), which is the
-  configured `chatTimeoutMs`, not an arbitrary hang.
+- **Hermes needed an external configuration fix (resolved 2026-10-09).** It was
+  reachable and authorized but every model turn failed: the configured `opencode-go`
+  key was stale (`429 GoUsageLimitError`), and the Go endpoint additionally requires an
+  `x-opencode-session` routing header (`400 MissingSessionID` without it). With the
+  working key and that header in `~/.hermes/config.yaml`, a real Hermes turn returns in
+  seconds, `worker-honesty` H3 passes and the `server.test.ts` relay test passes. The
+  fix was to Hermes only — no KAI source changed for it, and KAI's behaviour during the
+  outage (honest 120 s chat fallback, `AGENT_TIMEOUT` after the 15-minute run deadline)
+  was already correct. Details and backups: `docs/STATUS.md`.
