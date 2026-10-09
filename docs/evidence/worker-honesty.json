@@ -1,13 +1,13 @@
 {
-  "at": "2026-10-09T21:39:39.995Z",
+  "at": "2026-10-09T21:54:12.991Z",
   "scenarios": {
     "H1 opencode run_task parks for approval": {
       "pass": true,
-      "detail": "{\"ok\":false,\"status\":\"APPROVAL_REQUIRED\",\"approvalId\":\"apr_mv1hnm37_0\"}"
+      "detail": "{\"ok\":false,\"status\":\"APPROVAL_REQUIRED\",\"approvalId\":\"apr_mv1i6c44_0\"}"
     },
     "H4 denial is recorded": {
       "pass": true,
-      "detail": "{\"ok\":true,\"approval\":{\"id\":\"apr_mv1hnm37_0\",\"toolId\":\"agents.run_task\",\"action\":\"Run a task on a worker agent\",\"reason\":\"tool \\\"agents.run_task\\\" acts outside "
+      "detail": "{\"ok\":true,\"approval\":{\"id\":\"apr_mv1i6c44_0\",\"toolId\":\"agents.run_task\",\"action\":\"Run a task on a worker agent\",\"reason\":\"tool \\\"agents.run_task\\\" acts outside "
     },
     "H4 denied approval executes nothing": {
       "pass": true,
@@ -15,11 +15,11 @@
     },
     "H2 opencode-offline fails honestly, never fabricated": {
       "pass": true,
-      "detail": "{\"ok\":true,\"result\":{\"taskId\":\"task-mv1hnm4b\",\"state\":\"failed\",\"startedAt\":\"2026-10-09T21:39:43.931Z\",\"completedAt\":\"2026-10-09T21:39:43.935Z\",\"error\":{\"code\":\"INTERNAL\",\"message\":\"transport failure talking to http://127.0.0.1:4096\",\"retryable\":true,\"at\":\"2026-10-09T21:39:43.935Z\",\"detail\":\"TypeErro"
+      "detail": "{\"ok\":true,\"result\":{\"taskId\":\"task-mv1i6c57\",\"state\":\"failed\",\"startedAt\":\"2026-10-09T21:54:17.467Z\",\"completedAt\":\"2026-10-09T21:54:17.470Z\",\"error\":{\"code\":\"INTERNAL\",\"message\":\"transport failure talking to http://127.0.0.1:4096\",\"retryable\":true,\"at\":\"2026-10-09T21:54:17.470Z\",\"detail\":\"TypeErro"
     },
     "H3 hermes returns its real output": {
       "pass": true,
-      "detail": "{\"taskId\":\"task-mv1hnm4y\",\"state\":\"completed\",\"startedAt\":\"2026-10-09T21:39:43.955Z\",\"completedAt\":\"2026-10-09T21:39:47.022Z\",\"output\":\"PONG\",\"usage\":{\"inputTokens\":17834,\"outputTokens\":3}}"
+      "detail": "{\"taskId\":\"task-mv1i6c5s\",\"state\":\"completed\",\"startedAt\":\"2026-10-09T21:54:17.488Z\",\"completedAt\":\"2026-10-09T21:54:20.038Z\",\"output\":\"PONG\",\"usage\":{\"inputTokens\":17834,\"outputTokens\":3}}"
     }
   },
   "verdict": "pass"
