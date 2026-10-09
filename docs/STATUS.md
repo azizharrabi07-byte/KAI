@@ -4,6 +4,8 @@ Current, honest status of the KAI source tree. Everything here was produced by r
 commands shown; nothing is claimed from reading code.
 
 - **Commit:** `d729dda` ("production repair — real renderer, timeline, cancellation, memory, workers")
+  — the newest code commit; the docs-only follow-up changes no source, so this
+  is the exact tree the suites, harnesses, and package below were run against.
 - **Date:** 2026-10-09
 - **State:** experimental, single-machine, actively developed. Not a released product.
 
