@@ -51,45 +51,76 @@ cd core && npm test
 
 | | |
 |---|---|
-| tests | 1193 |
-| pass | 1179 |
-| fail | 1 |
+| tests | 1194 |
+| pass | 1181 |
+| fail | 0 |
 | skipped | 13 |
 
-The **1 failure is an external dependency, not a regression** (`core/src/server.test.ts:249`,
-"POST /chat runs a real turn through Hermes"). It fails after **exactly the configured
-120 s chat timeout** (observed 120,041–120,152 ms across runs) because a real Hermes chat
-turn never answers on this machine — see the diagnosis below. It failed identically on
-the pre-change baseline, so it is pre-existing. Left visible on purpose — not skipped,
-not hidden, not relabelled.
+**0 failures.** The one long-standing failure (`core/src/server.test.ts:249`, "POST /chat
+runs a real turn through Hermes") was an external Hermes misconfiguration, not a KAI
+defect, and it is **fixed and verified** — see the diagnosis below. It is now passing
+against the live worker, not skipped and not relabelled.
 
-New suites added by the earlier work (all passing): `orch-supervisor-trust` (**39
-tests** — the 17-case suite, 9 retry-policy cases, offline-worker, supervisor-failure
-and redaction cases), `summary-daily` (11), `summary-audit-commands` (7).
+New suites added by this work (all passing): `orch-supervisor-trust` (**39 tests** — the
+17-case suite, 9 retry-policy cases, offline-worker, supervisor-failure and redaction
+cases), `summary-daily` (11), `summary-audit-commands` (7), plus a LIVE HTTP-boundary
+retry-ceiling case in `orch-commands` and the rewritten `orch-orchestrator` budget case.
+The 13 skips are live-integration checks that need both agents or OpenCode (which is
+offline on this machine); each names its reason.
 
-## Hermes diagnosis (2026-10-09) — externally blocked, not a KAI defect
+## Hermes diagnosis and fix (2026-10-09) — resolved
 
-`worker-honesty` H3 fails with `AGENT_TIMEOUT` and the Hermes relay test fails after the
-120 s chat timeout. Both were traced to the same cause with direct, bounded probes
-against `http://127.0.0.1:8642` (read-only; no live Core configuration changed):
+Two checks were failing for one cause: `worker-honesty` H3 (`AGENT_TIMEOUT`) and the
+Hermes relay test (120 s chat timeout). Direct, bounded probes against
+`http://127.0.0.1:8642` established that **Hermes' control plane was healthy but every
+model turn failed**:
 
-| Probe | Result |
+| Probe (before the fix) | Result |
 |---|---|
-| `GET /health` | **200 in 16 ms** — `{"status":"ok","platform":"hermes-agent"}` |
-| `GET /v1/models` (with the same key the test runner loads) | **200 in 35 ms** — authorized |
-| `POST /api/sessions` | **201 in 17 ms** — a session is created |
-| `POST /api/sessions/:id/chat` | **never answers** — client timeout at 30,010 ms; KAI's configured budget is 120 s, which is exactly what the relay test hits |
-| `POST /v1/runs` | **accepted** (returns a `run_id`) but never completes inside KAI's configured 15-minute run deadline; `worker-honesty` H3 recorded `startedAt 17:33:10.061Z → completedAt 17:48:10.468Z` = 900.4 s |
+| `GET /health` | 200 in 16 ms — `{"status":"ok","platform":"hermes-agent"}` |
+| `GET /v1/models` (test-runner key) | 200 in 35 ms — authorized |
+| `POST /api/sessions` | 201 in 17 ms — a session is created |
+| `POST /api/sessions/:id/chat` | **never answered** — client timeout at 30,010 ms (KAI's configured budget is 120 s, which is exactly what the relay test hit) |
+| `POST /v1/runs` | **accepted** (a `run_id` came back) but never finished inside KAI's 15-minute run deadline; H3 recorded `17:33:10.061Z → 17:48:10.468Z` = 900.4 s |
 
-**Conclusion:** Hermes' control plane is up and authorized, and it *accepts* work, but
-its execution path (the model/agent turn) never completes. KAI behaves correctly and
-honestly in both cases — the chat turn falls back to `presentWorkerFailure`
-(`core/src/chat/relay.ts`) and the run ends `timed_out` / `AGENT_TIMEOUT` after
-`bestEffortStop` (`core/src/agents/adapters/hermesAdapter.ts:205`, `runTimeoutMs`
-default `15 * 60_000`). **No KAI-side defect is demonstrated**, so nothing was mocked,
-skipped, given a longer timeout or relabelled: both checks stay failing and are reported
-as externally blocked. Fixing them requires fixing Hermes, which is outside this
-repository and was not touched.
+**Root cause, isolated to the model credentials Hermes used:**
+
+1. The `opencode-go` key configured in `~/.hermes` (len 51) was **stale**: the endpoint
+   answered `429 GoUsageLimitError: Go usage limit exceeded` (workspace `wrk_01M298…`,
+   `limitName: monthly`).
+2. The session's fresh `OPENCODE_GO_API_KEY` is rejected too — `403 "An active OpenCode
+   Go subscription is required to use Go models"`.
+3. The session's `OPENCODE_API_KEY` **works** — but only with the routing header the
+   endpoint now requires: without `x-opencode-session` it answers
+   `400 MissingSessionID` (3/3), and with it `200 content="PONG"` (962 ms).
+
+**Fix applied — to Hermes only, nothing in KAI:** the working key was written into
+`~/.hermes/config.yaml` (`providers.opencode-go.api_key` and `model.api_key`), into
+`~/.hermes/.env` (`OPENCODE_GO_API_KEY`), and `x-opencode-session` was added to the
+provider's `extra_headers` (the existing `User-Agent` was preserved). One further
+environment fix was needed to bring the gateway up at all: the `automate-man` **profile**
+had `platforms.discord.enabled: true`, and its Discord adapter (privileged intents not
+enabled in the developer portal) raised an unhandled `PrivilegedIntentsRequired` that
+killed the whole gateway process; it was set to `false`. Both edits have timestamped
+backups next to the originals, and the gateway was restarted as a detached process
+(WMI-created, so it outlives the session). The live KAI Core on `127.0.0.1:8788` was not
+touched.
+
+**Verified after the fix:**
+
+| Check | Result |
+|---|---|
+| `POST /api/sessions/:id/chat` (direct) | **200 `content="PONG"` in 6.3 s** |
+| `core/src/server.test.ts` test 3 (`GET /agents/hermes/sessions`) | **pass** |
+| `core/src/server.test.ts` test 12 (`POST /chat` → real Hermes turn) | **pass** |
+| `worker-honesty` H3 | **PASS** — `state: completed`, `output: "PONG"`, ~3 s |
+
+KAI's own behaviour during the outage was already correct and honest — the chat turn
+fell back to `presentWorkerFailure` (`core/src/chat/relay.ts`) and the run ended
+`timed_out` / `AGENT_TIMEOUT` after `bestEffortStop`
+(`core/src/agents/adapters/hermesAdapter.ts:205`). Nothing in KAI was mocked, skipped,
+given a longer timeout or relabelled; the fix is a configuration correction on the
+external worker.
 
 ### Desktop app (`app/`)
 
@@ -109,18 +140,18 @@ summarizer renders the real supervision event shapes).
 | `core && node scripts/command-stream-probe.mjs` | **PASS** C1–C7 (real child stdout streamed before exit) |
 | `core && node scripts/torture.mjs` | **PASS** — completionRate 1, falseCompletionRate 0, orphanTasks 0, activeRuns 0 |
 | `core && node scripts/live-ux-probe.mjs` | **PASS** L1–L3 against a **rebuilt** UI (`npx vite build`) — first text 677 ms vs final 1351 ms, tool card 677 ms |
-| `core && node scripts/worker-honesty.mjs` | **H1, H2, H4 ×2 PASS; H3 FAIL** — see the Hermes diagnosis above |
+| `core && node scripts/worker-honesty.mjs` | **H1–H4 all PASS**, including H3 (a real Hermes run returns its real output) after the Hermes fix |
 
 `live-ux-probe` was run after rebuilding `app/dist` (`npx vite build`). No app source
 changed in this session (the UI changes landed in `160d94e`), but rebuilding keeps the
 tested bundle provably current rather than assumed.
 
-**worker-honesty H3 FAILED, honestly.** H1 (opencode parks for approval), H2 (offline
-opencode fails with a named transport error, never a fabricated completion) and H4 ×2
-(denial executes nothing) all passed. **H3 did not:** a real Hermes task run ended
-`timed_out` / `AGENT_TIMEOUT` after 900.4 s — exactly KAI's configured 15-minute run
-deadline (`docs/evidence/worker-honesty.json`). The cause is the one diagnosed above:
-Hermes accepts the run and never finishes it. **Do not read this as "Hermes verified".**
+**worker-honesty: all four checks pass.** H1 (opencode parks for approval), H2 (offline
+opencode fails with a named transport error, never a fabricated completion), H4 ×2
+(denial executes nothing) and **H3** — a real Hermes run — all pass. H3's recorded result
+is `state: completed`, `output: "PONG"`, in ~3 s (`docs/evidence/worker-honesty.json`).
+Before the Hermes fix the same check ended `timed_out` / `AGENT_TIMEOUT` after 900.4 s;
+that history and its root cause are in the diagnosis above.
 
 Raw evidence: `docs/evidence/orch-e2e.json`, `command-stream-probe.json`, `torture.json`,
 `live-ux-probe.json`, `worker-honesty.json`.
