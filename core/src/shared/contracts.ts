@@ -139,6 +139,7 @@ export type KaiErrorCode =
   | "STORAGE_FAILED"
   | "POLICY_DENIED"
   | "APPROVAL_REQUIRED"
+  | "CANCELLED"
   | "INTERNAL";
 
 /**

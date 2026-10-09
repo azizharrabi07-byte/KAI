@@ -300,7 +300,7 @@ test("H3. refusals emit tool_error; parks emit tool_approval_required", async ()
   assert.equal(park.status, "APPROVAL_REQUIRED");
 });
 
-test("H3. stream() yields tool events as chunks (values stripped) plus a budget-stamped terminal", async (t) => {
+test("H3. stream() yields tool events as chunks (values ride server-side; the wire preview is attached at the boundary) plus a budget-stamped terminal", async (t) => {
   const dir = tempDir();
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   writeFileSync(join(dir, "n.txt"), `${KNOWN}\n`, "utf8");
@@ -319,7 +319,11 @@ test("H3. stream() yields tool events as chunks (values stripped) plus a budget-
   assert.equal(eventChunks.length, 2, "start + done arrive as chunks");
   assert.equal(eventChunks[0]?.toolEvent?.type, "tool_start");
   assert.equal(eventChunks[1]?.toolEvent?.type, "tool_done");
-  assert.ok(!("result" in (eventChunks[1]?.toolEvent ?? {})), "the streamed event carries status, not values");
+  assert.ok("result" in (eventChunks[1]?.toolEvent ?? {}), "the streamed event carries the value server-side; server.ts attaches the bounded redacted preview for the wire");
+  const { previewToolResult } = await import("../src/chat/result-preview.ts");
+  const preview = previewToolResult((eventChunks[1]?.toolEvent as { result?: unknown })?.result);
+  assert.ok((preview.resultPreview ?? "").includes(KNOWN), "the wire preview shows the real match");
+  assert.equal(preview.resultTruncated, false);
   assert.equal(listener.length, 2, "the listener saw the same executions");
   assert.ok((listener[1]?.result as object) !== undefined, "…with the full value server-side");
   const terminal = chunks[chunks.length - 1]!;

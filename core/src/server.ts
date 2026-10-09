@@ -30,6 +30,7 @@ import { registerSessionRoutes } from "./sessions/routes.ts";
 import { registerCommandRoutes } from "./commands/routes.ts";
 import { presentWorkerResult, presentWorkerFailure, relayGuardIsLive, FALLBACK_SELF, type WorkerId } from "./chat/relay.ts";
 import { brainFailureReply, brainFailureReason } from "./chat/brain.ts";
+import { previewToolResult } from "./chat/result-preview.ts";
 import { beginTurn, finishTurn } from "./chat/turns.ts";
 
 export interface KaiServerDeps {
@@ -830,11 +831,29 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
           approvalId?: string;
           result?: unknown;
         }> = [];
+        // One run, one cancellation identity: when the client goes away
+        // (Stop aborts the fetch; a dead tab closes the socket), the RUN is
+        // aborted too — tools in flight are killed through the registry, not
+        // left running behind a closed stream. Ending the SSE subscription is
+        // otherwise NOT proof the work stopped.
+        //
+        // Both ends are watched: `req` close fires when the request stream
+        // dies, `res` close fires when the response socket dies before
+        // res.end() ran. Request-only watching misses aborts whose request
+        // body was already fully consumed (the usual POST case) — the run
+        // then finishes into the void instead of stopping.
+        const runController = new AbortController();
+        const onClientGone = (): void => {
+          runController.abort();
+        };
+        req.on("close", onClientGone);
+        res.on("close", onClientGone);
         try {
           for await (const chunk of core.brain.stream({
             text: streamText,
             system,
             ...(begun.objective !== streamText ? { objective: begun.objective } : {}),
+            signal: runController.signal,
             onToolEvent: (event) => {
               streamedToolEvents.push({ ...event });
             },
@@ -842,6 +861,9 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
             if (chunk.done) {
               const exhausted = chunk.toolBudgetExhausted ?? false;
               const synthesized = chunk.synthesized ?? false;
+              // A cancelled run settles as cancelled: the task lifecycle must
+              // record ABORTED, never verify a half-turn as complete.
+              const cancelled = chunk.cancelled === true || runController.signal.aborted;
               const pending = exhausted
                 ? (chunk.toolCalls ?? []).map((call) => call.name).filter((name) => name.length > 0)
                 : [];
@@ -873,6 +895,7 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
                 toolBudgetExhausted: exhausted,
                 synthesized,
                 ...(pending.length > 0 ? { pendingTools: pending } : {}),
+                ...(cancelled ? { cancelled: true as const } : {}),
               });
               if (finished.state === "PAUSED" && finished.replyText.length > 0) {
                 full += (full.length > 0 ? "\n\n" : "") + finished.replyText;
@@ -889,25 +912,45 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
                   tool_iterations: chunk.toolIterations ?? 0,
                   tool_budget_exhausted: exhausted,
                   ...(synthesized ? { synthesized: true } : {}),
+                  ...(cancelled ? { cancelled: true as const } : {}),
                   task_state: finished.state,
                   dependency: { normal_chat_calls_to_hermes: telemetry.normalChatCallsToHermes },
                 })}\n\n`,
               );
               break;
             }
-            // A tool-lifecycle event chunk carries the REAL execution outcome
-            // (result value stripped by the brain) — the UI renders these, it
-            // never invents them.
+            // A tool-lifecycle event chunk carries the REAL execution outcome.
+            // The raw value stays server-side; the wire gets a bounded,
+            // secret-redacted preview (chat/result-preview.ts) correlated by
+            // the real invocationId — the UI renders THIS, it never invents it.
             if (chunk.toolEvent !== undefined) {
               const { result, ...streamable } = chunk.toolEvent;
-              void result;
-              res.write(`data: ${JSON.stringify({ tool_event: streamable })}\n\n`);
+              const preview = previewToolResult(result);
+              res.write(
+                `data: ${JSON.stringify({ tool_event: { ...streamable, ...preview } })}\n\n`,
+              );
               continue;
             }
             full += chunk.delta;
             res.write(`data: ${JSON.stringify({ delta: chunk.delta })}\n\n`);
           }
         } catch (error) {
+          // A run the user stopped is a cancellation, not a brain failure:
+          // the task already settled CANCELLED inside the loop (or the socket
+          // is gone and these writes are no-ops) — never report it BLOCKED.
+          if (runController.signal.aborted) {
+            try {
+              res.write(`data: ${JSON.stringify({ done: true, cancelled: true, task_state: "CANCELLED" })}\n\n`);
+            } catch {
+              /* client already gone */
+            }
+            try {
+              res.end();
+            } catch {
+              /* client already gone */
+            }
+            return;
+          }
           if (core?.tasks !== undefined && begun.taskId !== null) core.tasks.move(begun.taskId, "BLOCKED");
           const reply = brainFailureReply(brainFailureReason(error));
           res.write(
@@ -922,6 +965,9 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
           );
           res.end();
           return;
+        } finally {
+          req.off("close", onClientGone);
+          if (typeof res.off === "function") res.off("close", onClientGone);
         }
         telemetry.normalChatTurns += 1;
         // The turn was verified inside the loop (before `done`), so `full`

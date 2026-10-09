@@ -1,0 +1,26 @@
+{
+  "at": "2026-10-09T00:48:00.317Z",
+  "scenarios": {
+    "H1 opencode run_task parks for approval": {
+      "pass": true,
+      "detail": "{\"ok\":false,\"status\":\"APPROVAL_REQUIRED\",\"approvalId\":\"apr_mv08xyrx_0\"}"
+    },
+    "H4 denial is recorded": {
+      "pass": true,
+      "detail": "{\"ok\":true,\"approval\":{\"id\":\"apr_mv08xyrx_0\",\"toolId\":\"agents.run_task\",\"action\":\"Run a task on a worker agent\",\"reason\":\"tool \\\"agents.run_task\\\" acts outside "
+    },
+    "H4 denied approval executes nothing": {
+      "pass": true,
+      "detail": "{\"ok\":false,\"status\":\"DENIED\"}"
+    },
+    "H2 opencode-offline fails honestly, never fabricated": {
+      "pass": true,
+      "detail": "{\"ok\":true,\"result\":{\"taskId\":\"task-mv08xysx\",\"state\":\"failed\",\"startedAt\":\"2026-10-09T00:48:04.209Z\",\"completedAt\":\"2026-10-09T00:48:04.212Z\",\"error\":{\"code\":\"INTERNAL\",\"message\":\"transport failure talking to http://127.0.0.1:4096\",\"retryable\":true,\"at\":\"2026-10-09T00:48:04.212Z\",\"detail\":\"TypeErro"
+    },
+    "H3 hermes returns its real output": {
+      "pass": true,
+      "detail": "{\"taskId\":\"task-mv08xyti\",\"state\":\"completed\",\"startedAt\":\"2026-10-09T00:48:04.230Z\",\"completedAt\":\"2026-10-09T00:48:07.282Z\",\"output\":\"PONG\",\"usage\":{\"inputTokens\":17873,\"outputTokens\":3}}"
+    }
+  },
+  "verdict": "pass"
+}

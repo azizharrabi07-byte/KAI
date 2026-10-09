@@ -482,7 +482,39 @@ interface ExecResult {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  /** True when a caller-provided AbortSignal stopped the run. */
+  cancelled?: boolean;
   durationMs: number;
+}
+
+/**
+ * Terminate a spawned child AND its descendants. `child.kill()` only ends the
+ * direct child: a `cmd.exe` (or anything it launched) keeps running after the
+ * parent dies, so Stop would lie. Windows has no process groups for this, so
+ * the tree kill goes through `taskkill /T /F`; POSIX kills the group.
+ */
+function killProcessTree(pid: number): void {
+  try {
+    if (process.platform === "win32") {
+      const killer = spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
+        windowsHide: true,
+        stdio: "ignore",
+      });
+      killer.on("error", () => undefined);
+    } else if (pid > 0) {
+      try {
+        process.kill(-pid, "SIGKILL");
+      } catch {
+        try {
+          process.kill(pid, "SIGKILL");
+        } catch {
+          /* already gone */
+        }
+      }
+    }
+  } catch {
+    /* already gone */
+  }
 }
 
 /**
@@ -504,6 +536,8 @@ export interface CommandStreamEvent {
   /** Present for exit. */
   exitCode?: number | null;
   timedOut?: boolean;
+  /** Present and true on exit when an AbortSignal stopped the run. */
+  cancelled?: boolean;
   durationMs?: number;
 }
 
@@ -515,9 +549,28 @@ export function setCommandStreamSink(sink: ((event: CommandStreamEvent) => void)
   commandStreamSink = sink;
 }
 
-function exec(command: string, args: string[], cwd: string, timeoutMs: number): Promise<ExecResult> {
+function exec(
+  command: string,
+  args: string[],
+  cwd: string,
+  timeoutMs: number,
+  opts?: { signal?: AbortSignal },
+): Promise<ExecResult> {
   const startedAt = Date.now();
   const commandExecutionId = `cmd_${Date.now().toString(36)}_${(commandSeq++).toString(36)}`;
+  const signal = opts?.signal;
+  // Already cancelled before the child exists: no process, no events past the
+  // exit record — stopping before a start is still a stop.
+  if (signal?.aborted === true) {
+    return Promise.resolve({
+      exitCode: null,
+      stdout: "",
+      stderr: "",
+      timedOut: false,
+      cancelled: true,
+      durationMs: 0,
+    });
+  }
   return new Promise<ExecResult>((resolvePromise, reject) => {
     let child: ReturnType<typeof spawn>;
     try {
@@ -526,13 +579,31 @@ function exec(command: string, args: string[], cwd: string, timeoutMs: number): 
       reject(new Error(`${command} could not run: ${messageOf(error)}`));
       return;
     }
+    let settled = false;
+    const finish = (result: ExecResult): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      resolvePromise(result);
+    };
     const emit = (event: Omit<CommandStreamEvent, "commandExecutionId" | "command" | "args" | "cwd">): void => {
+      if (settled) return;
       try {
         commandStreamSink?.({ commandExecutionId, command, args, cwd, ...event });
       } catch {
         // Observation is best-effort; execution continues regardless.
       }
     };
+    const onAbort = (): void => {
+      // Stop means stop: kill the whole tree (not just the direct child),
+      // record the REAL exit, and emit nothing further for this execution.
+      if (child.pid !== undefined) killProcessTree(child.pid);
+      const durationMs = Date.now() - startedAt;
+      emit({ type: "command.exit", exitCode: null, timedOut: false, durationMs, cancelled: true });
+      finish({ exitCode: null, stdout: out.join(""), stderr: err.join(""), timedOut: false, cancelled: true, durationMs });
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
     emit({ type: "command.started" });
 
     const out: string[] = [];
@@ -553,27 +624,34 @@ function exec(command: string, args: string[], cwd: string, timeoutMs: number): 
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      try { child.kill(); } catch { /* already gone */ }
+      if (child.pid !== undefined) killProcessTree(child.pid);
+      else {
+        try { child.kill(); } catch { /* already gone */ }
+      }
     }, timeoutMs);
 
     child.on("error", (error: NodeJS.ErrnoException) => {
-      clearTimeout(timer);
+      if (settled) return;
       const code = error.code;
       // A numeric exit is a RESULT; a missing binary (ENOENT) / signal is a real
       // failure with nothing to report — the same rule the callback form used.
       if (typeof code === "number") {
-        emit({ type: "command.exit", exitCode: code, timedOut, durationMs: Date.now() - startedAt });
-        resolvePromise({ exitCode: code, stdout: out.join(""), stderr: err.join(""), timedOut, durationMs: Date.now() - startedAt });
+        const durationMs = Date.now() - startedAt;
+        emit({ type: "command.exit", exitCode: code, timedOut, durationMs });
+        finish({ exitCode: code, stdout: out.join(""), stderr: err.join(""), timedOut, durationMs });
         return;
       }
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      settled = true;
       reject(new Error(`${command} could not run: ${messageOf(error)}`));
     });
 
     child.on("close", (code: number | null) => {
-      clearTimeout(timer);
+      if (settled) return;
       const durationMs = Date.now() - startedAt;
       emit({ type: "command.exit", exitCode: timedOut ? null : code, timedOut, durationMs });
-      resolvePromise({ exitCode: timedOut ? null : code, stdout: out.join(""), stderr: err.join(""), timedOut, durationMs });
+      finish({ exitCode: timedOut ? null : code, stdout: out.join(""), stderr: err.join(""), timedOut, durationMs });
     });
   });
 }
@@ -643,12 +721,13 @@ export async function gitDiff(input: unknown): Promise<{ cwd: string; staged: bo
 
 // ── shell ─────────────────────────────────────────────────────────────────────
 
-export async function shellRun(input: unknown): Promise<{
+export async function shellRun(input: unknown, signal?: AbortSignal): Promise<{
   command: string;
   args: string[];
   cwd: string;
   exitCode: number | null;
   timedOut: boolean;
+  cancelled?: boolean;
   stdout: string;
   stderr: string;
   truncated: boolean;
@@ -668,7 +747,7 @@ export async function shellRun(input: unknown): Promise<{
   const timeoutMs = positiveInt(parsed.value.timeoutMs, "timeoutMs", MAX_SHELL_TIMEOUT_MS, DEFAULT_SHELL_TIMEOUT_MS);
   if (!timeoutMs.ok) throw new Error(timeoutMs.reason);
 
-  const result = await exec(parsed.value.command, args, cwd, timeoutMs.value);
+  const result = await exec(parsed.value.command, args, cwd, timeoutMs.value, { ...(signal !== undefined ? { signal } : {}) });
   const stdout = clip(result.stdout, MAX_OUTPUT_CHARS);
   const stderr = clip(result.stderr, MAX_OUTPUT_CHARS);
   return {
@@ -677,6 +756,7 @@ export async function shellRun(input: unknown): Promise<{
     cwd,
     exitCode: result.exitCode,
     timedOut: result.timedOut,
+    ...(result.cancelled === true ? { cancelled: true as const } : {}),
     stdout: stdout.text,
     stderr: stderr.text,
     truncated: stdout.truncated || stderr.truncated,
@@ -1129,8 +1209,8 @@ export function createWorkspaceTools(): ToolDefinition[] {
         if (!timeoutMs.ok) return timeoutMs;
         return { ok: true, value: parsed.value };
       },
-      async execute(input) {
-        return shellRun(input);
+      async execute(input, ctx) {
+        return shellRun(input, ctx?.signal);
       },
     },
   ];
