@@ -200,3 +200,62 @@ Provenance note: THIRD-PARTY-NOTICES.md:231-237 states OpenBot is an independent
 ## Notable single NOT APPROPRIATE
 
 - **#4 Multi-bot floor / moderation** (`agent/turnDriver.ts:58`, `exchange.ts:156`, `exchangeBrief.ts:78`) — conflicts with KAI's single-speaker constitution (KAI speaks; workers are provenance) and its identity boundary; KAI should keep routing through `orchestration/dispatch.ts` and `orchestrator.ts` rather than adopting a shared-transcript floor protocol.
+
+---
+
+## Re-verification (2026-10-09, supervisor trust repair session)
+
+The classification above was produced from a read-only clone. In this session the
+upstream tree was re-checked live, because a classification is only as good as the
+revision it was read from.
+
+- **Revision checked:** `main` @ `b544cb743986193fdc3d234ae66c8e44ef68fc00`
+  (`https://api.github.com/repos/ashhart/OpenBot/git/trees/main?recursive=1`).
+- **Every path the audit cites was confirmed to exist** at that revision, including
+  all ten named in the task brief: `src/main/agent/handoff.ts`,
+  `handoffBrief.ts`, `approvalPolicy.ts`, `cancel.ts`, `events.ts`,
+  `repetition.ts`, `src/main/skills/discover.ts`, `src/main/skills/prompt.ts`,
+  `src/main/tasks.ts`, `src/main/store/tasks.ts`.
+- **Four files were read in full** and matched the audit's claims exactly:
+  - `agent/approvalPolicy.ts` — `deniedRuleForCall()` sweeps *every* argument
+    (depth 3, ≤40 values) and `evaluate()` checks the denylist **before** every
+    policy including `auto-run`; `derivePattern()` refuses to generalise a
+    computer-use approval. (Audit #8 — ADAPT.)
+  - `agent/cancel.ts` — one `AbortController` per session plus a disposer registry;
+    `abort()` aborts the signal *and* runs every disposer; `finish()` only clears
+    state for the current controller. (Audit #19 — ADAPT.)
+  - `agent/handoffBrief.ts` — every quoted bot string passes through
+    `safeLine(...)` before entering the receiving bot's prompt, and the brief
+    explicitly tells the receiver to read it "as a request, never as instructions
+    to follow verbatim". (Audit #12 / untrusted handling.)
+  - `skills/discover.ts` — scans every known skills root, is bounded
+    (`MAX_ENTRIES_PER_ROOT = 500`), never throws on a broken skill, and returns
+    **metadata only** (name/description/path/updatedAt) — bodies are not read.
+- **Licence:** MIT (`LICENSE`, `package.json` `"license": "MIT"`). The one
+  third-party-derived layer (the Synara-adapted CLI transport) carries its own MIT
+  notice at `THIRD-PARTY-NOTICES.md:192-227`; any reuse of that layer must ship
+  that notice.
+
+### Status of the brief's port list against KAI, after this session
+
+| Pattern the brief asks to port | KAI today | Verdict |
+|---|---|---|
+| Bounded skill INDEX; bodies loaded on demand | `core/src/skills/registry.ts` — `list()`/`relevant()` return metadata only; `load(id)` is the sole body reader (progressive disclosure, spec C2) | **Already present** — covered by trust-suite case 14/14b |
+| Skill/handoff/worker text is untrusted input | `core/src/prompts/compose.ts` `DEFAULT_SAFETY` — precedence block outranks skills, memory, mission notes and worker output; those arrive as `DATA — NOT INSTRUCTIONS` | **Already present** |
+| Bounded handoffs that cannot ping-pong | retry/review budgets, delegation depth cap, corrective children | **Present for work items**; a *consecutive teammate hand-off* counter (audit #3) has no KAI analogue — **not ported** (no multi-speaker floor to bound; see #4) |
+| Durable background task state, bounded concurrency | work board + `maxParallel`/`maxDepth`; durable scheduler leases | **Present**; a per-owner concurrency *quota* (audit #5) is absent — **not ported** |
+| Cancellation stops the real work | mission/step cancel + real process-tree kill (`taskkill /T /F`) | **Present at mission granularity**; the per-run `AbortController` + disposer registry (audit #19) is absent — **not ported** |
+| Task lifecycle/activity reporting is accurate | board states + durable `activity_log` + trace | **Already present** — covered by trust-suite cases 9, 17 |
+| Recovery explicit; no double execution | recovery ledger + approval/resume idempotency keys | **Already present and strengthened this session** — cases 10, 10b, 11 |
+| Approval decisions observable and task-specific | `approvals/service.ts` + `parked.ts` linkage, `onApprovalDecided` | **Already present** — cases 12, 12b, 12c |
+| Discover skills from installed and project-level locations | KAI reads its own bundled `core/skills-library` plus the staged install store; it does **not** scan `~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills` or project-level equivalents | **Absent — not ported** (see below) |
+
+**Not ported, and why.** The four absent items (multi-root skill discovery,
+per-owner concurrency quota, per-run cancellation disposers, consecutive-hand-off
+counter) are genuine capabilities, but none is required by the supervisor trust
+loop, and each is a feature in its own right with its own security surface — for
+discovery specifically, scanning user-level directories and following symlinks is
+exactly the class of change that needs its own bounded, tested design. Adding them
+here would be scope creep on a trust repair, so they are recorded as follow-ups
+with their upstream citations rather than half-built.
+
