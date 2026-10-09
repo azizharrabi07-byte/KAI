@@ -21,7 +21,7 @@
  */
 
 /** Target schema version. Bump by appending to MIGRATIONS, never by editing. */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export interface Migration {
   readonly version: number;
@@ -320,6 +320,26 @@ export const MIGRATIONS: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_work_items_task   ON work_items (taskId)`,
       `CREATE INDEX IF NOT EXISTS idx_activity_task     ON activity_log (taskId, seq DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_activity_work     ON activity_log (workItemId, seq DESC)`,
+    ],
+  },
+  {
+    version: 4,
+    statements: [
+      // ── work_items: supervisor trust fields ─────────────────────────────────
+      // The Outcome Contract rides the item from creation to the Gate (no more
+      // silent drops), and KAI-observed evidence + skill receipts persist with
+      // the work. All JSON TEXT, all nullable: pre-existing rows read back as
+      // absent and the board normalizes them to empty — no reset, no rewrite.
+      `ALTER TABLE work_items ADD COLUMN criteria TEXT`,
+      `ALTER TABLE work_items ADD COLUMN constraints TEXT`,
+      `ALTER TABLE work_items ADD COLUMN forbiddenOutcomes TEXT`,
+      `ALTER TABLE work_items ADD COLUMN requiredEvidence TEXT`,
+      `ALTER TABLE work_items ADD COLUMN evidenceLinks TEXT`,
+      `ALTER TABLE work_items ADD COLUMN budget TEXT`,
+      `ALTER TABLE work_items ADD COLUMN workingDir TEXT`,
+      `ALTER TABLE work_items ADD COLUMN evidence TEXT`,
+      `ALTER TABLE work_items ADD COLUMN skillReceipts TEXT`,
+      `ALTER TABLE work_items ADD COLUMN nextAction TEXT`,
     ],
   },
 ];

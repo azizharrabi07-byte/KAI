@@ -23,6 +23,8 @@
  * OpenBot source copied.
  */
 
+import type { VerifiedEvidence } from "./types.ts";
+
 export type OutcomeResult = "PASS" | "FAIL" | "INSUFFICIENT_EVIDENCE" | "CONTRADICTED" | "UNKNOWN";
 
 export interface OutcomeContract {
@@ -33,6 +35,12 @@ export interface OutcomeContract {
   constraints: string[];
   acceptanceCriteria: string[];
   requiredEvidence: string[];
+  /**
+   * Criterion label -> required-evidence labels supporting it. Entries absent
+   * here default to ALL required evidence (strict). Additive; old persisted
+   * contracts lack it and read as "every criterion needs everything".
+   */
+  evidenceLinks?: Record<string, string[]>;
   forbiddenOutcomes: string[];
   authorityScope: string[];
   timeBudgetMs?: number;
@@ -58,6 +66,7 @@ export function createOutcomeContract(input: {
   constraints?: string[];
   acceptanceCriteria?: string[];
   requiredEvidence?: string[];
+  evidenceLinks?: Record<string, string[]>;
   forbiddenOutcomes?: string[];
   authorityScope?: string[];
   timeBudgetMs?: number;
@@ -79,6 +88,7 @@ export function createOutcomeContract(input: {
         ? input.deliverables!.map((d) => `deliverable present: ${d}`)
         : ["a user-facing deliverable exists"],
     requiredEvidence: [...(input.requiredEvidence ?? [])],
+    ...(input.evidenceLinks !== undefined ? { evidenceLinks: { ...input.evidenceLinks } } : {}),
     forbiddenOutcomes: [...(input.forbiddenOutcomes ?? [])],
     authorityScope: [...(input.authorityScope ?? [])],
     ...(input.timeBudgetMs !== undefined ? { timeBudgetMs: input.timeBudgetMs } : {}),
@@ -93,8 +103,12 @@ export function createOutcomeContract(input: {
 export interface Observation {
   /** The user-facing deliverable text (from the worker, but VERIFIED below). */
   deliverable: string;
-  /** Evidence items the runtime or reviewer actually produced. */
-  evidence: string[];
+  /**
+   * Typed evidence records. `source: "kai-observed"` settlements are the ONLY
+   * thing that can satisfy a requirement; `source: "worker-reported"` entries
+   * are displayable claims, never proof.
+   */
+  evidence: VerifiedEvidence[];
   /** criteria label -> met? (from verification, never the worker's claim). */
   criteriaMet: Record<string, boolean>;
   /** Free-text claims the worker made (never trusted as truth). */
@@ -113,14 +127,28 @@ export interface OutcomeGateDecision {
   reason: string;
 }
 
-/** Does the evidence text satisfy a required-evidence phrase (token match)? */
-function evidenceSatisfies(evidenceText: string, required: string): boolean {
-  const needle = required.trim().toLowerCase();
-  if (needle.length === 0) return true;
-  if (evidenceText.includes(needle)) return true;
-  const tokens = needle.match(/[a-z0-9]+/g)?.filter((t) => t.length >= 4) ?? [];
-  if (tokens.length === 0) return evidenceText.includes(needle.slice(0, 24));
-  return tokens.some((t) => evidenceText.includes(t));
+/**
+ * Does a required-evidence label have a KAI-observed record behind it?
+ *
+ * Strict by construction: a requirement is satisfied ONLY by an observed
+ * record whose `supports` names the label EXACTLY. Worker-reported text,
+ * token overlap, substring containment, and short-prefix matches NEVER
+ * satisfy — those were the permissive paths this replaces. An empty label is
+ * vacuously satisfied (nothing was asked for).
+ */
+export function evidenceSatisfies(observations: VerifiedEvidence[], required: string): boolean {
+  const label = required.trim();
+  if (label.length === 0) return true;
+  return observations.some(
+    (record) => record.source === "kai-observed" && record.supports.includes(label),
+  );
+}
+
+/** The required-evidence labels backing one criterion (default: all of them). */
+export function linkedEvidence(contract: OutcomeContract, criterion: string): string[] {
+  const links = contract.evidenceLinks?.[criterion];
+  if (links !== undefined) return [...links];
+  return [...contract.requiredEvidence];
 }
 
 /**
@@ -150,8 +178,8 @@ export function evaluateOutcome(contract: OutcomeContract, obs: Observation): Ou
 
   const deliverablePresent = obs.deliverable.trim().length > 0;
   const unmet = contract.acceptanceCriteria.filter((c) => obs.criteriaMet[c] !== true);
-  const evidenceText = obs.evidence.join(" ").toLowerCase();
-  const missingEvidence = contract.requiredEvidence.filter((e) => !evidenceSatisfies(evidenceText, e));
+  const observed = obs.evidence.filter((record) => record.source === "kai-observed");
+  const missingEvidence = contract.requiredEvidence.filter((e) => !evidenceSatisfies(observed, e));
 
   const criteriaOk = contract.completionPolicy === "all_criteria"
     ? unmet.length === 0
@@ -173,6 +201,28 @@ export function evaluateOutcome(contract: OutcomeContract, obs: Observation): Ou
     return { result: "UNKNOWN", unmetCriteria: [], missingEvidence, violations: [], reason: "no acceptance criteria to gate on" };
   }
   return { result: "PASS", unmetCriteria: [], missingEvidence: [], violations: [], reason: "deliverable present and acceptance criteria met with evidence" };
+}
+
+/**
+ * Is one acceptance criterion met? Strict:
+ * - trivial deliverable-presence criteria: the deliverable exists;
+ * - otherwise EVERY linked required-evidence label must have a KAI-observed
+ *   record behind it — worker prose, token overlap, and substring matches
+ *   never count;
+ * - `compensated` (an independent review PASS on this deliverable) may stand
+ *   in where direct observation was impossible — recorded, never hidden.
+ */
+export function criterionMet(
+  contract: OutcomeContract,
+  criterion: string,
+  observations: VerifiedEvidence[],
+  opts?: { compensated?: boolean; deliverablePresent?: boolean },
+): boolean {
+  if (criterion.startsWith("deliverable present") || criterion === "a user-facing deliverable exists") {
+    return opts?.deliverablePresent ?? false;
+  }
+  if (opts?.compensated === true) return true;
+  return linkedEvidence(contract, criterion).every((entry) => evidenceSatisfies(observations, entry));
 }
 
 // ── Decision Kernel ──────────────────────────────────────────────────────────

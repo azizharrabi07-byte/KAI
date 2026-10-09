@@ -1071,7 +1071,9 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
    * consumed either way, never sent to the model as chat.
    */
   async function runSlash(text: string): Promise<void> {
-    const match = /^\/([A-Za-z][A-Za-z0-9_-]*)(?:\s+(.*))?$/.exec(text);
+    // `[\s\S]` so a multiline paste after the command name (an external report
+    // for /audit) is captured whole, not rejected as "not a command".
+    const match = /^\/([A-Za-z][A-Za-z0-9_-]*)(?:[ \t]+([\s\S]*))?$/.exec(text);
     busy = true;
     refreshChatSurface();
     const userTurn: Turn = { id: chatSeq++, role: "user", text };
@@ -1087,7 +1089,8 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
         fail(`“${text}” is not a command — try /help.`);
         return;
       }
-      const res = await client.runCommand(match[1] ?? "", (match[2] ?? "").trim());
+      const rawArgs = (match[2] ?? "").trim();
+      const res = await client.runCommand(match[1] ?? "", rawArgs, rawArgs);
       if (!res.ok) {
         fail(res.error.reason ?? res.error.message);
         return;

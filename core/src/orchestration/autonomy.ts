@@ -20,7 +20,7 @@
 
 import type { AutonomyLevel, AutonomyPolicy } from "./types.ts";
 
-export type AutoAction = "delegate" | "review" | "learn" | "retry" | "reassign";
+export type AutoAction = "delegate" | "review" | "learn" | "retry" | "reassign" | "verify";
 
 export type AutoVerdict = "AUTO" | "ASK" | "OFF";
 
@@ -33,6 +33,9 @@ export function autoVerdict(policy: AutonomyPolicy, action: AutoAction, risk?: s
     learn: policy.skillLearning,
     retry: policy.workerAuto,
     reassign: policy.workerAuto,
+    // Verification rides the review dimension: read-only checks run, guarded
+    // effects ask — same posture as review, never a new bypass.
+    verify: policy.review,
   };
   const pref = dim[action];
   if (pref === "OFF") return "OFF";
@@ -48,7 +51,7 @@ export function autoVerdict(policy: AutonomyPolicy, action: AutoAction, risk?: s
     // Level 1 delegates READ-scoped work only; everything else asks.
     return risk === "READ" || risk === undefined ? "AUTO" : "ASK";
   }
-  if (action === "review") {
+  if (action === "review" || action === "verify") {
     return policy.level >= 2 ? "AUTO" : "ASK";
   }
   return "ASK";

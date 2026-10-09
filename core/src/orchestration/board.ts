@@ -36,7 +36,9 @@
 import type { WorkItemRecord, WorkItemStore } from "../shared/contracts.ts";
 import type {
   ReviewRecord,
+  SkillReceipt,
   VerificationRecord,
+  VerifiedEvidence,
   WorkBudget,
   WorkCost,
   WorkItem,
@@ -60,6 +62,14 @@ export interface WorkItemInput {
   parentId?: string;
   skills?: string[];
   tools?: string[];
+  /** Acceptance criteria (default: derived from the deliverable at gate time). */
+  criteria?: string[];
+  constraints?: string[];
+  forbiddenOutcomes?: string[];
+  requiredEvidence?: string[];
+  evidenceLinks?: Record<string, string[]>;
+  budget?: WorkBudget;
+  workingDir?: string;
 }
 
 export interface WorkBoardOptions {
@@ -118,6 +128,24 @@ export interface WorkBoard {
   createChild(parentId: string, input: WorkItemInput, budgets?: WorkBudget): BoardResult<WorkItem>;
   /** Attach auxiliary outputs (e.g. parked approval linkage). Additive only. */
   annotate(id: string, outputs: unknown): BoardResult<WorkItem>;
+  /**
+   * Append KAI-observed (or worker-reported, labeled) evidence records,
+   * deduped by record id. The trust split lives on each record's `source` —
+   * the board stores, never adjudicates.
+   */
+  recordEvidence(id: string, records: VerifiedEvidence[]): BoardResult<WorkItem>;
+  /**
+   * Persist the parsed worker handoff IMMEDIATELY, before review or evidence
+   * gathering. A run that parks (review ASK, guarded evidence check) must not
+   * lose what the worker actually said: the resume path re-gates on this
+   * handoff, and an absent one would make a resumable item unresolvable.
+   */
+  recordHandoff(id: string, handoff: WorkerHandoff): BoardResult<WorkItem>;
+  /**
+   * Append skill usage receipts (id + version/hash + bytes), deduped by
+   * id@hash. What was handed to the worker, checkably.
+   */
+  recordSkillReceipts(id: string, receipts: SkillReceipt[]): BoardResult<WorkItem>;
   checkRetry(id: string, maxRetries: number): BoardResult<RetryStatus>;
   recordFailure(id: string, reason: string, workerId?: string, taskType?: string): BoardResult<FailureOutcome>;
   recordSuccess(workerId: string, taskType?: string): BoardResult<{ consecutiveFailures: number }>;
@@ -136,14 +164,27 @@ function toRecord(item: WorkItem): WorkItemRecord {
 }
 
 function fromRecord(record: WorkItemRecord): WorkItem {
-  return {
+  const item = {
     ...record,
     state: record.state as WorkItemState,
     handoff: record.handoff as WorkerHandoff | undefined,
     verification: record.verification as VerificationRecord | undefined,
     review: record.review as ReviewRecord | undefined,
     cost: record.cost as WorkCost | undefined,
-  };
+  } as WorkItem;
+  // Additive contract fields (Phase 5): rows written before they existed
+  // read back as undefined — normalize so every reader sees arrays.
+  if (!Array.isArray(item.criteria)) item.criteria = [];
+  if (!Array.isArray(item.constraints)) item.constraints = [];
+  if (!Array.isArray(item.forbiddenOutcomes)) item.forbiddenOutcomes = [];
+  if (!Array.isArray(item.requiredEvidence)) item.requiredEvidence = [];
+  if (!Array.isArray(item.skills)) item.skills = [];
+  if (!Array.isArray(item.skillReceipts)) item.skillReceipts = [];
+  if (!Array.isArray(item.tools)) item.tools = [];
+  if (!Array.isArray(item.evidence)) item.evidence = [];
+  if (!Array.isArray(item.failures)) item.failures = [];
+  if (!Array.isArray(item.heartbeats)) item.heartbeats = [];
+  return item;
 }
 
 function clone<T>(value: T): T {
@@ -204,8 +245,19 @@ export function createWorkBoard(store: WorkItemStore, opts: WorkBoardOptions = {
         ...(input.taskId !== undefined ? { taskId: input.taskId } : {}),
         objective: input.objective,
         ...(input.deliverable !== undefined ? { deliverable: input.deliverable } : {}),
+        // Contract fields ride the item from creation to the Gate (Phase 5):
+        // anything the API accepted is persisted here, never dropped.
+        criteria: [...(input.criteria ?? [])],
+        constraints: [...(input.constraints ?? [])],
+        forbiddenOutcomes: [...(input.forbiddenOutcomes ?? [])],
+        requiredEvidence: [...(input.requiredEvidence ?? [])],
+        ...(input.evidenceLinks !== undefined ? { evidenceLinks: { ...input.evidenceLinks } } : {}),
+        ...(input.budget !== undefined ? { budget: { ...input.budget } } : {}),
+        ...(input.workingDir !== undefined ? { workingDir: input.workingDir } : {}),
         skills: input.skills ?? [],
+        skillReceipts: [],
         tools: input.tools ?? [],
+        evidence: [],
         state: "READY",
         attempts: 0,
         heartbeats: [],
@@ -251,6 +303,21 @@ export function createWorkBoard(store: WorkItemStore, opts: WorkBoardOptions = {
     claim(id: string, workerId: string, workerVersion?: string): BoardResult<WorkItem> {
       const item = load(id);
       if (item === null) return unknownId(id);
+      // Idempotent dispatch guard (Phase 2C/12-10): a duplicate run/completion
+      // event must never double-execute. CLAIMED/RUNNING means a worker holds
+      // it right now. COMPLETED/CANCELLED are settled; BLOCKED is parked by a
+      // deny that re-running would bypass. Re-claim is allowed from READY
+      // (first run), FAILED (bounded retry re-entry — budgets bind it), and
+      // CHANGES_REQUESTED/WAITING/REVIEW (resume paths re-enter deliberately).
+      if (item.state === "CLAIMED" || item.state === "RUNNING") {
+        return {
+          ok: false,
+          reason: `work item ${id} is already ${item.state}${item.workerId !== undefined ? ` by ${item.workerId}` : ""} — duplicate dispatch refused`,
+        };
+      }
+      if (item.state === "COMPLETED" || item.state === "CANCELLED" || item.state === "BLOCKED") {
+        return { ok: false, reason: `work item ${id} is ${item.state} — create a new item instead of re-running it` };
+      }
       item.workerId = workerId;
       if (workerVersion !== undefined) item.workerVersion = workerVersion;
       item.state = "CLAIMED";
@@ -288,6 +355,42 @@ export function createWorkBoard(store: WorkItemStore, opts: WorkBoardOptions = {
       if (item === null) return unknownId(id);
       const saved = save(item);
       emit("worker.progress", { id, label, workerId: item.workerId });
+      return { ok: true, value: saved };
+    },
+
+    recordEvidence(id: string, records: VerifiedEvidence[]): BoardResult<WorkItem> {
+      const item = load(id);
+      if (item === null) return unknownId(id);
+      const have = new Set((item.evidence ?? []).map((record) => record.id));
+      for (const record of records) {
+        if (have.has(record.id)) continue;
+        have.add(record.id);
+        item.evidence.push(clone(record));
+      }
+      const saved = save(item);
+      emit("worker.progress", { id, phase: "evidence", count: saved.evidence.length });
+      return { ok: true, value: saved };
+    },
+
+    recordHandoff(id: string, handoff: WorkerHandoff): BoardResult<WorkItem> {
+      const item = load(id);
+      if (item === null) return unknownId(id);
+      item.handoff = clone(handoff);
+      const saved = save(item);
+      return { ok: true, value: saved };
+    },
+
+    recordSkillReceipts(id: string, receipts: SkillReceipt[]): BoardResult<WorkItem> {
+      const item = load(id);
+      if (item === null) return unknownId(id);
+      const have = new Set((item.skillReceipts ?? []).map((receipt) => `${receipt.id}@${receipt.hash ?? receipt.version ?? "?"}`));
+      for (const receipt of receipts) {
+        const key = `${receipt.id}@${receipt.hash ?? receipt.version ?? "?"}`;
+        if (have.has(key)) continue;
+        have.add(key);
+        item.skillReceipts.push(clone(receipt));
+      }
+      const saved = save(item);
       return { ok: true, value: saved };
     },
 

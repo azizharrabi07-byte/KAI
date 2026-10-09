@@ -25,15 +25,21 @@ import { attemptOf, chainRoot, createMissionSupervisor, TRANSIENT_ERROR_CODES } 
 import type { KaiErrorCode, Mission } from "../src/shared/contracts.ts";
 
 function mission(over: Partial<Mission> & { code?: KaiErrorCode; errorMessage?: string }): Mission {
+  const status = over.status ?? "FAILED";
+  // Step status follows the mission status unless a test supplies steps: a
+  // COMPLETED mission is one whose steps settled, and the supervisor verifies
+  // exactly that (an unsettled step under COMPLETED is an inconsistency it
+  // reports). A blanket FAILED step on every fixture hid that distinction.
+  const settled = status === "COMPLETED";
   const base: Mission = {
     id: over.id ?? "mission_1",
     title: over.title ?? "a mission",
-    status: over.status ?? "FAILED",
+    status,
     priority: 0,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
-    steps: [
-      { id: "s0", missionId: over.id ?? "mission_1", index: 0, title: "do it", kind: "tool", status: "FAILED", sideEffecting: true, target: "net.send" },
+    steps: over.steps ?? [
+      { id: "s0", missionId: over.id ?? "mission_1", index: 0, title: "do it", kind: "tool", status: settled ? "COMPLETED" : "FAILED", sideEffecting: true, target: "net.send" },
     ],
   };
   if (over.metadata !== undefined) base.metadata = over.metadata;
@@ -129,11 +135,36 @@ test("maxAttempts 0 disables the loop entirely", async () => {
   assert.equal(h.started.length, 0);
 });
 
-test("only a FAILED mission is evaluated; an unknown one is a no-op", async () => {
+test("only a settled mission is supervised; a running or unknown one is a no-op", async () => {
   const h = harness([mission({ id: "ok", status: "COMPLETED" }), mission({ id: "running", status: "RUNNING" })]);
+  // A COMPLETED mission with settled steps is verified and left settled — not
+  // retried, and it starts nothing.
   assert.equal((await h.supervisor.observe("ok")).action, "stop");
   assert.equal((await h.supervisor.observe("running")).action, "stop");
   assert.equal((await h.supervisor.observe("nope")).action, "stop");
+  assert.equal(h.started.length, 0);
+});
+
+test("a COMPLETED mission with an unsettled step escalates to a human, never silently passes", async () => {
+  const h = harness([
+    mission({
+      id: "bad",
+      status: "COMPLETED",
+      steps: [
+        { id: "s0", missionId: "bad", index: 0, title: "did not finish", kind: "tool", status: "FAILED", sideEffecting: true, target: "net.send" },
+      ],
+    }),
+  ]);
+  const decision = await h.supervisor.observe("bad");
+  assert.equal(decision.action, "escalate", JSON.stringify(decision));
+  assert.equal(h.notices.length, 1, "the inconsistency is told to the human");
+  assert.equal(h.started.length, 0, "an inconsistent completion is never re-run automatically");
+});
+
+test("a cancelled mission is deliberate: supervised, never retried", async () => {
+  const h = harness([mission({ id: "c1", status: "CANCELLED" })]);
+  const decision = await h.supervisor.observe("c1");
+  assert.equal(decision.action, "stop", JSON.stringify(decision));
   assert.equal(h.started.length, 0);
 });
 

@@ -27,10 +27,24 @@ const CONTRACT = createOutcomeContract({
   forbiddenOutcomes: ["force-push"],
 });
 
+function observed(id: string, supports: string[], detail = "established by KAI"): import("../src/orchestration/types.ts").VerifiedEvidence {
+  return {
+    id, kind: "check", source: "kai-observed", method: "test-fixture",
+    detail, supports, at: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+function reported(id: string, detail = "worker words"): import("../src/orchestration/types.ts").VerifiedEvidence {
+  return {
+    id, kind: "worker claim", source: "worker-reported", method: "worker-handoff",
+    detail, supports: [], at: "2026-01-01T00:00:00.000Z",
+  };
+}
+
 function obs(over: Partial<Observation> = {}): Observation {
   return {
     deliverable: "patched poller; tests pass; only poller.ts changed",
-    evidence: ["tests: 18/18 passed", "diff: poller.ts only"],
+    evidence: [observed("ev_test_output", ["test output"], "18/18 passed, exit 0")],
     criteriaMet: { "tests pass": true, "no unrelated files changed": true },
     ...over,
   };
@@ -39,6 +53,25 @@ function obs(over: Partial<Observation> = {}): Observation {
 test("gate: a met deliverable with evidence PASSES", () => {
   const d = evaluateOutcome(CONTRACT, obs());
   assert.equal(d.result, "PASS", d.reason);
+});
+
+test("gate: worker-reported text NEVER satisfies required evidence", () => {
+  const d = evaluateOutcome(
+    CONTRACT,
+    obs({ evidence: [reported("ev_w1", "tests: 18/18 passed")] }),
+  );
+  assert.equal(d.result, "INSUFFICIENT_EVIDENCE", d.reason);
+  assert.deepEqual(d.missingEvidence, ["test output"]);
+});
+
+test("gate: one keyword in prose cannot satisfy a requirement", () => {
+  // "output" appears; the LABEL "test output" has no observed record behind it.
+  const d = evaluateOutcome(
+    CONTRACT,
+    obs({ evidence: [observed("ev_other", ["something else"], "some output here")] }),
+  );
+  assert.equal(d.result, "INSUFFICIENT_EVIDENCE", d.reason);
+  assert.deepEqual(d.missingEvidence, ["test output"]);
 });
 
 test("B: a worker claim is not enough — missing acceptance criterion never PASSES", () => {

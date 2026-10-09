@@ -1362,21 +1362,30 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
       Array.isArray(value) && value.every((v) => typeof v === "string") ? (value as string[]) : undefined;
     const strVal = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
     const candidates = runtime.subagents.list().map((persona) => persona.spec.id);
+    const asRecord = (value: unknown): Record<string, string[]> | undefined =>
+      typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, string[]>) : undefined;
     const started = runtime.orchestrator.startObjective(
       {
         objective: (body.objective as string).trim(),
         ...(strVal(body.deliverable) !== undefined ? { deliverable: strVal(body.deliverable) as string } : {}),
         ...(strList(body.constraints) !== undefined ? { constraints: strList(body.constraints) as string[] } : {}),
+        ...(strList(body.forbiddenOutcomes) !== undefined ? { forbiddenOutcomes: strList(body.forbiddenOutcomes) as string[] } : {}),
         ...(strList(body.successCriteria) !== undefined ? { successCriteria: strList(body.successCriteria) as string[] } : {}),
+        ...(strList(body.requiredEvidence) !== undefined ? { requiredEvidence: strList(body.requiredEvidence) as string[] } : {}),
+        ...(asRecord(body.evidenceLinks) !== undefined ? { evidenceLinks: asRecord(body.evidenceLinks) as Record<string, string[]> } : {}),
         ...(strVal(body.risk) !== undefined ? { risk: strVal(body.risk) as string } : {}),
         ...(strVal(body.taskId) !== undefined ? { taskId: strVal(body.taskId) as string } : {}),
         ...(strVal(body.missionId) !== undefined ? { missionId: strVal(body.missionId) as string } : {}),
+        ...(strVal(body.workingDir) !== undefined ? { workingDir: strVal(body.workingDir) as string } : {}),
         ...(strList(body.subtasks) !== undefined ? { subtasks: strList(body.subtasks) as string[] } : {}),
         ...(strList(body.skills) !== undefined ? { skills: strList(body.skills) as string[] } : {}),
       },
       candidates,
     );
-    return ok(started, started.delegated ? 201 : 200);
+    // 201 means a durable work item now exists (planned); it does NOT mean a
+    // worker was dispatched. `delegated` stays false until dispatch happens,
+    // so status is keyed on creation, never on the old delegation lie.
+    return ok(started, started.planned ? 201 : 200);
   }
 
   async function runWorkItem(req: ApiRequest, params: Record<string, string>): Promise<ApiResponse> {
@@ -1398,6 +1407,30 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     const outcome = await runtime.orchestrator.reviewItem(params.id ?? "", criteria);
     if ("error" in outcome) return bad(outcome.error);
     return ok(outcome);
+  }
+
+  /**
+   * POST /work-items/audit — ingest an EXTERNAL worker report (Case B). The
+   * report is parsed into labeled claims, audited against the real workspace,
+   * gated, and answered with a correction prompt. Auto-launch happens only
+   * through startObjective when autonomy permits; otherwise the prompt returns
+   * waiting. WRITE because it creates a durable work item (and may launch).
+   */
+  async function auditWorkItem(req: ApiRequest): Promise<ApiResponse> {
+    const body = asBodyObject(req.body);
+    if (body === null || typeof body.reportText !== "string" || (body.reportText as string).trim().length === 0) {
+      return bad('"body" must be a JSON object with a non-empty string "reportText"');
+    }
+    const strVal = (value: unknown): string | undefined => (typeof value === "string" && value.length > 0 ? value : undefined);
+    const audit = await runtime.orchestrator.auditExternalReport({
+      reportText: body.reportText as string,
+      ...(strVal(body.objective) !== undefined ? { objective: strVal(body.objective) as string } : {}),
+      ...(strVal(body.workingDir) !== undefined ? { workingDir: strVal(body.workingDir) as string } : {}),
+      ...(strVal(body.missionId) !== undefined ? { missionId: strVal(body.missionId) as string } : {}),
+      ...(strVal(body.taskId) !== undefined ? { taskId: strVal(body.taskId) as string } : {}),
+      ...(strVal(body.workerId) !== undefined ? { workerId: strVal(body.workerId) as string } : {}),
+    });
+    return ok(audit, audit.launched.started ? 201 : 200);
   }
 
   function listBench(): ApiResponse {
@@ -2926,6 +2959,7 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     route("GET", "/work-items/:id", "READ", (_req, p) => Promise.resolve(getWorkItem(p))),
     route("POST", "/work-items/:id/run", "WRITE", (req, p) => runWorkItem(req, p)),
     route("POST", "/work-items/:id/review", "READ", (req, p) => reviewWorkItem(req, p)),
+    route("POST", "/work-items/audit", "WRITE", (req) => auditWorkItem(req)),
     route("GET", "/bench", "READ", () => Promise.resolve(listBench())),
     route("GET", "/activity", "READ", (req) => Promise.resolve(listActivity(req))),
     // The KAI Visual Engine's seam: structured visual intent, validated HERE.

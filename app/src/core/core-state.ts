@@ -329,6 +329,8 @@ export function summarizeEvent(type: string, payload?: unknown): string {
       return "Memory removed";
     case "scheduled_task.triggered":
       return `Scheduled task ran${str(p["title"]) ? `: ${str(p["title"])}` : ""}`;
+    case "scheduler.tick_failed":
+      return `Scheduler housekeeping failed${str(p["reason"]) ? `: ${str(p["reason"])}` : ""}`;
     case "session.created":
       return `Session created${str(p["title"]) ? `: ${str(p["title"])}` : ""}`;
     case "session.updated":
@@ -366,7 +368,9 @@ export function summarizeEvent(type: string, payload?: unknown): string {
     case "review.decided":
       return `Review: ${str(p["verdict"]) ?? "decided"}`;
     case "delegation.routed":
-      return str(p["rationale"]) ?? "Work routed";
+      return str(p["rationale"]) ?? "Worker dispatched";
+    case "work.planned":
+      return str(p["rationale"]) ?? "Work planned — awaiting dispatch";
     case "benchmark.updated":
       return "Worker benchmark updated";
     case "command.started":

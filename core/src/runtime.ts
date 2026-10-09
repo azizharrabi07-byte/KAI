@@ -72,6 +72,7 @@ import { createScheduler } from "./scheduler/scheduler.ts";
 import { createDurableLeaseStore, type DurableLeaseStore } from "./scheduler/lease.ts";
 import { createScheduledJobRunner, type ScheduledJob } from "./scheduler/jobs.ts";
 import { stripScheduleExtensions } from "./scheduler/schedule.ts";
+import { createDailySummaryService, type DailySummaryService } from "./summary/daily.ts";
 import { createCheckpointManager, type CheckpointManager } from "./checkpoints/checkpoint.ts";
 import { createExecutionLedger, type ExecutionLedger } from "./recovery/ledger.ts";
 import { createBoundaryRunner } from "./recovery/boundary.ts";
@@ -462,6 +463,12 @@ export interface CoreRuntime {
   plugins: ReturnType<typeof createPluginRegistry>;
   missions: ReturnType<typeof createMissionExecutor>;
   scheduler: ReturnType<typeof createScheduler>;
+  /**
+   * The daily work summary: the durable once-per-local-day offer plus the
+   * evidence-backed report behind `/summary`. Built from the work board and the
+   * activity log — never from a second event history.
+   */
+  summary: DailySummaryService;
 
   // ── Memory scope honesty (Phase 2 Part H) ───────────────────────────────────
   /** Which memory scopes this runtime can genuinely honour, and why not for the rest. */
@@ -2373,6 +2380,22 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
         missionId: input.missionId,
       });
     },
+    // Supervision lessons: mission-scoped, provenance-carrying, verified basis
+    // only. A bogus mission id refuses structurally (never silently global).
+    recordLesson: (input) => {
+      try {
+        const result = rememberForMission(input.scopeId, {
+          content: input.content,
+          type: "mission_context",
+          provenance: "system_state",
+        });
+        return result.ok
+          ? { ok: true as const }
+          : { ok: false as const, refusal: { reason: result.refusal.reason } };
+      } catch (error) {
+        return { ok: false as const, refusal: { reason: error instanceof Error ? error.message : String(error) } };
+      }
+    },
     ...(options.autonomy?.maxAttempts !== undefined ? { bounds: { maxAttempts: options.autonomy.maxAttempts } } : {}),
   });
 
@@ -2441,9 +2464,11 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     syncViews: () => syncEmployeeViews(),
   });
 
-  // The loop's own trigger: a mission settling FAILED is evaluated, and the
-  // decision is recorded. Fire-and-forget on purpose — the bus must never wait
-  // on the supervisor, and a failed evaluation must not break the bus.
+  // The loop's triggers: a mission settling FAILED is evaluated for retry,
+  // and a mission settling COMPLETED or CANCELLED is supervised for
+  // settlement truth + a provenanced lesson. Fire-and-forget on purpose —
+  // the bus must never wait on the supervisor. observe() itself records and
+  // notifies on internal failure, so the catch here is only a backstop.
   const detachSupervisor = bus.subscribe(
     (event) => {
       const missionId = typeof (event.payload as { missionId?: unknown })?.missionId === "string"
@@ -2452,7 +2477,7 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       if (typeof missionId !== "string" || missionId.length === 0) return;
       void supervisor.observe(missionId).catch(() => undefined);
     },
-    { types: ["mission.failed"] },
+    { types: ["mission.failed", "mission.completed", "mission.cancelled"] },
   );
 
   /**
@@ -2492,6 +2517,19 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   const jobRunner = createScheduledJobRunner({ boundary: tools, jobs: scheduledJobs });
 
   /**
+   * The daily work-summary offer. It rides the ONE scheduler through its tick
+   * seam (below) rather than adding a second timer, and keeps its "already
+   * offered on <local day>" state in the durable settings store so a restart
+   * cannot re-offer. It compiles reports from the work board + activity log.
+   */
+  const summary = createDailySummaryService({
+    workItems: stores.workItems,
+    activity: stores.activity,
+    notifications,
+    settings: stores.settings,
+  });
+
+  /**
    * Durable lease ledger (Part F). Every fire is claimed before it runs, so two
    * processes — or one process restarting over another — cannot both execute the
    * same slot. `recoverInterrupted()` is called on boot (below).
@@ -2505,6 +2543,12 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     describe: (task) => jobRunner.describe(task),
     onFire: (task, ctx) => jobRunner.run(task, { missed: ctx.missed, scheduleId: task.id }),
     ...(options.tickMs === undefined ? {} : { tickMs: options.tickMs }),
+    // Housekeeping on the same loop: the daily summary offer, at most once per
+    // local calendar day. Contained inside the scheduler, so a throw here is a
+    // recorded tick failure, never a lost loop.
+    onTick: (at) => {
+      summary.maybeOffer(at);
+    },
   });
 
   const startedAt = new Date();
@@ -3680,6 +3724,47 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
         if (!result.ok) return { ok: false as const, reason: result.error.message };
         return { ok: true as const, name: result.value.metadata.name, body: result.value.body };
       },
+      inspect: (id: string) => {
+        const result = skills.inspect(id);
+        if (!result.ok) return null;
+        const metadata = result.value;
+        return {
+          ...(metadata.version !== undefined ? { version: metadata.version } : {}),
+          ...(metadata.contentHash !== undefined ? { hash: metadata.contentHash } : {}),
+        };
+      },
+    },
+    // Supervision inspects through KAI's own tools (READ allowlist enforced
+    // by the collectors; the registry boundary still policy-checks).
+    tools: {
+      invoke: async (id, input, opts) => {
+        const invoked = await tools.invoke(id, input, {
+          source: "orchestrator:verify",
+          ...(opts?.missionId !== undefined ? { missionId: opts.missionId } : {}),
+          ...(opts?.turnId !== undefined ? { turnId: opts.turnId } : {}),
+          ...(opts?.approvalId !== undefined ? { approvalId: opts.approvalId } : {}),
+        });
+        if (invoked.ok) return { ok: true as const, result: invoked.result };
+        return {
+          ok: false as const,
+          error: { code: invoked.error.code, message: invoked.error.message },
+          ...(invoked.invocation.approvalId !== undefined ? { approvalId: invoked.invocation.approvalId } : {}),
+        };
+      },
+    },
+    rememberLesson: (input) => {
+      try {
+        const result = rememberForMission(input.scopeId, {
+          content: input.content,
+          type: "mission_context",
+          provenance: "system_state",
+        });
+        return result.ok
+          ? { ok: true as const }
+          : { ok: false as const, refusal: { reason: result.refusal.reason } };
+      } catch (error) {
+        return { ok: false as const, refusal: { reason: error instanceof Error ? error.message : String(error) } };
+      }
     },
     policyCheck: (input) => policy.check(input),
     approvals: {
@@ -3719,6 +3804,7 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     plugins,
     missions,
     scheduler,
+    summary,
     leases,
     recovery,
     sessions,

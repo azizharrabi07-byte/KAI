@@ -569,14 +569,18 @@ test("LIVE: work board, bench, and activity answer over real HTTP", async (t) =>
   assert.equal(spawned.ok, true, JSON.stringify(spawned.ok ? {} : spawned.error).slice(0, 300));
 
   const created = await post("/work-items", { objective: READ_OBJECTIVE });
-  assert.equal(created.status, 201, "a routed objective creates a work item");
+  assert.equal(created.status, 201, "a routed objective creates a durable work item");
   const createdBody = (await created.json()) as {
     delegated: boolean;
+    planned: boolean;
     workItemId: string;
     decision: { decision: string; rationale: string };
     note: string;
   };
-  assert.equal(createdBody.delegated, true);
+  // Truthful dispatch: creating a work item is planning, not delegation. No
+  // worker has started until the item is actually run.
+  assert.equal(createdBody.delegated, false, "planning alone never reports a worker as started");
+  assert.equal(createdBody.planned, true, "a durable work item exists and is runnable");
   assert.match(createdBody.workItemId, /^work_/);
   assert.ok(typeof createdBody.decision?.decision === "string", "the routing decision rides along");
   assert.ok(createdBody.note.length > 0);
