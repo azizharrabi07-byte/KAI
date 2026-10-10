@@ -206,11 +206,15 @@ export function evaluateOutcome(contract: OutcomeContract, obs: Observation): Ou
 /**
  * Is one acceptance criterion met? Strict:
  * - trivial deliverable-presence criteria: the deliverable exists;
- * - otherwise EVERY linked required-evidence label must have a KAI-observed
- *   record behind it — worker prose, token overlap, and substring matches
- *   never count;
- * - `compensated` (an independent review PASS on this deliverable) may stand
- *   in where direct observation was impossible — recorded, never hidden.
+ * - a criterion that DECLARES linked required evidence is met only when EVERY
+ *   linked label has a KAI-observed record behind it — a review PASS cannot
+ *   stand in for evidence the contract explicitly demanded (that was a real
+ *   hole: an all_criteria contract with `evidenceLinks` completed while one
+ *   criterion's linked evidence was never observed);
+ * - a criterion with NO declared evidence path (no link, no required evidence)
+ *   has nothing for KAI to observe, so an independent review PASS may
+ *   compensate it — recorded, never hidden.
+ * Worker prose, token overlap and substring matches never count anywhere.
  */
 export function criterionMet(
   contract: OutcomeContract,
@@ -221,8 +225,9 @@ export function criterionMet(
   if (criterion.startsWith("deliverable present") || criterion === "a user-facing deliverable exists") {
     return opts?.deliverablePresent ?? false;
   }
-  if (opts?.compensated === true) return true;
-  return linkedEvidence(contract, criterion).every((entry) => evidenceSatisfies(observations, entry));
+  const links = linkedEvidence(contract, criterion);
+  if (links.length === 0) return opts?.compensated === true;
+  return links.every((entry) => evidenceSatisfies(observations, entry));
 }
 
 // ── Decision Kernel ──────────────────────────────────────────────────────────

@@ -101,6 +101,14 @@ export interface MissionSupervisorOptions {
    * Absent → verified in trace only. Never throws (the supervisor guards).
    */
   recordLesson?: (input: { scopeId: string; content: string; verified: string }) => { ok: boolean; refusal?: { reason?: string } };
+  /**
+   * Record durably that this settled mission has already been re-attempted, so
+   * a duplicate `mission.failed` delivery (the executor can emit one more than
+   * once for a mission, e.g. on recovery) or a Core restart cannot start a
+   * SECOND re-attempt for the same failure. Absent → the supervisor still
+   * bounds duplicates in-process. Must not throw.
+   */
+  markRetried?: (missionId: string) => void;
   bounds?: AutonomyBounds;
   now?: () => Date;
   idFactory?: () => string;
@@ -148,6 +156,8 @@ export function createMissionSupervisor(options: MissionSupervisorOptions): Miss
   const now = options.now ?? (() => new Date());
   const bounds: AutonomyBounds = { maxAttempts: options.bounds?.maxAttempts ?? 1 };
   const log: AutonomyDecision[] = [];
+  /** Mission ids already re-attempted in this process (duplicate-delivery bound). */
+  const retriedLocally = new Set<string>();
 
   function record(decision: AutonomyDecision): AutonomyDecision {
     log.push(decision);
@@ -272,6 +282,25 @@ export function createMissionSupervisor(options: MissionSupervisorOptions): Miss
       return record({ missionId, action: "escalate", attempt, reason, at });
     }
 
+    // DUPLICATE-DELIVERY BOUND. The executor can emit `mission.failed` more than
+    // once for the same settled mission (recovery, a replayed frame), and a
+    // Core restart re-reads the same FAILED row. The attempt counter lives on
+    // the mission, so it does not advance between those deliveries: without this
+    // guard each delivery started ANOTHER re-attempt of one failure. A mission
+    // that already has a retry (durably marked, or seen this process) is left
+    // settled.
+    const alreadyRetried =
+      (mission.metadata !== undefined && mission.metadata["autonomyRetriedAt"] !== undefined) || retriedLocally.has(mission.id);
+    if (alreadyRetried) {
+      return record({
+        missionId,
+        action: "stop",
+        attempt,
+        reason: `"${error.code}" was already retried once for this mission; a duplicate delivery must not start another attempt`,
+        at,
+      });
+    }
+
     const next = attempt + 1;
     const root = chainRoot(mission);
     const retry = await options.startAttempt({
@@ -286,6 +315,14 @@ export function createMissionSupervisor(options: MissionSupervisorOptions): Miss
         autonomyReason: `${error.code}: ${error.message}`,
       },
     });
+    // Mark BEFORE the notify so a delivery arriving during the notification
+    // cannot start a second attempt. Neither step may break the retry.
+    retriedLocally.add(mission.id);
+    try {
+      options.markRetried?.(mission.id);
+    } catch {
+      // The in-process marker still bounds duplicates.
+    }
 
     options.notify({
       title: "KAI is trying again",
