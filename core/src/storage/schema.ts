@@ -21,7 +21,7 @@
  */
 
 /** Target schema version. Bump by appending to MIGRATIONS, never by editing. */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export interface Migration {
   readonly version: number;
@@ -340,6 +340,20 @@ export const MIGRATIONS: readonly Migration[] = [
       `ALTER TABLE work_items ADD COLUMN evidence TEXT`,
       `ALTER TABLE work_items ADD COLUMN skillReceipts TEXT`,
       `ALTER TABLE work_items ADD COLUMN nextAction TEXT`,
+    ],
+  },
+  {
+    version: 5,
+    statements: [
+      // ── work_items: the goal linkage ────────────────────────────────────────
+      // A work item created from an APPROVED goal plan carries the goal and the
+      // exact plan revision it came from. That is what lets the orchestration
+      // boundary refuse to dispatch work belonging to an unapproved plan — one
+      // authoritative guard instead of a check in every caller. Both columns are
+      // nullable: every pre-existing row reads back as absent, meaning "not part
+      // of a goal", which is exactly the old behaviour.
+      `ALTER TABLE work_items ADD COLUMN goalId TEXT`,
+      `ALTER TABLE work_items ADD COLUMN goalRevisionId TEXT`,
     ],
   },
 ];

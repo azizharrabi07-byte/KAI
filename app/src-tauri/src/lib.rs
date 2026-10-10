@@ -8,6 +8,9 @@ mod integrations;
 mod island;
 mod log;
 mod main_window;
+mod owner_call;
+
+use crate::owner_call::core_owner_call;
 mod pipe;
 mod secrets;
 mod settings;
@@ -519,6 +522,7 @@ pub fn run() {
         .manage(CoreStatus::default())
         .invoke_handler(tauri::generate_handler![
             boot,
+            core_owner_call,
             save_settings,
             set_collapsed,
             set_island_rect,

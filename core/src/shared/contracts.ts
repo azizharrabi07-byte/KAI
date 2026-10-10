@@ -253,7 +253,16 @@ export type KaiEventType =
   | "doer.disabled"
   | "doer.result_pending"
   | "doer.result_processed"
-  | "doer.result_failed";
+  | "doer.result_failed"
+  // The goal layer: intake, challenge, plan and approval. A goal is the durable
+  // contract above the orchestrator, so its lifecycle is as auditable as a
+  // mission's — an approval that is later invalidated must still be visible.
+  | "goal.created"
+  | "goal.challenged"
+  | "goal.plan_proposed"
+  | "goal.plan_approved"
+  | "goal.plan_rejected"
+  | "goal.state_changed";
 
 export interface KaiEvent<T = unknown> {
   id: string;
@@ -316,6 +325,14 @@ export const PERSISTED_EVENT_TYPES: readonly KaiEventType[] = [
   "doer.result_pending",
   "doer.result_processed",
   "doer.result_failed",
+  // Goal lifecycle persists: who approved which plan revision, and when, is
+  // exactly the kind of record that must outlive the process.
+  "goal.created",
+  "goal.challenged",
+  "goal.plan_proposed",
+  "goal.plan_approved",
+  "goal.plan_rejected",
+  "goal.state_changed",
 ];
 
 export function shouldPersist(type: KaiEventType): boolean {
@@ -643,6 +660,13 @@ export interface WorkItemRecord {
   taskId?: string;
   objective: string;
   deliverable?: string;
+  /**
+   * Goal linkage (schema v5; absent on older rows, which means "not part of a
+   * goal"). When present, the orchestration boundary refuses to dispatch this
+   * item until the goal's current plan revision carries a matching approval.
+   */
+  goalId?: string;
+  goalRevisionId?: string;
   /** Supervisor trust fields (schema v4; absent on older rows). */
   criteria?: string[];
   constraints?: string[];

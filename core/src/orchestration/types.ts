@@ -91,6 +91,14 @@ export interface WorkItem {
   parentId?: string;
   missionId?: string;
   taskId?: string;
+  /**
+   * The goal this work item was created for, and the EXACT plan revision that
+   * authorised it. Both absent means "not part of a goal" — the pre-existing
+   * behaviour. When `goalId` is set, the orchestration boundary refuses to
+   * dispatch until that goal's current revision carries a matching approval.
+   */
+  goalId?: string;
+  goalRevisionId?: string;
   objective: string;
   deliverable?: string;
   /**

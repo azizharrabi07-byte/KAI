@@ -332,8 +332,8 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
         skills, tools, state, attempts, heartbeats, outputs, handoff, verification, review, cost,
         tokensIn, tokensOut, latencyMs, failures, retries, valueScore, createdAt, updatedAt,
         criteria, constraints, forbiddenOutcomes, requiredEvidence, evidenceLinks, budget, workingDir,
-        evidence, skillReceipts, nextAction)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        evidence, skillReceipts, nextAction, goalId, goalRevisionId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET parentId = excluded.parentId, missionId = excluded.missionId,
         taskId = excluded.taskId, objective = excluded.objective, deliverable = excluded.deliverable,
         workerId = excluded.workerId, workerVersion = excluded.workerVersion, skills = excluded.skills,
@@ -346,6 +346,7 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
         requiredEvidence = excluded.requiredEvidence, evidenceLinks = excluded.evidenceLinks, budget = excluded.budget,
         workingDir = excluded.workingDir, evidence = excluded.evidence, skillReceipts = excluded.skillReceipts,
         nextAction = excluded.nextAction,
+        goalId = excluded.goalId, goalRevisionId = excluded.goalRevisionId,
         updatedAt = excluded.updatedAt`,
     ),
     getWorkItem: db.prepare(`SELECT * FROM work_items WHERE id = ?`),
@@ -947,6 +948,8 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
       ...(row.evidence !== null && row.evidence !== undefined ? { evidence: fromJson(row.evidence) } : {}),
       ...(row.skillReceipts !== null && row.skillReceipts !== undefined ? { skillReceipts: fromJson(row.skillReceipts) } : {}),
       ...(row.nextAction !== null && row.nextAction !== undefined ? { nextAction: fromJson(row.nextAction) } : {}),
+      ...(row.goalId !== null && row.goalId !== undefined ? { goalId: String(row.goalId) } : {}),
+      ...(row.goalRevisionId !== null && row.goalRevisionId !== undefined ? { goalRevisionId: String(row.goalRevisionId) } : {}),
     };
   }
 
@@ -989,6 +992,8 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
         item.evidence !== undefined ? jsonText(item.evidence) : null,
         item.skillReceipts !== undefined ? jsonText(item.skillReceipts) : null,
         item.nextAction !== undefined ? jsonText(item.nextAction) : null,
+        item.goalId ?? null,
+        item.goalRevisionId ?? null,
       );
     },
     get(id: string): WorkItemRecord | null {

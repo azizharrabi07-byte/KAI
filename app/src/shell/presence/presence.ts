@@ -29,6 +29,7 @@ import type { ToolDescription, McpServerSummary } from "../../workspace/types";
 import { describeTool } from "../../views/tools";
 import { serverStatus, serverTarget, credentialKeys } from "../../views/mcp";
 import { ACTIVITY_GROUPS, filterActivity, groupColor, relativeTime, type ActivityGroup } from "../../views/activity";
+import { buildGoalsView as buildGoals } from "./goals";
 import { createOrb, setOrbMood, boop, mountOrbParallax, MOOD_LABELS, MOOD_ORDER, type Mood } from "./orb";
 import { MoodDriver } from "./mood";
 import { createAgentApi, type Subagent } from "../../agents/api";
@@ -117,7 +118,7 @@ const RAIL_ROUTE_IDS: readonly RouteId[] = ["chat", "sessions", "agents", "setti
 
 const ROUTE_ICON: Record<RouteId, string> = {
   home: "home", chat: "chat", sessions: "sessions", missions: "missions", agents: "agent",
-  workers: "workers", tools: "plug", mcp: "mcp", activity: "activity", memory: "memory",
+  workers: "workers", tools: "plug", mcp: "mcp", activity: "activity", memory: "memory", goals: "missions",
   skills: "skills", settings: "settings",
 };
 
@@ -344,6 +345,7 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
     buildActivity(views.get("activity")!);
     buildSessions(views.get("sessions")!);
     buildOverview(views.get("home")!);
+    buildGoals(views.get("goals")!, ctx);
     // `buildLists` is primed by `prime()` (called immediately after `buildViews`)
     // so the list pages share ONE re-runnable primer with the rest of the app.
   }

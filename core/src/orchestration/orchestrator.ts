@@ -123,6 +123,12 @@ export interface OrchestratorDeps {
   policyCheck: (input: PolicyRequest) => Promise<{ outcome: "allow" | "deny" | "needs_approval"; reason: string }>;
   approvals: ApprovalPorts;
   autonomy: () => AutonomyPolicy;
+  /**
+   * May this goal be dispatched right now? Answers from the DURABLE goal store:
+   * an approval that still matches the current plan revision. Absent means the
+   * runtime has no goal layer and goal-linked items are not gated.
+   */
+  goalGate?: (goalId: string, goalRevisionId: string | undefined) => { ok: boolean; reason: string };
   publish(type: string, payload: unknown, opts?: { source?: string }): void;
   now?(): string;
   /** KAI's own tools for evidence collection (absent → supervision degrades honestly, never invents). */
@@ -144,6 +150,9 @@ export interface OrchestratorDeps {
 export interface ObjectiveInput {
   objective: string;
   deliverable?: string;
+  /** The goal and plan revision this objective belongs to, when it has one. */
+  goalId?: string;
+  goalRevisionId?: string;
   constraints?: string[];
   forbidden?: string[];
   successCriteria?: string[];
@@ -414,6 +423,8 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       ...(input.deliverable !== undefined ? { deliverable: input.deliverable } : {}),
       ...(input.missionId !== undefined ? { missionId: input.missionId } : {}),
       ...(input.taskId !== undefined ? { taskId: input.taskId } : {}),
+      ...(input.goalId !== undefined ? { goalId: input.goalId } : {}),
+      ...(input.goalRevisionId !== undefined ? { goalRevisionId: input.goalRevisionId } : {}),
       ...(skillIds.length > 0 ? { skills: skillIds } : {}),
       ...(input.successCriteria !== undefined ? { criteria: input.successCriteria } : {}),
       ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
@@ -931,6 +942,20 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     const started = Date.now();
     const item = deps.board.get(id);
     if (item === null) return { workItemId: id, state: "UNKNOWN", note: `unknown work item "${id}"` };
+    // ── The goal gate ─────────────────────────────────────────────────────────
+    // An item created from a goal plan may not be dispatched until the goal's
+    // CURRENT revision carries a matching approval. This is checked HERE, at the
+    // one boundary every dispatch passes through — HTTP routes, the slash
+    // command, the Doer drain, corrective children and approval resumes — so a
+    // new caller cannot forget it. An item with no `goalId` is not part of a
+    // goal and is unaffected.
+    if (item.goalId !== undefined && deps.goalGate !== undefined) {
+      const gate = deps.goalGate(item.goalId, item.goalRevisionId);
+      if (!gate.ok) {
+        deps.trace.record(ref(item), "plan", `Dispatch refused: ${gate.reason}`);
+        return { workItemId: id, state: item.state, note: `not dispatchable: ${gate.reason}` };
+      }
+    }
     const policy = autonomy();
     // Duplicate-delivery guard (Phase 2C/12-10): a resume key (completion /
     // approval event id) recorded on the item makes a redelivered trigger a

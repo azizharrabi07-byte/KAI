@@ -59,6 +59,9 @@ export interface WorkItemInput {
   deliverable?: string;
   missionId?: string;
   taskId?: string;
+  /** The goal and the exact plan revision that authorise this item. */
+  goalId?: string;
+  goalRevisionId?: string;
   parentId?: string;
   skills?: string[];
   tools?: string[];
@@ -243,6 +246,8 @@ export function createWorkBoard(store: WorkItemStore, opts: WorkBoardOptions = {
         ...(input.parentId !== undefined ? { parentId: input.parentId } : {}),
         ...(input.missionId !== undefined ? { missionId: input.missionId } : {}),
         ...(input.taskId !== undefined ? { taskId: input.taskId } : {}),
+        ...(input.goalId !== undefined ? { goalId: input.goalId } : {}),
+        ...(input.goalRevisionId !== undefined ? { goalRevisionId: input.goalRevisionId } : {}),
         objective: input.objective,
         ...(input.deliverable !== undefined ? { deliverable: input.deliverable } : {}),
         // Contract fields ride the item from creation to the Gate (Phase 5):

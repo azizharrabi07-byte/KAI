@@ -25,6 +25,7 @@ const EXPECTED_ORDER = [
   "chat",
   "sessions",
   "missions",
+  "goals",
   "agents",
   "workers",
   "tools",
@@ -35,7 +36,7 @@ const EXPECTED_ORDER = [
   "settings",
 ] as const;
 
-test("the sidebar declares KAI's twelve sections, in order", () => {
+test("the sidebar declares KAI's sections, in order", () => {
   assert.deepEqual(
     ROUTES.map((r) => r.id),
     [...EXPECTED_ORDER],

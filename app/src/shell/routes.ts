@@ -13,6 +13,7 @@ export type RouteId =
   | "chat"
   | "sessions"
   | "missions"
+  | "goals"
   | "agents"
   | "workers"
   | "tools"
@@ -40,6 +41,7 @@ export const ROUTES: readonly ShellRoute[] = [
   { id: "chat", label: "Chat", blurb: "Talk with KAI.", accent: "#22d3ee" },
   { id: "sessions", label: "Sessions", blurb: "Your conversations with KAI.", accent: "#22d3ee" },
   { id: "missions", label: "Missions", blurb: "Work KAI is carrying out.", accent: "#f5a524" },
+  { id: "goals", label: "Goals", blurb: "Challenged, planned, approved — then run.", accent: "#a855f7" },
   { id: "agents", label: "Agents", blurb: "KAI's own personas.", accent: "#f472b6" },
   { id: "workers", label: "Workers", blurb: "The engines KAI drives.", accent: "#34d399" },
   { id: "tools", label: "Tools", blurb: "What KAI can do.", accent: "#6366f1" },

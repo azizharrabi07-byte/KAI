@@ -110,6 +110,25 @@ export const Bridge = {
   ingestFile: (path: string) => callOrThrow<DroppedFile>("ingest_file", { path }),
   /** Only ever tells you whether a key exists — never its value. */
   secretPresent: (key: string) => call<boolean>("secret_present", { key }),
+
+  /**
+   * Make an owner-authorized Core request.
+   *
+   * The Core's owner-only routes (goals, the Doer switch, approval decisions)
+   * require the per-install host token, which lives in the OS credential store
+   * and is attached by the Rust side. It is deliberately NOT available here: a
+   * token in JavaScript is a token in devtools. The caller supplies a Core PATH,
+   * never a URL, so the credential cannot be pointed at another host.
+   *
+   * Returns `null` outside Tauri (a plain browser has no credential and no way
+   * to obtain one), which is why the caller must handle it.
+   */
+  coreOwnerCall: (method: "GET" | "POST", path: string, body?: unknown) =>
+    call<{ status: number; body: unknown }>("core_owner_call", {
+      method,
+      path,
+      ...(body !== undefined ? { body } : {}),
+    }),
   secretSet: (key: string, value: string) => callOrThrow<void>("secret_set", { key, value }),
   secretClear: (key: string) => callOrThrow<void>("secret_clear", { key }),
 

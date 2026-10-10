@@ -264,13 +264,11 @@ test("the Doer stops interpreting the moment it is switched OFF", async (t) => {
   runtime.stores.settings.set("orchestration.doer", "ON", new Date().toISOString());
   const processed = countProcessed(runtime);
 
-  // Switch it OFF through the real API, approving the gated write.
-  const parked = await api(runtime, "POST", "/doer", { state: "OFF" });
-  assert.equal(parked.status, 409);
-  const approvalId = (parked.body as { approvalId: string | null }).approvalId;
-  assert.ok(approvalId);
-  await runtime.decideApproval(approvalId, true);
-  assert.equal(readOrchestrationPrefs(runtime.stores.settings).doer, "OFF", "the approved switch applied");
+  // Switch it OFF through the real API. OFF is authority-REDUCING, so it must
+  // apply immediately — no approval, no park.
+  const stopped = await api(runtime, "POST", "/doer", { state: "OFF" });
+  assert.equal(stopped.status, 200, `stopping KAI must never need an approval: ${JSON.stringify(stopped.body)}`);
+  assert.equal(readOrchestrationPrefs(runtime.stores.settings).doer, "OFF", "the switch applied immediately");
 
   // A result arriving now must be parked, not interpreted.
   const planned = planWorkItem(runtime, "after switch off");
@@ -297,4 +295,32 @@ test("a parked orchestration-only settings change applies when it is approved", 
 
   const decided = await runtime.decideApproval(approvalId, true);
   assert.equal(readOrchestrationPrefs(runtime.stores.settings).doer, "ON", `the approved write applied: ${JSON.stringify(decided)}`);
+});
+
+test("the owner's OFF is immediate and unapproved, while ON still parks", async (t) => {
+  // The asymmetry is the whole point: a user must never need a second approval
+  // to make KAI STOP acting on its own, but widening autonomy is not the same
+  // kind of act and stays human-gated.
+  const { runtime, dir } = makeRuntime();
+  t.after(cleanup(runtime, dir));
+
+  runtime.stores.settings.set("orchestration.doer", "ON", new Date().toISOString());
+
+  const stopped = await api(runtime, "POST", "/doer", { state: "OFF" });
+  assert.equal(stopped.status, 200, `OFF applies immediately: ${JSON.stringify(stopped.body)}`);
+  assert.equal((stopped.body as { doer: { state: string } }).doer.state, "OFF");
+  assert.equal(readOrchestrationPrefs(runtime.stores.settings).doer, "OFF");
+
+  // Guard is untouched by the switch in either direction.
+  const decided = runtime.policy.check({ toolId: "workspace.write", action: "write", risk: "DESTRUCTIVE" });
+  assert.notEqual(decided.outcome, "allow", "Guard stayed active after the Doer was stopped");
+
+  const started = await api(runtime, "POST", "/doer", { state: "ON" });
+  assert.equal(started.status, 409, `turning autonomy ON parks for a human: ${JSON.stringify(started.body)}`);
+  assert.equal(readOrchestrationPrefs(runtime.stores.settings).doer, "OFF", "and did not apply on its own");
+
+  // The value-scoped tool cannot be used to escalate.
+  const escalated = await runtime.tools.invoke("doer.set", { state: "ON" });
+  assert.equal(escalated.ok, false, "doer.set refuses ON outright");
+  assert.equal(readOrchestrationPrefs(runtime.stores.settings).doer, "OFF");
 });

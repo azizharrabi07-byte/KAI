@@ -30,6 +30,8 @@
  */
 
 import type { CoreRuntime } from "../runtime.ts";
+import { isGoalState, routeTo, type Goal, type GoalState } from "../goals/goal.ts";
+import { revisionIdFor } from "../goals/challenger.ts";
 import { loadIdentity } from "../identity.ts";
 import { createUnavailableEmployee } from "../workforce/employee.ts";
 import type { KaiSubagent } from "../workforce/subagent.ts";
@@ -78,6 +80,20 @@ export interface ApiRequest {
   query: URLSearchParams;
   /** Parsed JSON, or undefined. Untrusted: the caller's types are erased. */
   body?: unknown;
+  /**
+   * Whether the caller proved it holds the per-install owner credential. The
+   * server computes this from the `x-kai-host-token` header; a direct
+   * in-process call must pass it explicitly. CORS is NOT authentication and
+   * loopback is NOT trust — 127.0.0.1 is reachable by every local process and
+   * every local user account on this machine.
+   */
+  attested?: boolean;
+  /**
+   * Whether this Core has an owner credential at all. When false, owner-only
+   * routes cannot be enforced and are allowed (a bare developer Core); when
+   * true, an unattested owner-only request is REFUSED.
+   */
+  ownerAuthConfigured?: boolean;
 }
 
 export interface ApiResponse {
@@ -221,16 +237,34 @@ interface RouteDef {
   segments: string[];
   /** What this route actually does (Part I). Drives its enforcement note. */
   classification: RouteClass;
+  /**
+   * Owner-only. The route mutates what KAI is AUTHORIZED to do (autonomy, a
+   * goal, a plan approval) or releases a parked action, so it is refused unless
+   * the caller proved it is the installed desktop app / the owner.
+   *
+   * Enforced only when the Core actually has an owner credential configured: a
+   * Core started without one (a developer running `npm start` directly) cannot
+   * check anything, and pretending to refuse would make it unusable. That case
+   * is reported honestly in `GET /identity` and in the docs.
+   */
+  requiresOwner?: boolean;
   handler: Handler;
 }
 
 /** Builds a route and its segment list together, so the two cannot drift. */
-function route(method: string, pattern: string, classification: RouteClass, handler: Handler): RouteDef {
+function route(
+  method: string,
+  pattern: string,
+  classification: RouteClass,
+  handler: Handler,
+  opts?: { requiresOwner?: boolean },
+): RouteDef {
   return {
     method,
     pattern,
     classification,
     segments: pattern.split("/").filter((s) => s.length > 0),
+    ...(opts?.requiresOwner === true ? { requiresOwner: true } : {}),
     handler,
   };
 }
@@ -344,6 +378,8 @@ export const MUTATION_TOOL_IDS = {
   soulSet: "soul.set",
   /** Change KAI's own settings (parks by default) — the SAME id runtime.ts registers. */
   settingsUpdate: "settings.update",
+  /** Stop KAI's autonomous execution (authority-reducing: applies immediately). */
+  doerSet: "doer.set",
   notificationRead: "notification.read",
   approvalDecide: "approval.decide",
   workforceRegister: "workforce.register",
@@ -1247,6 +1283,234 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
   // GET serves the stored rows plus the EFFECTIVE values with their winning
   // source per key (settings > environment > credential-file > defaults), so a
   // human sees why a value is what it is. POST/POST-reset go through the
+  // ── Goals: intake → challenge → plan → approval ──────────────────────────
+  //
+  // A goal is the durable contract ABOVE the orchestrator. Nothing here
+  // dispatches: creating a goal, challenging it and proposing a plan are all
+  // non-executing. The only way a goal becomes executable is an owner approval
+  // bound to ONE exact revision, and even then only while the Doer is ON.
+  //
+  // Every mutation on this surface is `requiresOwner`: a goal is what authorises
+  // KAI to act, so an unrelated local process must not be able to create one,
+  // challenge one, or approve a plan.
+  function goalView(goal: Goal) {
+    const approval = runtime.goals.isApproved(goal.id);
+    const doerOn = readOrchestrationPrefs(runtime.stores.settings).doer === "ON";
+    return {
+      ...goal,
+      currentRevision: runtime.goals.currentRevision(goal.id),
+      approval: {
+        approved: approval.approved,
+        reason: approval.reason,
+        revisionId: approval.revision?.id ?? null,
+        revisionVersion: approval.revision?.version ?? null,
+        approvedBy: approval.approval?.approvedBy ?? null,
+        approvedAt: approval.approval?.approvedAt ?? null,
+      },
+      doer: doerOn ? "ON" : "OFF",
+      // Eligible means: an approval that still matches the current revision, and
+      // the Doer is ON. Approved-but-paused is a real, distinct state.
+      eligibility: approval.approved
+        ? (doerOn ? "ELIGIBLE" : "PAUSED_DOER_OFF")
+        : "NOT_APPROVED",
+    };
+  }
+
+  /** Advance a goal to `target` through the lifecycle's legal intermediates. */
+  function advanceGoal(goalId: string, target: GoalState, cause: string): { ok: boolean; reason?: string } {
+    const goal = runtime.goals.getGoal(goalId);
+    if (goal === null) return { ok: false, reason: `no goal "${goalId}" exists` };
+    if (goal.state === target) return { ok: true };
+    const path = routeTo(goal.state, target);
+    if (path === null) return { ok: false, reason: `the lifecycle does not reach ${target} from ${goal.state}` };
+    for (const step of path) {
+      const moved = runtime.goals.setGoalState(goalId, step, cause, "user");
+      if (!moved.ok) return { ok: false, reason: moved.reason };
+    }
+    return { ok: true };
+  }
+
+  async function createGoalHandler(req: ApiRequest): Promise<ApiResponse> {
+    const body = asBodyObject(req.body);
+    if (body === null) return bad('"body" must be a JSON object, e.g. {"intent": "…"}');
+    const intent = typeof body.intent === "string" ? body.intent.trim() : "";
+    if (intent.length === 0) return bad('"intent" must be a non-empty string');
+    // Oversized input is refused rather than silently truncated: a truncated goal
+    // would be a different goal.
+    if (intent.length > 8000) return bad('"intent" must be 8000 characters or fewer');
+    const strings = (value: unknown, field: string): string[] | ApiResponse => {
+      if (value === undefined) return [];
+      if (!Array.isArray(value) || !value.every((v) => typeof v === "string")) {
+        return bad(`"${field}" must be an array of strings when present`);
+      }
+      return value.map((v) => v.trim()).filter((v) => v.length > 0);
+    };
+    const constraints = strings(body.constraints, "constraints");
+    if (!Array.isArray(constraints)) return constraints;
+    const forbidden = strings(body.forbiddenOutcomes, "forbiddenOutcomes");
+    if (!Array.isArray(forbidden)) return forbidden;
+
+    const goal = runtime.goals.createGoal({ statement: intent, createdBy: "user" });
+    runtime.goals.setGoalFields(goal.id, { constraints, ...(forbidden.length > 0 ? {} : {}) });
+    // Forbidden outcomes ride the plan/contract, not the goal row; keep them on
+    // the goal's constraints so nothing is dropped before a plan exists.
+    if (forbidden.length > 0) {
+      runtime.goals.setGoalFields(goal.id, { constraints: [...constraints, ...forbidden.map((f) => `forbidden: ${f}`)] });
+    }
+    runtime.bus.publish("goal.created", { goalId: goal.id }, { source: "ui" });
+    const stored = runtime.goals.getGoal(goal.id);
+    return { status: 201, body: goalView(stored ?? goal) };
+  }
+
+  function listGoalsHandler(): ApiResponse {
+    return ok({ goals: runtime.goals.listGoals().map(goalView) });
+  }
+
+  function getGoalHandler(_req: ApiRequest, params: Record<string, string>): ApiResponse {
+    const goal = runtime.goals.getGoal(params.id ?? "");
+    if (goal === null) return notFound(`no goal "${params.id ?? ""}" exists`);
+    return ok(goalView(goal));
+  }
+
+  async function goalStateHandler(req: ApiRequest, params: Record<string, string>): Promise<ApiResponse> {
+    const body = asBodyObject(req.body);
+    if (body === null) return bad('"body" must be a JSON object, e.g. {"state": "CANCELLED"}');
+    const state = body.state;
+    if (!isGoalState(state)) return bad('"state" must be a valid goal state');
+    const moved = runtime.goals.setGoalState(params.id ?? "", state, "user request", "user");
+    if (!moved.ok) return conflict(moved.reason);
+    return ok(goalView(moved.goal));
+  }
+
+  async function challengeGoalHandler(req: ApiRequest, params: Record<string, string>): Promise<ApiResponse> {
+    const body = asBodyObject(req.body) ?? {};
+    const mode = body.mode === undefined ? "QUICK" : body.mode;
+    if (mode !== "QUICK" && mode !== "DEEP") {
+      return bad('"mode" must be "QUICK" or "DEEP" (OFF skips the panel entirely)');
+    }
+    const goal = runtime.goals.getGoal(params.id ?? "");
+    if (goal === null) return notFound(`no goal "${params.id ?? ""}" exists`);
+
+    // The revision identity is derived from the goal text, so a challenge is
+    // always bound to the exact text that was critiqued.
+    const goalRevisionId = revisionIdFor(goal.id, goal.statement);
+    const prepared = advanceGoal(goal.id, "CHALLENGING", "challenge requested");
+    if (!prepared.ok) return conflict(prepared.reason ?? "the goal cannot be challenged from its current state");
+
+    let outcome;
+    try {
+      outcome = await runtime.challengerFor(mode).challenge({
+        goalRevisionId,
+        goal: goal.statement,
+        contract: {
+          acceptanceCriteria: [],
+          constraints: goal.constraints,
+          forbiddenOutcomes: [],
+          requiredEvidence: [],
+        },
+      });
+    } catch (error) {
+      // A reviewer failure is reported as a blocker, never as a pass.
+      runtime.goals.setGoalFields(goal.id, { blocker: `challenge failed: ${error instanceof Error ? error.message : String(error)}` });
+      runtime.goals.setGoalState(goal.id, "BLOCKED", "challenge runner failed", "system");
+      const failed = runtime.goals.getGoal(goal.id);
+      return { status: 502, body: { error: true, reason: "the challenge panel failed", goal: failed === null ? null : goalView(failed) } };
+    }
+
+    const report = outcome.report;
+    runtime.goals.setGoalFields(goal.id, { challenge: report });
+    const target: GoalState =
+      report.verdict === "BLOCKED" ? "BLOCKED"
+        : report.verdict === "REVISE" ? "REVISION_REQUIRED"
+          : report.verdict === "CONDITIONAL" ? "CONDITIONAL"
+            : "READY_FOR_PLAN";
+    const moved = runtime.goals.setGoalState(goal.id, target, `challenge verdict ${report.verdict}`, "kai");
+    if (!moved.ok) return conflict(moved.reason);
+    runtime.bus.publish("goal.challenged", { goalId: goal.id, verdict: report.verdict, mode }, { source: "core" });
+    return ok(goalView(moved.goal));
+  }
+
+  async function planGoalHandler(req: ApiRequest, params: Record<string, string>): Promise<ApiResponse> {
+    const goal = runtime.goals.getGoal(params.id ?? "");
+    if (goal === null) return notFound(`no goal "${params.id ?? ""}" exists`);
+    if (goal.state !== "READY_FOR_PLAN" && goal.state !== "CONDITIONAL") {
+      return conflict(`a plan is proposed from READY_FOR_PLAN (or CONDITIONAL), not from ${goal.state}`);
+    }
+    const planned = await runtime.architect.planGoal({
+      goalId: goal.id,
+      intent: goal.statement,
+      constraints: goal.constraints,
+      ...(goal.assumptions.length > 0 ? { facts: goal.assumptions } : {}),
+      mode: "QUICK",
+    });
+    if (!planned.ok) {
+      // A refused plan is a refusal, not an empty plan presented as valid.
+      return conflict(planned.reason);
+    }
+    const revision = runtime.goals.addRevision(goal.id, planned.content, "kai");
+    runtime.goals.setGoalFields(goal.id, {
+      uncertainties: [...new Set([...goal.uncertainties, ...planned.content.uncertainties])],
+      assumptions: [...new Set([...goal.assumptions, ...planned.content.assumptions])],
+    });
+    const proposed = advanceGoal(goal.id, "AWAITING_PLAN_APPROVAL", "plan proposed");
+    if (!proposed.ok) return conflict(proposed.reason ?? "the plan could not be presented for approval");
+    runtime.bus.publish("goal.plan_proposed", { goalId: goal.id, revisionId: revision.id, version: revision.version }, { source: "core" });
+    const stored = runtime.goals.getGoal(goal.id);
+    return ok({ ...(stored === null ? {} : goalView(stored)), revision });
+  }
+
+  async function approvePlanHandler(req: ApiRequest, params: Record<string, string>): Promise<ApiResponse> {
+    const body = asBodyObject(req.body);
+    if (body === null) return bad('"body" must be a JSON object, e.g. {"revisionId": "…"}');
+    const goalId = params.id ?? "";
+    const goal = runtime.goals.getGoal(goalId);
+    if (goal === null) return notFound(`no goal "${goalId}" exists`);
+    const current = runtime.goals.currentRevision(goalId);
+    if (current === null) return conflict("this goal has no plan revision to approve");
+    // The caller may name the revision it believes it is approving. If it names
+    // an older one, refuse: approving revision N while revision N+1 is current
+    // would authorise a plan the human never read.
+    const claimed = typeof body.revisionId === "string" ? body.revisionId : current.id;
+    if (claimed !== current.id) {
+      return conflict(`revision "${claimed}" is not current (current is "${current.id}"); re-read the plan and approve again`);
+    }
+    const recorded = runtime.goals.recordApproval({
+      goalId,
+      revisionId: current.id,
+      approvedBy: "user",
+      status: "APPROVED",
+      authorityScope: current.content.authorizedWorkspace,
+      budgets: current.content.budgets,
+    });
+    if (!recorded.ok) return conflict(recorded.reason);
+    const moved = advanceGoal(goalId, "APPROVED", "plan approved by the user");
+    if (!moved.ok) return conflict(moved.reason ?? "the approval was recorded but the goal could not advance");
+    runtime.bus.publish("goal.plan_approved", { goalId, revisionId: current.id, created: recorded.created }, { source: "ui" });
+    const stored = runtime.goals.getGoal(goalId);
+    return ok(stored === null ? null : goalView(stored));
+  }
+
+  async function rejectPlanHandler(req: ApiRequest, params: Record<string, string>): Promise<ApiResponse> {
+    const body = asBodyObject(req.body) ?? {};
+    const goalId = params.id ?? "";
+    const goal = runtime.goals.getGoal(goalId);
+    if (goal === null) return notFound(`no goal "${goalId}" exists`);
+    const current = runtime.goals.currentRevision(goalId);
+    if (current === null) return conflict("this goal has no plan revision to reject");
+    const recorded = runtime.goals.recordApproval({
+      goalId,
+      revisionId: current.id,
+      approvedBy: "user",
+      status: "REJECTED",
+      note: typeof body.note === "string" ? body.note : "rejected by the user",
+    });
+    if (!recorded.ok) return conflict(recorded.reason);
+    const moved = runtime.goals.setGoalState(goalId, "REVISION_REQUIRED", "plan rejected by the user", "user");
+    if (!moved.ok) return conflict(moved.reason);
+    runtime.bus.publish("goal.plan_rejected", { goalId, revisionId: current.id }, { source: "ui" });
+    return ok(goalView(moved.goal));
+  }
+
   // ── KAI Doer (the autonomous switch) ─────────────────────────────────────
   //
   // GET is a typed read of the DURABLE preference plus the pending-result
@@ -1274,17 +1538,20 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     if (state !== "ON" && state !== "OFF") {
       return bad('"state" must be "ON" or "OFF"');
     }
-    const gated = await invokeGate(
-      runtime,
-      MUTATION_TOOL_IDS.settingsUpdate,
-      { settings: { "orchestration.doer": state } },
-      approvalIdOf(body),
-    );
+    // OFF is authority-REDUCING, so it goes through `doer.set` and applies
+    // immediately — a user must never need an approval to make KAI stop acting
+    // on its own. ON goes through `settings.update`, which the default policy
+    // parks for a human: widening autonomy is not the same kind of act.
+    const gated =
+      state === "OFF"
+        ? await invokeGate(runtime, MUTATION_TOOL_IDS.doerSet, { state: "OFF" }, approvalIdOf(body))
+        : await invokeGate(runtime, MUTATION_TOOL_IDS.settingsUpdate, { settings: { "orchestration.doer": "ON" } }, approvalIdOf(body));
     if (!gated.ok) return gated.response;
-    // The switch event and the resulting drain belong to the settings write
-    // (runtime `updateSettings`), so an approved park and a direct write take
-    // exactly the same path. Nothing is deferred to a later tick.
-    return ok({ settings: gated.result, doer: getDoer() });
+    // The switch event and the resulting drain belong to the write itself
+    // (runtime `updateSettings` / `setDoerOff`), so an approved park and a direct
+    // write take exactly the same path. Nothing is deferred to a later tick.
+    // `getDoer()` returns a full ApiResponse; embed its PAYLOAD, not the envelope.
+    return ok({ settings: gated.result, doer: getDoer().body });
   }
 
   function listDoerPending(): ApiResponse {
@@ -2989,7 +3256,8 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     // KAI's live soul: READ serves the current text + version; WRITE replaces
     // it through the policy-gated soul.set tool (parks by default).
     route("GET", "/soul", "READ", () => getSoul()),
-    route("POST", "/soul", "WRITE", (req) => setSoulHandler(req)),
+    // Replaces KAI's identity: owner-only.
+    route("POST", "/soul", "WRITE", (req) => setSoulHandler(req), { requiresOwner: true }),
     // KAI's own settings: READ serves stored rows + effective values with
     // sources; WRITE patches (or resets) through the parking `settings.update`.
     route("GET", "/settings", "READ", () => Promise.resolve(getSettings())),
@@ -3010,9 +3278,20 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     route("POST", "/work-items/audit", "WRITE", (req) => auditWorkItem(req)),
     route("GET", "/bench", "READ", () => Promise.resolve(listBench())),
     route("GET", "/activity", "READ", (req) => Promise.resolve(listActivity(req))),
+    // Goals: intake, challenge, plan, approval. Reads are open; every mutation
+    // is owner-only, because a goal is what authorises KAI to act.
+    route("GET", "/goals", "READ", () => Promise.resolve(listGoalsHandler())),
+    route("POST", "/goals", "WRITE", (req) => createGoalHandler(req), { requiresOwner: true }),
+    route("GET", "/goals/:id", "READ", (req, p) => Promise.resolve(getGoalHandler(req, p))),
+    route("POST", "/goals/:id/state", "WRITE", (req, p) => goalStateHandler(req, p), { requiresOwner: true }),
+    route("POST", "/goals/:id/challenge", "WRITE", (req, p) => challengeGoalHandler(req, p), { requiresOwner: true }),
+    route("POST", "/goals/:id/plan", "WRITE", (req, p) => planGoalHandler(req, p), { requiresOwner: true }),
+    route("POST", "/goals/:id/approve", "WRITE", (req, p) => approvePlanHandler(req, p), { requiresOwner: true }),
+    route("POST", "/goals/:id/reject", "WRITE", (req, p) => rejectPlanHandler(req, p), { requiresOwner: true }),
     // KAI Doer: the autonomous switch (Guard stays on and is never toggled here).
     route("GET", "/doer", "READ", () => Promise.resolve(getDoer())),
-    route("POST", "/doer", "WRITE", (req) => setDoerHandler(req)),
+    // Changes KAI's autonomy: owner-only.
+    route("POST", "/doer", "WRITE", (req) => setDoerHandler(req), { requiresOwner: true }),
     route("GET", "/doer/pending", "READ", () => Promise.resolve(listDoerPending())),
     // The KAI Visual Engine's seam: structured visual intent, validated HERE.
     // READ: these routes compute and validate; they mutate nothing.
@@ -3022,7 +3301,8 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     route("GET", "/actions", "READ", (req) => listActions(req)),
     route("POST", "/prompts/compose", "READ", (req) => composePrompt(req)),
     route("GET", "/policy", "READ", () => getPolicy()),
-    route("POST", "/policy/rules", "WRITE", (req) => setPolicyRulesHandler(req)),
+    // Rewrites what KAI is allowed to do: owner-only.
+    route("POST", "/policy/rules", "WRITE", (req) => setPolicyRulesHandler(req), { requiresOwner: true }),
     route("GET", "/state", "READ", () => getState()),
     route("GET", "/employees", "READ", () => listEmployees()),
     route("GET", "/employees/:id", "READ", (_req, p) => getEmployee(p)),
@@ -3068,7 +3348,10 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     route("GET", "/notifications", "READ", (req) => listNotifications(req)),
     route("POST", "/notifications/:id/read", "WRITE", (req, p) => markNotificationRead(req, p)),
     route("GET", "/approvals", "READ", (req) => listApprovals(req)),
-    route("POST", "/approvals/:id/decide", "WRITE", (req, p) => decideApproval(req, p)),
+    // A human decision. Unattested, ANY local process could approve any
+    // pending approval and release the parked action behind it — including the
+    // switch that enables autonomy. Owner-only.
+    route("POST", "/approvals/:id/decide", "WRITE", (req, p) => decideApproval(req, p), { requiresOwner: true }),
     route("GET", "/memory", "READ", (req) => listMemory(req)),
     route("POST", "/memory", "WRITE", (req) => createMemoryHandler(req)),
     // Memory engine (literal segments registered before "/memory/:id").
@@ -3218,6 +3501,21 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     const hit = match(method, path);
     if (hit === null) {
       return notFound(`no route for ${method || "(no method)"} ${path}`);
+    }
+
+    // Owner-only routes: a local process that cannot present the owner
+    // credential must not be able to widen KAI's autonomy, approve a plan or
+    // release a parked action. Enforced only when a credential exists.
+    if (hit.def.requiresOwner === true && request.ownerAuthConfigured === true && request.attested !== true) {
+      return {
+        status: 401,
+        body: {
+          error: true,
+          code: "OWNER_AUTH_REQUIRED",
+          reason:
+            "this control changes what KAI is authorized to do, so it requires the owner credential from the installed desktop app",
+        },
+      };
     }
 
     try {

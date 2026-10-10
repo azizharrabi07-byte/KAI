@@ -59,6 +59,58 @@ Challenger, a per-worker-kind task compiler, improvement proposals, the Island's
 Doer/Guard and worker-cockpit surfaces, and the guest VM. Research for each is
 complete; see the phase report.
 
+### Vertical slice 2 — the goal executive (intake → challenge → plan → approval)
+
+A goal is now a durable contract ABOVE the orchestrator. Nothing dispatches until an
+owner approves ONE exact plan revision, and even then only while the Doer is ON.
+
+- **Goal layer** (`core/src/goals/`): `goal.ts` (types, the lifecycle transition
+  table, canonical-JSON hashing), `store.ts` (its own SQLite file `goals.db`:
+  goals, plan revisions, approvals), `challenger.ts` (the critic panel),
+  `architect.ts` (plan production + validation), `runners.ts` (the model seam).
+- **Schema v5** (additive): `work_items.goalId` + `goalRevisionId`, nullable, so a
+  pre-existing row reads back as "not part of a goal". A round-trip test builds a
+  real v4 database and proves the upgrade keeps its work items, evidence and
+  settings.
+- **Premature dispatch is impossible by construction**: `runWorkItem` refuses at
+  the top when the item's goal has no approval matching the CURRENT revision — one
+  check at the one boundary every dispatch passes. `setGoalState` independently
+  refuses any transition into `RUNNING` without a current approval.
+- **Approval binding**: `revisionId` + `contentHash`, taken from the stored
+  revision. A material edit makes the approval stale even if nobody invalidated it;
+  approving a non-current revision is refused.
+- **Goal Challenger**: six critic roles as data; QUICK runs three, DEEP all six,
+  OFF none. Findings are captured independently before synthesis; a blocking
+  objection beats any majority; conflicting verdicts are retained verbatim; a
+  computed count never drives the verdict; rounds are bounded (default 3, hard cap
+  10). A malformed or throwing critic becomes a BLOCKED finding, never a PASS.
+- **Goal Architect**: every acceptance criterion must carry a non-empty
+  verification method or the plan is REFUSED; dependency cycles and unknown ids are
+  refused; the task budget is enforced; a malformed model reply is a refusal, not
+  an empty plan presented as valid.
+- **Owner authorization**: `/goals*` mutations, `POST /doer` and
+  `POST /approvals/:id/decide` are `requiresOwner` — refused unless the caller
+  proved it holds the install's host token. This closes the escalation where any
+  local process could approve any pending approval (including the one that enables
+  autonomy). The token is attached by the Rust side and never enters JavaScript.
+- **The OFF asymmetry**: `POST /doer {state:"OFF"}` now applies IMMEDIATELY through
+  a value-scoped `doer.set` tool (authority-reducing, no approval). Enabling the
+  Doer still parks for a human. Previously OFF also parked, which contradicted the
+  requirement that stopping KAI must never need an approval.
+- **UI**: a Goals surface (`app/src/shell/presence/goals.ts`) reading real Core
+  state, with three visibly distinct eligibility badges (eligible / paused because
+  the Doer is OFF / not approved) and no green badge hiding a conditional verdict.
+
+### Verification of slice 2 (commands actually run)
+
+- `cd core && npm test` — see the counts below.
+- `cd core && npm run typecheck` — clean.
+- `cd app && npx tsc --noEmit -p tsconfig.json` — clean.
+- `cd app && npm test` — **307 pass · 0 fail**.
+- `cd app/src-tauri && cargo test --lib owner_call` — **2 passed · 0 failed** (the
+  owner-call path guard: Core paths accepted; a URL, authority, traversal, scheme
+  or newline refused, so the credential cannot be redirected).
+
 ### Verification of slice 1 (commands actually run)
 
 - `cd core && npm test` — **1287 tests · 1274 pass · 0 fail · 13 skipped** (was

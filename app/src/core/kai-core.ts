@@ -549,6 +549,81 @@ export interface CoreStateSummary {
   tools?: { registered?: number };
 }
 
+/** One plan revision, as the Core stores it. */
+export interface CorePlanRevision {
+  id: string;
+  goalId: string;
+  version: number;
+  contentHash: string;
+  createdAt: string;
+  createdBy?: string;
+  supersedes?: string;
+  content: {
+    summary: string;
+    deliverables: string[];
+    tasks: { id: string; title: string; objective: string; dependsOn: string[]; role: string; acceptanceCriteria: string[]; verification: string[] }[];
+    acceptanceCriteria: string[];
+    requiredEvidence: string[];
+    constraints: string[];
+    forbiddenOutcomes: string[];
+    authorizedWorkspace: string[];
+    assumptions: string[];
+    uncertainties: string[];
+    budgets: { maxTasks: number; maxRetries: number; maxDepth: number };
+  };
+}
+
+/** A goal, with the approval state and eligibility the UI must show honestly. */
+export interface CoreGoalSummary {
+  id: string;
+  statement: string;
+  state: string;
+  createdAt: string;
+  updatedAt: string;
+  assumptions: string[];
+  constraints: string[];
+  uncertainties: string[];
+  blocker?: string;
+  currentRevision: CorePlanRevision | null;
+  approval: {
+    approved: boolean;
+    reason: string;
+    revisionId: string | null;
+    revisionVersion: number | null;
+    approvedBy: string | null;
+    approvedAt: string | null;
+  };
+  doer: "ON" | "OFF";
+  /**
+   * ELIGIBLE — approved AND the Doer is ON.
+   * PAUSED_DOER_OFF — approved, but the Doer is OFF, so nothing runs.
+   * NOT_APPROVED — no approval that matches the current revision.
+   */
+  eligibility: "ELIGIBLE" | "PAUSED_DOER_OFF" | "NOT_APPROVED";
+  challenge?: {
+    goalRevisionId: string;
+    mode: string;
+    rounds: number;
+    verdict: string;
+    findings: { role: string; verdict: string; objections: { statement: string; severity: string; blocking: boolean; evidence: string[]; remediation: string; verification: string }[] }[];
+    synthesis: { verdict: string; conflicts: string[]; unresolved: string[]; criticalRisks: string[]; summary: string };
+  };
+}
+
+/** The Doer switch and its pending-result inbox, as the Core reports them. */
+export interface CoreDoerState {
+  state: "ON" | "OFF";
+  paused: boolean;
+  guard: "ON";
+  pending: { pending: number; claimed: number; done: number; failed: number };
+}
+
+// The Tauri boundary, used ONLY for owner-authorized calls: the install's host
+// token never enters JavaScript, so those requests are made by the Rust side.
+// Every other call is plain fetch. Outside Tauri the bridge is a no-op and the
+// owner call falls back to a plain request, whose 401 is surfaced honestly.
+import { Bridge } from "./bridge";
+
 export interface CoreClientOptions {
   baseUrl?: string;
   /** Injected for tests. Defaults to global fetch. */
@@ -693,6 +768,24 @@ export interface CoreClient {
    * (traffic redirection is security-relevant); the caller surfaces the 409.
    */
   updateSettings(patch: Record<string, string>): Promise<CoreResult<unknown>>;
+
+  // ── Goals ─────────────────────────────────────────────────────────────────
+  // Reads go straight to Core. Every mutation is an OWNER call: it is performed
+  // by the Rust side with the install's host token, because the Core refuses an
+  // unattested caller on anything that changes what KAI is authorized to do.
+  listGoals(): Promise<CoreResult<CoreGoalSummary[]>>;
+  getGoal(id: string): Promise<CoreResult<CoreGoalSummary>>;
+  createGoal(intent: string, options?: { constraints?: string[]; forbiddenOutcomes?: string[] }): Promise<CoreResult<CoreGoalSummary>>;
+  challengeGoal(id: string, mode: "QUICK" | "DEEP"): Promise<CoreResult<CoreGoalSummary>>;
+  planGoal(id: string): Promise<CoreResult<CoreGoalSummary>>;
+  approvePlan(id: string, revisionId?: string): Promise<CoreResult<CoreGoalSummary>>;
+  rejectPlan(id: string, note?: string): Promise<CoreResult<CoreGoalSummary>>;
+  setGoalState(id: string, state: string): Promise<CoreResult<CoreGoalSummary>>;
+
+  // ── The Doer switch ───────────────────────────────────────────────────────
+  getDoer(): Promise<CoreResult<CoreDoerState>>;
+  /** OFF applies immediately (authority-reducing); ON is policy-gated. */
+  setDoer(state: "ON" | "OFF"): Promise<CoreResult<unknown>>;
   /** `POST /settings/reset` — clear stored keys (all when omitted), revealing the layer below. */
   resetSettings(keys?: string[]): Promise<CoreResult<unknown>>;
   /** `GET /providers` — live provider summaries from the ONE registry. */
@@ -1424,6 +1517,34 @@ export function createCoreClient(options: CoreClientOptions = {}): CoreClient {
    * caller can never observe a rejection. The abort timer is armed before fetch
    * and cleared in `finally`, covering the body read as well.
    */
+  /**
+   * A request that changes what KAI is AUTHORIZED to do.
+   *
+   * The Core's owner-only routes refuse a caller that cannot prove it holds the
+   * install's host token. That token is never exposed to JavaScript, so the
+   * request is handed to the Rust side, which attaches it and returns only the
+   * response. Outside Tauri there is no credential to attach, so the call falls
+   * through to a plain request and the Core's 401 is surfaced honestly as
+   * AUTH_REQUIRED — never faked into a success.
+   */
+  async function ownerRequest(
+    method: "GET" | "POST",
+    path: string,
+    body?: unknown,
+  ): Promise<CoreResult<JsonObject>> {
+    const bridged = await Bridge.coreOwnerCall(method, path, body);
+    if (bridged !== null) {
+      const payload = isObject(bridged.body) ? bridged.body : {};
+      if (bridged.status >= 200 && bridged.status < 300) return ok(payload);
+      if (bridged.status === 401 || bridged.status === 403) {
+        return fail("AUTH_REQUIRED", "Core requires the owner credential for this control", bridged.status);
+      }
+      const reason = typeof payload["reason"] === "string" ? payload["reason"] : "Core refused the request";
+      return fail("REQUEST_FAILED", reason, bridged.status);
+    }
+    return request(path, { method, ...(body !== undefined ? { body } : {}) });
+  }
+
   async function request(
     path: string,
     init: { method?: string; body?: unknown; query?: Record<string, string | number | boolean | undefined> } = {},
@@ -2052,6 +2173,76 @@ export function createCoreClient(options: CoreClientOptions = {}): CoreClient {
 
     async updateSettings(patch) {
       const res = await request("/settings", { method: "POST", body: patch });
+      if (!res.ok) return res;
+      return ok(res.value);
+    },
+
+    async listGoals() {
+      const res = await request("/goals");
+      if (!res.ok) return res;
+      const raw = res.value["goals"];
+      if (!Array.isArray(raw)) return fail("INVALID_RESPONSE", 'expected an array at "goals"');
+      return ok(raw.filter(isObject) as unknown as CoreGoalSummary[]);
+    },
+
+    async getGoal(id) {
+      const res = await request(`/goals/${encodeURIComponent(id)}`);
+      if (!res.ok) return res;
+      return ok(res.value as unknown as CoreGoalSummary);
+    },
+
+    async createGoal(intent, options) {
+      const res = await ownerRequest("POST", "/goals", {
+        intent,
+        ...(options?.constraints !== undefined ? { constraints: options.constraints } : {}),
+        ...(options?.forbiddenOutcomes !== undefined ? { forbiddenOutcomes: options.forbiddenOutcomes } : {}),
+      });
+      if (!res.ok) return res;
+      return ok(res.value as unknown as CoreGoalSummary);
+    },
+
+    async challengeGoal(id, mode) {
+      const res = await ownerRequest("POST", `/goals/${encodeURIComponent(id)}/challenge`, { mode });
+      if (!res.ok) return res;
+      return ok(res.value as unknown as CoreGoalSummary);
+    },
+
+    async planGoal(id) {
+      const res = await ownerRequest("POST", `/goals/${encodeURIComponent(id)}/plan`, {});
+      if (!res.ok) return res;
+      return ok(res.value as unknown as CoreGoalSummary);
+    },
+
+    async approvePlan(id, revisionId) {
+      const res = await ownerRequest("POST", `/goals/${encodeURIComponent(id)}/approve`, {
+        ...(revisionId !== undefined ? { revisionId } : {}),
+      });
+      if (!res.ok) return res;
+      return ok(res.value as unknown as CoreGoalSummary);
+    },
+
+    async rejectPlan(id, note) {
+      const res = await ownerRequest("POST", `/goals/${encodeURIComponent(id)}/reject`, {
+        ...(note !== undefined ? { note } : {}),
+      });
+      if (!res.ok) return res;
+      return ok(res.value as unknown as CoreGoalSummary);
+    },
+
+    async setGoalState(id, state) {
+      const res = await ownerRequest("POST", `/goals/${encodeURIComponent(id)}/state`, { state });
+      if (!res.ok) return res;
+      return ok(res.value as unknown as CoreGoalSummary);
+    },
+
+    async getDoer() {
+      const res = await request("/doer");
+      if (!res.ok) return res;
+      return ok(res.value as unknown as CoreDoerState);
+    },
+
+    async setDoer(state) {
+      const res = await ownerRequest("POST", "/doer", { state });
       if (!res.ok) return res;
       return ok(res.value);
     },

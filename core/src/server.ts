@@ -1351,6 +1351,11 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
           path,
           query: url.searchParams,
           body: coreBody,
+          // Owner attestation for the routes that change what KAI is AUTHORIZED
+          // to do. Computed here, where the request headers are, and passed as a
+          // fact — the API module never re-reads a header.
+          attested: hostAttested(req),
+          ownerAuthConfigured: hostToken !== undefined && hostToken.length > 0,
         });
         if (result.status !== 404) {
           sendJson(res, result.status, result.body);

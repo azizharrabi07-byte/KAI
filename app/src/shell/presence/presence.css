@@ -419,3 +419,50 @@
 #kai-presence-root .thread{position:relative}
 #kai-presence-root .jump{position:sticky;bottom:12px;margin-left:auto;display:block;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--glass);font-size:11.5px;color:var(--ink);cursor:pointer;backdrop-filter:blur(8px)}
 #kai-presence-root .jump[hidden]{display:none}
+
+/* ── Goals surface ─────────────────────────────────────────────────────────
+   Real Core state only: the intake, the challenge panel, the versioned plan and
+   the approval. The badges carry the meaning — approved-and-eligible, approved-
+   but-paused, and not-approved are three visibly different states. */
+#kai-presence-root .gp-head{margin:0 0 14px}
+#kai-presence-root .gp-head-title{font:600 20px/1.2 "Figtree",system-ui,sans-serif}
+#kai-presence-root .gp-head-blurb{color:var(--soft);font-size:13px;max-width:70ch;margin-top:4px}
+#kai-presence-root .gp-intake{background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:16px}
+#kai-presence-root .gp-intent{width:100%;box-sizing:border-box;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;background:rgba(255,255,255,.7);color:var(--ink)}
+#kai-presence-root .gp-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+#kai-presence-root .gp-primary,#kai-presence-root .gp-action{border:1px solid var(--line);background:rgba(255,255,255,.8);color:var(--ink);border-radius:10px;padding:7px 12px;font:inherit;cursor:pointer}
+#kai-presence-root .gp-primary{background:var(--blue);border-color:transparent;color:#fff;font-weight:600}
+#kai-presence-root .gp-action[disabled]{opacity:.45;cursor:not-allowed}
+#kai-presence-root .gp-body{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:16px;align-items:start}
+#kai-presence-root .gp-list{display:flex;flex-direction:column;gap:6px}
+#kai-presence-root .gp-row-item{display:flex;flex-direction:column;gap:6px;align-items:flex-start;text-align:left;background:var(--glass);border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;font:inherit;color:var(--ink)}
+#kai-presence-root .gp-row-item.gp-selected{border-color:var(--blue);box-shadow:0 0 0 2px rgba(74,143,214,.18)}
+#kai-presence-root .gp-row-title{font-weight:600}
+#kai-presence-root .gp-card,#kai-presence-root .gp-challenge,#kai-presence-root .gp-plan{background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+#kai-presence-root .gp-card-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+#kai-presence-root .gp-title{font:600 17px/1.3 "Figtree",system-ui,sans-serif;flex:1 1 100%}
+#kai-presence-root .gp-section-title{font:600 13px/1.2 "Figtree",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:var(--soft);margin-bottom:8px}
+#kai-presence-root .gp-badge{display:inline-block;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:600;border:1px solid transparent}
+#kai-presence-root .gp-ok{background:rgba(31,157,116,.14);color:var(--ok);border-color:rgba(31,157,116,.3)}
+#kai-presence-root .gp-paused{background:rgba(201,133,18,.14);color:var(--warn);border-color:rgba(201,133,18,.32)}
+#kai-presence-root .gp-revise{background:rgba(74,143,214,.14);color:var(--blue);border-color:rgba(74,143,214,.32)}
+#kai-presence-root .gp-blocked{background:rgba(217,67,95,.12);color:var(--err);border-color:rgba(217,67,95,.3)}
+#kai-presence-root .gp-neutral{background:rgba(11,24,56,.06);color:var(--soft)}
+#kai-presence-root .gp-facts{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+#kai-presence-root .gp-field{display:grid;grid-template-columns:150px 1fr;gap:10px;font-size:13px}
+#kai-presence-root .gp-field-label{color:var(--soft)}
+#kai-presence-root .gp-field-value{display:flex;gap:6px;flex-wrap:wrap}
+#kai-presence-root .gp-chip{background:rgba(11,24,56,.06);border-radius:8px;padding:1px 7px;font-size:12px}
+#kai-presence-root .gp-finding{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+#kai-presence-root .gp-finding-role{font-weight:600;font-size:13px}
+#kai-presence-root .gp-objection{margin:6px 0 0 10px}
+#kai-presence-root .gp-objection-text{font-size:13px}
+#kai-presence-root .gp-objection-meta{font-size:12px;color:var(--soft)}
+#kai-presence-root .gp-plan-summary{font-size:13px;margin-bottom:8px}
+#kai-presence-root .gp-task{border-top:1px dashed var(--line);padding-top:8px;margin-top:8px}
+#kai-presence-root .gp-task-title{font-weight:600;font-size:13px}
+#kai-presence-root .gp-task-objective{font-size:13px;color:var(--soft)}
+#kai-presence-root .gp-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+#kai-presence-root .gp-status{color:var(--err);font-size:13px;margin-top:8px}
+#kai-presence-root .gp-empty{color:var(--soft);font-size:13px}
+#kai-presence-root .gp-error{color:var(--err);font-size:13px}

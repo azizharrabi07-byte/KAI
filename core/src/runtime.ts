@@ -76,6 +76,11 @@ import {
   type PendingResult,
   type PendingResultStore,
 } from "./orchestration/doer.ts";
+import { createGoalStore, type GoalStore } from "./goals/store.ts";
+import { createGoalChallenger, type ChallengeMode, type GoalChallenger } from "./goals/challenger.ts";
+import { createGoalArchitect, type GoalArchitect } from "./goals/architect.ts";
+import { buildCriticPrompt, CRITIC_SYSTEM, parseFinding, PLANNER_SYSTEM } from "./goals/runners.ts";
+import type { ChallengeFinding, RoleInput } from "./goals/challenger.ts";
 import { createMissionExecutor } from "./missions/executor.ts";
 import { createMission } from "./missions/mission.ts";
 import { createScheduler } from "./scheduler/scheduler.ts";
@@ -308,6 +313,15 @@ export interface CoreRuntimeOptions {
    */
   autonomy?: { maxAttempts?: number };
   /**
+   * Deterministic runners for the goal layer. Production uses a dedicated brain;
+   * a test injects scripted ones so a challenge verdict or a plan is decided by
+   * the test, never by a live model.
+   */
+  goalRunners?: {
+    runRole?: (input: RoleInput) => Promise<ChallengeFinding>;
+    runPlanner?: (prompt: string) => Promise<string>;
+  };
+  /**
    * Where the Phase 2 subsystems keep their state. Defaults are DERIVED from
    * `dbPath`, so a test that points the Core at a temp directory gets every
    * subsystem file in that directory and nothing leaks into the user profile.
@@ -335,6 +349,8 @@ export interface CoreRuntimeOptions {
     parkedPath?: string;
     /** Doer pending-result inbox (its own file). Default `<dbDir>/doer-pending.db`. */
     doerPath?: string;
+    /** Goals, plan revisions and plan approvals (their own file). Default `<dbDir>/goals.db`. */
+    goalsPath?: string;
     /** Checkpoint store root. Default `<dbDir>/checkpoints`. */
     checkpointsDir?: string;
     /** KAI_HOME for identity docs (SOUL.md/USER.md). Defaults to the real KAI_HOME. */
@@ -452,6 +468,15 @@ export interface CoreRuntime {
   doer: Doer;
   /** The Doer's durable pending-result inbox (exposed for the UI and tests). */
   pendingResults: PendingResultStore;
+  /**
+   * Goals, plan revisions and plan approvals. The durable layer ABOVE the
+   * orchestrator: an approved revision is what authorises its work items.
+   */
+  goals: GoalStore;
+  /** Build a Goal Challenger for one challenge mode (the mode is per goal). */
+  challengerFor(mode: ChallengeMode, maxRounds?: number): GoalChallenger;
+  /** The Goal Architect: turns a goal into a validated, verifiable plan. */
+  architect: GoalArchitect;
   /** The live Workforce Manager: the employee layer above the agent registry. */
   workforce: ReturnType<typeof createWorkforceManager>;
   /** The live Capability Manager: one instance, in the production runtime. */
@@ -620,6 +645,17 @@ export const MUTATION_TOOLS = {
    * for a human — same rule as `soul.set`.
    */
   settingsUpdate: "settings.update",
+  /**
+   * Reduce KAI's OWN autonomy. WRITE, and deliberately restricted to `OFF`.
+   *
+   * Stopping autonomous behaviour must never require a second approval: a user
+   * who wants KAI to stop acting on its own is exercising the one control that
+   * can only ever REMOVE authority. So `doer.set` is value-scoped — it refuses
+   * `ON` outright — and it is internal-state, meaning the default policy applies
+   * it immediately. Turning autonomy ON still goes through `settings.update`,
+   * which parks for a human.
+   */
+  doerSet: "doer.set",
 } as const;
 
 /**
@@ -665,6 +701,12 @@ export const KAI_INTERNAL_STATE_TOOLS: readonly string[] = [
   MUTATION_TOOLS.checkpointCreate,
   MUTATION_TOOLS.sessionManage,
   MUTATION_TOOLS.maintenanceRun,
+  // Reducing autonomy is the ONE mutation that can only ever remove authority,
+  // so it is authorized immediately: a user must never need an approval to make
+  // KAI stop acting on its own. The tool itself refuses `ON` (see its
+  // definition), so this cannot be used to escalate — enabling the Doer still
+  // parks through `settings.update`.
+  MUTATION_TOOLS.doerSet,
 ];
 
 /**
@@ -713,6 +755,11 @@ export interface StateMutationToolDeps {
    * service refuses unknown keys and bad values, so this never writes junk.
    */
   updateSettings(input: unknown): unknown;
+  /**
+   * Turn the Doer OFF, immediately and without an approval. Authority-reducing
+   * only: it cannot enable autonomy.
+   */
+  setDoerOff(): unknown;
   /** Dry-run validation for the tool boundary (a refusal is a 400). */
   checkSettings(
     input: unknown,
@@ -1014,6 +1061,31 @@ export function createStateMutationTools(deps: StateMutationToolDeps): ToolDefin
       },
       async execute(input) {
         return deps.updateSettings(input);
+      },
+    },
+    {
+      id: MUTATION_TOOLS.doerSet,
+      name: "Stop KAI's autonomous execution",
+      description:
+        "Turn the KAI Doer OFF: stop autonomous planning, worker dispatch, result interpretation, corrective action and proactive recommendations. This ONLY reduces authority, so it applies immediately with no approval. It never disables Guard — policy, approvals and the execution registry stay active. It cannot turn the Doer ON; that is `settings.update`, which parks for a human.",
+      risk: "WRITE",
+      validate(input) {
+        // Value-scoped on purpose: `ON` is refused here rather than parked, so
+        // this tool can never be the path that widens autonomy.
+        if (typeof input !== "object" || input === null || Array.isArray(input)) {
+          return { ok: false, reason: "doer.set expects an object like {\"state\":\"OFF\"}" };
+        }
+        const state = (input as { state?: unknown }).state;
+        if (state !== "OFF") {
+          return {
+            ok: false,
+            reason: 'doer.set only accepts {"state":"OFF"} — enabling the Doer requires an approved settings.update',
+          };
+        }
+        return { ok: true, value: { state: "OFF" } };
+      },
+      async execute() {
+        return deps.setDoerOff();
       },
     },
     {
@@ -1397,6 +1469,10 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   // approvals and the scheduler leases: a worker result that arrives while the
   // Doer is OFF must survive a restart, and it must not reshape `Stores`.
   const doerPath = subsystemPaths.doerPath ?? (dataDir !== undefined ? join(dataDir, "doer-pending.db") : ":memory:");
+  // The goal layer owns its own file too: a goal, its plan revisions and the
+  // approval bound to one exact revision are not `Stores` state, and putting
+  // them in the shared database would mean reshaping a frozen interface.
+  const goalsPath = subsystemPaths.goalsPath ?? (dataDir !== undefined ? join(dataDir, "goals.db") : ":memory:");
   const checkpointsDir = subsystemPaths.checkpointsDir ?? underData("checkpoints");
 
   /**
@@ -3494,6 +3570,15 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       return { soul: identity.soul, version: identity.version, path: identity.source.soulPath };
     },
     checkSettings: (input) => checkCombinedSettings(input),
+    // Authority-REDUCING only: writing the OFF preference directly, with the
+    // same single-source transition event the settings write emits. There is no
+    // path here that can set ON, so this needs no approval.
+    setDoerOff: () => {
+      const at = new Date().toISOString();
+      stores.settings.set("orchestration.doer", "OFF", at);
+      publish("doer.disabled", { source: "core" }, { source: "core" });
+      return { ok: true, updated: ["orchestration.doer"], effective: settings.effective() };
+    },
     updateSettings: (input) => {
       // The ONE owner of the settings write. `input` is the VALIDATED value
       // from checkCombinedSettings: model.* patch, orchestration.* patch, or
@@ -3835,6 +3920,24 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       maxCallsPerMission: readOrchestrationPrefs(stores.settings).jevMaxCalls,
     },
     publish: (type, payload, opts) => publish(type as Parameters<typeof publish>[0], payload, opts),
+    // The goal gate: an item that belongs to a goal is dispatchable only while
+    // the goal's CURRENT plan revision carries an approval that still matches
+    // its content hash. A material edit to the plan makes the approval stale and
+    // this refuses again — one authoritative check at the orchestration
+    // boundary, so no caller can route around it.
+    goalGate: (goalId, goalRevisionId) => {
+      const goal = goals.getGoal(goalId);
+      if (goal === null) return { ok: false, reason: `no goal "${goalId}" exists` };
+      const approval = goals.isApproved(goalId);
+      if (!approval.approved) return { ok: false, reason: `the plan is not approved: ${approval.reason}` };
+      if (goalRevisionId !== undefined && approval.revision !== undefined && approval.revision.id !== goalRevisionId) {
+        return {
+          ok: false,
+          reason: `this work item came from plan revision "${goalRevisionId}", but "${approval.revision.id}" is the approved one`,
+        };
+      }
+      return { ok: true, reason: `approved revision ${approval.revision?.id ?? "(unknown)"}` };
+    },
   });
 
   /**
@@ -3935,6 +4038,46 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     detachDoerSwitch();
   };
 
+  /**
+   * ── The goal layer ────────────────────────────────────────────────────────
+   *
+   * Goals, their plan revisions and the approval bound to ONE exact revision.
+   * This sits ABOVE the orchestrator: a goal is not a fourth task executor, it
+   * is the durable contract that authorises work items to exist. The challenger
+   * and the architect are model-backed, so both take an injected runner — the
+   * production runners use a dedicated brain, and a test injects scripted ones.
+   */
+  const goals: GoalStore = createGoalStore({ path: goalsPath });
+
+  const goalBrain: KaiBrain = createKaiBrain({ provider: modelProvider });
+
+  // The challenge MODE is chosen per goal, so a challenger is built for the
+  // chosen mode rather than captured once. Cheap by construction: the only
+  // stateful part is the injected runner, and the panel itself is pure.
+  const challengerFor = (mode: ChallengeMode, maxRounds?: number): GoalChallenger =>
+    createGoalChallenger({
+      mode,
+      ...(maxRounds !== undefined ? { maxRounds } : {}),
+      runRole: async (input) => {
+        if (options.goalRunners?.runRole !== undefined) return options.goalRunners.runRole(input);
+        const result = await goalBrain.respond({
+          text: buildCriticPrompt(input),
+          system: CRITIC_SYSTEM,
+          purpose: `goal:critic:${input.role}`,
+        });
+        // A malformed reply becomes a BLOCKED finding, never a PASS.
+        return parseFinding(result.text, input.role);
+      },
+    });
+
+  const architect: GoalArchitect = createGoalArchitect({
+    runPlanner: async (prompt) => {
+      if (options.goalRunners?.runPlanner !== undefined) return options.goalRunners.runPlanner(prompt);
+      const result = await goalBrain.respond({ text: prompt, system: PLANNER_SYSTEM, purpose: "goal:planner" });
+      return result.text;
+    },
+  });
+
   return {
     stores,
     bus,
@@ -3945,6 +4088,9 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     parkedRequests,
     doer,
     pendingResults,
+    goals,
+    challengerFor,
+    architect,
     decideApproval,
     workforce,
     capabilities,
@@ -4138,6 +4284,11 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       }
       try {
         pendingResults.close();
+      } catch {
+        /* see above */
+      }
+      try {
+        goals.close();
       } catch {
         /* see above */
       }
