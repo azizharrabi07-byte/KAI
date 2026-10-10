@@ -1,0 +1,78 @@
+{
+  "at": "2026-10-10T13:53:18.602Z",
+  "seed": 20261010,
+  "rounds": 10,
+  "itemsPerRound": 8,
+  "invariants": {
+    "retry exhaustion parks every item (never completes)": {
+      "held": true,
+      "detail": "not BLOCKED: []"
+    },
+    "retry exhaustion respects the ceiling": {
+      "held": true,
+      "detail": "over ceiling: 0"
+    },
+    "zero false completions": {
+      "held": true,
+      "detail": "without a PASS gate: []"
+    },
+    "zero completion events without a PASS gate": {
+      "held": true,
+      "detail": "non-PASS completions: 0"
+    },
+    "no duplicate authoritative completion": {
+      "held": true,
+      "detail": "duplicates: []"
+    },
+    "no lost dispatch ledger": {
+      "held": true,
+      "detail": "items with work but no ledger: 0"
+    },
+    "no lost outcome contract": {
+      "held": true,
+      "detail": "contracted=41 lost=0 []"
+    },
+    "no retry-budget bypass": {
+      "held": true,
+      "detail": "over-ceiling items: 0"
+    },
+    "no orphaned or stuck work": {
+      "held": true,
+      "detail": "non-terminal: []"
+    },
+    "no memory-scope violation": {
+      "held": true,
+      "detail": "lessons are written only through rememberForMission (mission scope)"
+    },
+    "no unhandled rejections or uncaught exceptions": {
+      "held": true,
+      "detail": "[]"
+    },
+    "every item settled or visibly parked": {
+      "held": true,
+      "detail": "states: []"
+    }
+  },
+  "counters": {
+    "created": 80,
+    "dispatched": 100,
+    "failed": 25,
+    "completed": 26,
+    "parked": 55,
+    "resumed": 110,
+    "duplicatesIgnored": 20,
+    "exhausted": 4,
+    "restarts": 3,
+    "schedulerTicks": 30,
+    "items": 80,
+    "rssMB": 174
+  },
+  "latencyMs": {
+    "samples": 80,
+    "p50": 484,
+    "p95": 653,
+    "max": 707
+  },
+  "verdict": "PASS",
+  "durationMs": 22237
+}
