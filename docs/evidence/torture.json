@@ -1,13 +1,13 @@
 {
-  "at": "2026-10-10T00:34:31.850Z",
+  "at": "2026-10-10T13:37:21.127Z",
   "scenarios": {
     "T1: 100 sequential missions complete": {
       "pass": true,
-      "detail": "100/100 in 12928ms"
+      "detail": "100/100 in 27077ms"
     },
     "T2: 25 concurrent missions, no collision": {
       "pass": true,
-      "detail": "25/25 in 3672ms"
+      "detail": "25/25 in 7378ms"
     },
     "T3: 10 concurrent multi-child missions created": {
       "pass": true,
@@ -71,8 +71,8 @@
     }
   },
   "metrics": {
-    "t1Ms": 12928,
-    "t2Ms": 3672,
+    "t1Ms": 27077,
+    "t2Ms": 7378,
     "activityEvents": 100,
     "created": 171,
     "attempted": 131,

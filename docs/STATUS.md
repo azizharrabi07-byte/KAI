@@ -84,6 +84,7 @@ Each has a regression test that now protects it.
 | 6 | A lesson write that **threw** was silently swallowed (a refusal was traced, a throw was not) | the throw is traced; completion still stands | `campaign-skills-memory` memory-10 |
 | 7 | Approving a **review** park re-dispatched the worker, burned an attempt and could park again forever; a plain run on a REVIEW-parked item also re-dispatched | a review park settles through the gate without a dispatch; a plain run on it is refused | `campaign-retry-stress` S4d |
 | 8 | **Duplicate `mission.failed` deliveries** (and a restart) started another re-attempt of one failure, unbounded | a durable `autonomyRetriedAt` stamp plus an in-process marker bound it to one re-attempt | `campaign-approval-lifecycle` 10c |
+| 9 | The HTTP server used Node's 5s `keepAliveTimeout`, so a keep-alive client (undici — the UI and every probe) could reuse a socket the server was closing and get **ECONNRESET** (measured: `orch-e2e` failed 3/3 runs at the first request after its S6 burst) | the window is raised above any client idle timeout (65s, `headersTimeout` 66s); 3/3 runs clean afterwards, and a 70s idle reuse succeeds | `server-keepalive` |
 
 Also fixed alongside #7: resuming a **parked delegation** now continues the same
 attempt instead of charging a fresh retry (a park is not a dispatch), so a human

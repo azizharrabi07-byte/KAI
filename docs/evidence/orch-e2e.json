@@ -1,5 +1,5 @@
 {
-  "at": "2026-10-10T00:35:35.478Z",
+  "at": "2026-10-10T13:31:01.268Z",
   "scenarios": {
     "setup: autonomy level 3 + auto review applies": {
       "pass": true,
@@ -35,11 +35,11 @@
     },
     "S1: trace recorded real activity": {
       "pass": true,
-      "detail": "Outcome gate PASS | Reviewer checking | e2e-good-mv1nxrqs working | Planned: RC-ORCH-mv1nxrqs: analyze the workspace, name the three biggest risks, propose a pa"
+      "detail": "Outcome gate PASS | Reviewer checking | e2e-good-mv2fmz9u working | Planned: RC-ORCH-mv2fmz9u: analyze the workspace, name the three biggest risks, propose a pa"
     },
     "S2: breaker recommends after repeated failure": {
       "pass": true,
-      "detail": "no available employee can handle \"subagent:e2e-bad-mv1nxrqs\" (role: subagent:e2e-bad-mv1nxrqs) — recommended: reassign (3 consecutive failur"
+      "detail": "no available employee can handle \"subagent:e2e-bad-mv2fmz9u\" (role: subagent:e2e-bad-mv2fmz9u) — recommended: reassign (3 consecutive failur"
     },
     "S2: switched worker completes": {
       "pass": true,
@@ -47,7 +47,7 @@
     },
     "S3: bench distinguishes failed cheap from verified dear": {
       "pass": true,
-      "detail": "bad=0.1029740574422174 good=0.44187133336498574"
+      "detail": "bad=0.10297423723473106 good=0.44187119857834534"
     },
     "S3: difficult routes differently than simple": {
       "pass": true,
@@ -55,7 +55,7 @@
     },
     "S4: retry prompt carried the failure context": {
       "pass": true,
-      "detail": "I'm e2e-good-mv1nxrqs, KAI's worker. hermes mock output: You are acting as KAI's subagent \"e2e-good-mv1nxrqs\" (worker). I help. ## MISSION direct objective ## YOUR ROLE Role: e2e-good-mv1nxrqs Selecte"
+      "detail": "I'm e2e-good-mv2fmz9u, KAI's worker. hermes mock output: You are acting as KAI's subagent \"e2e-good-mv2fmz9u\" (worker). I help. ## MISSION direct objective ## YOUR ROLE Role: e2e-good-mv2fmz9u Selecte"
     },
     "S5: 10 parallel runs, no collisions": {
       "pass": true,

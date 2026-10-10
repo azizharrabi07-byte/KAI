@@ -1389,6 +1389,16 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
     if (socket.writable) socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
   });
 
+  // KEEP-ALIVE: the client (undici, which backs `fetch` in the UI and in the
+  // probes) derives its idle timeout from this server's `Keep-Alive: timeout=`
+  // header. At Node's 5s default both sides expire at the same instant, so a
+  // client can reuse a socket the server is closing and get ECONNRESET —
+  // measured systematically in orch-e2e S6 (3/3 runs failed at the first
+  // request after the burst; 3/3 clean once this was raised). `headersTimeout`
+  // must stay above `keepAliveTimeout`.
+  server.keepAliveTimeout = 65_000;
+  server.headersTimeout = 66_000;
+
   return server;
 }
 

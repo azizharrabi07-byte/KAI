@@ -1,5 +1,5 @@
 {
-  "at": "2026-10-09T02:42:47.277Z",
+  "at": "2026-10-10T13:39:59.485Z",
   "scenarios": {
     "A headings/lists/code/table/quote/link render richly": {
       "pass": true,
@@ -11,7 +11,7 @@
     },
     "B tool card carries a real result body": {
       "pass": true,
-      "detail": "{\"cards\":2,\"all\":[\"action.executedKAI is researching…just now\",\"✓ filesystem.searchEXECUTED · “lighthouse” in C:\\\\Users\\\\DELL\\\\AppData\\\\Local\\\\Temp\\\\kai-browser\"],\"summary\":\"✓ filesystem.searchEXECUTED · “lighthouse” in C:\\\\Users\\\\DELL\\\\AppData\\\\Local\\\\Temp\\\\kai-browser-prod-w0Bj8A\\\\workspace\",\"hasB"
+      "detail": "{\"cards\":2,\"all\":[\"action.executedKAI is researching…just now\",\"✓ filesystem.searchEXECUTED · “lighthouse” in C:\\\\Users\\\\DELL\\\\AppData\\\\Local\\\\Temp\\\\kai-browser\"],\"summary\":\"✓ filesystem.searchEXECUTED · “lighthouse” in C:\\\\Users\\\\DELL\\\\AppData\\\\Local\\\\Temp\\\\kai-browser-prod-Sxu9AR\\\\workspace\",\"hasB"
     },
     "C search card, then read card, then the final answer — in DOM order": {
       "pass": true,
@@ -19,7 +19,7 @@
     },
     "D command streams live and stamps exit last": {
       "pass": true,
-      "detail": "{\"runningSeen\":\"exit 0 · 1728ms\",\"st\":\"exit 0 · 1728ms\"}"
+      "detail": "{\"runningSeen\":\"exit 0 · 1723ms\",\"st\":\"exit 0 · 1723ms\"}"
     },
     "E scrolled-away view is not yanked; jump appears": {
       "pass": true,
@@ -27,11 +27,11 @@
     },
     "E jump-to-latest returns to bottom": {
       "pass": true,
-      "detail": "gap=99"
+      "detail": "gap=91"
     },
     "F 1200-chunk flood stays bounded + UI responsive": {
       "pass": true,
-      "detail": "{\"spans\":7,\"chars\":62493,\"rafMs\":15.4}"
+      "detail": "{\"spans\":9,\"chars\":62493,\"rafMs\":10.3}"
     },
     "G stop leaves no failure card": {
       "pass": true,
@@ -48,9 +48,9 @@
   },
   "perf": {
     "flood": {
-      "spans": 7,
+      "spans": 9,
       "chars": 62493,
-      "rafMs": 15.4
+      "rafMs": 10.3
     }
   },
   "verdict": "pass"
