@@ -21,6 +21,8 @@
  * only the verify + review path here writes terminal states, from evidence.
  */
 
+import { createHash } from "node:crypto";
+import { isAbsolute, join } from "node:path";
 import type { PolicyRequest } from "../policies/gate.ts";
 import type {
   AutonomyPolicy,
@@ -512,10 +514,17 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         } catch {
           // Receipts never break delegation.
         }
+        // The receipt must describe the body that was ACTUALLY handed over. When
+        // the registry exposes no hash, hash the loaded body here: receipts are
+        // deduped by id@hash, so a missing hash made two different bodies of the
+        // same skill collapse into one receipt and misreport what was loaded.
+        if (hash === undefined) {
+          hash = createHash("sha256").update(loaded.body, "utf8").digest("hex");
+        }
         receipts.push({
           id: sid,
           ...(version !== undefined ? { version } : {}),
-          ...(hash !== undefined ? { hash } : {}),
+          hash,
           bodyLength: loaded.body.length,
           at: nowIso(),
         });
@@ -681,21 +690,44 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     const policy = autonomy();
     for (const label of entries) {
       // 1. Claimed-artifact checks: existence + working-tree state.
+      //
+      // SCOPED TO THE ITEM'S WORKSPACE. `filesystem.metadata` resolves a bare
+      // path against KAI's OWN sandbox roots, so an unscoped check would verify
+      // whatever KAI happens to have at that path — evidence about the wrong
+      // tree, which could satisfy the gate for work KAI never inspected. With
+      // no `workingDir` there is no workspace to check, so the label is
+      // recorded as unverifiable instead of being checked against KAI's cwd.
       const artifact = matchArtifact(label, handoff.changedArtifacts);
       if (artifact !== null) {
+        if (cwd === undefined) {
+          blocked.push({
+            label,
+            reason: "no working directory on this work item: the claimed artifact cannot be checked against its own workspace",
+          });
+          continue;
+        }
+        const target = isAbsolute(artifact) ? artifact : join(cwd, artifact);
         try {
-          const meta = await tools.invoke("filesystem.metadata", { path: artifact }, invokeOpts);
-          const info = meta.ok && typeof meta.result === "object" && meta.result !== null
+          const meta = await tools.invoke("filesystem.metadata", { path: target }, invokeOpts);
+          // A REFUSED call is not a fact about the file. The tool answers
+          // `ok:false` when it will not look (out-of-sandbox path, policy), and
+          // treating that as "absent" invented an observation for a path KAI
+          // never stat'd. Refusals are recorded as unverifiable, with the
+          // tool's own reason, and never as an observation.
+          if (!meta.ok) {
+            blocked.push({
+              label,
+              reason: `artifact check refused: ${meta.error?.code ?? "unknown"} — ${meta.error?.message ?? ""}`.slice(0, 200),
+            });
+            continue;
+          }
+          const info = typeof meta.result === "object" && meta.result !== null
             ? (meta.result as Record<string, unknown>)
             : null;
-          const exists = meta.ok && info?.["exists"] === true;
+          const exists = info?.["exists"] === true;
           let diffNote = "";
           try {
-            const st = await tools.invoke(
-              "git.status",
-              { ...(cwd !== undefined ? { cwd } : {}) },
-              invokeOpts,
-            );
+            const st = await tools.invoke("git.status", { cwd }, invokeOpts);
             if (st.ok) diffNote = ` git: ${clipPreview(JSON.stringify(st.result)).slice(0, 300)}`;
           } catch {
             // Status is enrichment; existence is the verdict.
@@ -706,9 +738,9 @@ export function createOrchestrator(deps: OrchestratorDeps) {
             source: "kai-observed",
             method: "filesystem.metadata + git.status",
             detail: exists
-              ? `${artifact} exists${typeof info?.["size"] === "number" ? ` (${info["size"]} bytes)` : ""}.${diffNote}`
-              : `${artifact} ABSENT — claimed change not on disk.${diffNote}`,
-            path: artifact,
+              ? `${target} exists${typeof info?.["size"] === "number" ? ` (${info["size"]} bytes)` : ""} in ${cwd}.${diffNote}`
+              : `${target} ABSENT in ${cwd} — claimed change not on disk.${diffNote}`,
+            path: target,
             supports: exists ? [label] : [],
             at,
           });
@@ -803,8 +835,19 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       if (!outcome.ok) {
         deps.trace.record(ref(item), "memory", `Supervision lesson refused: ${outcome.refusal?.reason ?? "unknown"}`);
       }
-    } catch {
-      // Lessons never break completion.
+    } catch (error) {
+      // A lesson write that THREW must be as visible as one that was refused —
+      // otherwise a failure to record looks identical to "nothing to record".
+      // It still never breaks completion.
+      try {
+        deps.trace.record(
+          ref(item),
+          "memory",
+          `Supervision lesson write threw: ${error instanceof Error ? error.message : String(error)}`.slice(0, 300),
+        );
+      } catch {
+        // Tracing must not break completion either.
+      }
     }
   }
 
@@ -910,8 +953,64 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       return resumeEvidenceRun(id, item, pending.labels, opts, dedupeKey);
     }
 
-    const analysis = deps.dispatcher.analyze(item.objective);
+    // Resume path: a REVIEW park is NOT a dispatch. The item parked because
+    // review policy is ASK — "a human clears the review" — so approving it must
+    // produce the review OUTCOME and settle through the gate. Treating it as a
+    // fresh run re-dispatched the worker, consumed another attempt and could
+    // park again forever (observed: ledger [initial, retry], then a second park).
+    const parked = outputs0["parked"] as { approvalId?: string; kind?: string } | undefined;
+    if (
+      item.state === "REVIEW" &&
+      parked?.kind === "review" &&
+      opts.approvalId !== undefined &&
+      parked.approvalId === opts.approvalId
+    ) {
+      const handoff = item.handoff;
+      if (handoff === undefined) {
+        return { workItemId: id, state: item.state, note: "review resume has no stored handoff to settle" };
+      }
+      const claimedReview = deps.board.claim(id, item.workerId ?? "reviewer");
+      if (!claimedReview.ok) return { workItemId: id, state: item.state, note: claimedReview.reason };
+      if (dedupeKey !== undefined) markResumeKey(id, dedupeKey);
+      const cleared = claimedReview.value.workerId ?? item.workerId ?? "worker";
+      deps.trace.record(ref(claimedReview.value), "review", "A human cleared the review — settling through the gate");
+      emit("review.decided", { workItemId: id, verdict: "PASS", rounds: 0, by: "human" });
+      const verification = item.verification ?? verifyHandoff(handoff, item.deliverable !== undefined ? [item.deliverable] : []);
+      return finishComplete(id, cleared, handoff, verification, { verdict: "PASS", findings: ["review cleared by a human"] }, {
+        latencyMs: 0,
+        role: "worker",
+        configVersion: "v1",
+        domain: "general",
+        ...(opts.approvalId !== undefined ? { approvalId: opts.approvalId } : {}),
+      });
+    }
 
+    // A REVIEW park means a HUMAN is the reviewer. A plain run must not slip past
+    // it and re-dispatch the worker (that duplicated real work and burned
+    // budget); the approval is the only way forward.
+    if (item.state === "REVIEW" && parked?.kind === "review" && opts.approvalId === undefined) {
+      const waitingOn = parked.approvalId ?? "(unknown)";
+      deps.trace.record(ref(item), "review", `Run refused: a human review (${waitingOn}) is pending`);
+      return {
+        workItemId: id,
+        state: item.state,
+        note: `waiting for a human review (approval ${waitingOn}) — decide the approval instead of re-running`,
+      };
+    }
+    /**
+     * Resuming a PARKED DELEGATION continues the SAME attempt: the worker never
+     * ran when the park happened, so the approval must not be charged as a fresh
+     * retry (otherwise two approvals could exhaust the budget with a single real
+     * execution). Evidence parks are handled above and review parks above that.
+     */
+    const resumingParkedDispatch =
+      item.state === "WAITING" &&
+      opts.approvalId !== undefined &&
+      parked?.approvalId !== undefined &&
+      parked.approvalId === opts.approvalId &&
+      parked.kind === undefined;
+
+    const analysis = deps.dispatcher.analyze(item.objective);
     // Worker selection: explicit > ranked (avoiding repeat failures).
     let workerId = opts.workerId;
     let whySelected = "explicitly assigned";
@@ -950,7 +1049,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     // Reassignment is the breaker's sanctioned "never blind retry" path
     // (./bench.ts, scripts/orch-e2e.mjs S2), so it has its own allowance — but
     // it never resets the retry count, and both ceilings bind the same item.
-    const refusal = retryRefusal(item, policy, workerId);
+    const refusal = resumingParkedDispatch ? null : retryRefusal(item, policy, workerId);
     if (refusal !== null) {
       deps.trace.record(ref(item), "error", refusal);
       emit("worker.progress", { workItemId: id, phase: "retry", result: "refused", workerId });
@@ -961,7 +1060,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
     const claimed = deps.board.claim(id, workerId);
     if (!claimed.ok) return { workItemId: id, state: item.state, note: claimed.reason };
-    appendDispatch(id, workerId);
+    if (!resumingParkedDispatch) appendDispatch(id, workerId);
     deps.trace.record(ref(claimed.value), "worker", `${workerId} working`);
     emit("worker.started", { workItemId: id, workerId });
     deps.board.heartbeat(id, "started", workerId);
@@ -2114,6 +2213,21 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         launched: { started: false, reason: "empty report: nothing to audit" },
       };
     }
+    // STRUCTURE CHECK. `handoffFromText` is deliberately lenient — it treats any
+    // text as a RESULT and defaults a missing STATUS to "ok" — which is fine for
+    // a worker reply (the gate still demands real evidence) but wrong for an
+    // audit: auditing a document that is not a worker report invents a status it
+    // never asserted and creates a durable item out of nothing. A report must
+    // declare at least one real section before anything is audited.
+    const REPORT_SECTIONS = /^\s*(STATUS|RESULT|CHANGED ARTIFACTS|EVIDENCE|TESTS|BLOCKERS|RISKS|FOLLOW-UPS|RECOMMENDED NEXT STEP|TOOLS USED)\s*:/im;
+    if (!REPORT_SECTIONS.test(report)) {
+      const reason = "unrecognized report: no worker-report section (STATUS, RESULT, EVIDENCE, TESTS, CHANGED ARTIFACTS, BLOCKERS, …) was found — nothing was audited";
+      return {
+        workItemId: "", claims: [], observed: [], unmetCriteria: [], missingEvidence: [],
+        blockers: [reason], reviewNotes: [], nextPrompt: "",
+        launched: { started: false, reason },
+      };
+    }
     const handoff = handoffFromText(report);
     const objective = (input.objective ?? "").trim().length > 0
       ? (input.objective as string).trim()
@@ -2203,15 +2317,21 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     } else {
       reviewNotes.push("review skipped by autonomy policy (ASK/OFF) — findings rest on KAI-observed evidence only");
     }
+    // Only claim a status the document ACTUALLY asserted. `handoffFromText`
+    // defaults a missing STATUS line to "ok", which is a lenient default for a
+    // worker reply but a fabrication when presented as an audit claim.
+    const declaredStatus = /^\s*STATUS\s*:/im.test(report);
     const claims = [
-      `worker status: ${handoff.status}`,
+      ...(declaredStatus ? [`worker status: ${handoff.status}`] : []),
       `result: ${handoff.result.slice(0, 300)}`,
       ...handoff.evidence.slice(0, 5).map((e) => `claimed evidence: ${e.slice(0, 160)}`),
       ...(handoff.tests !== undefined ? [`claimed tests: ${handoff.tests.slice(0, 200)}`] : []),
       ...handoff.blockers.slice(0, 3).map((b) => `claimed blocker: ${b.slice(0, 160)}`),
     ];
+    // Surface the REASON a requirement could not be checked, not just its label:
+    // a refused check (out-of-sandbox path, policy) must be visible as a refusal.
     const limitation = gathered.blocked.length > 0 || input.workingDir === undefined
-      ? `Workspace ${input.workingDir === undefined ? "not provided — file claims unverified" : "checked"}; ${gathered.blocked.length} requirement(s) have no safe check: ${gathered.blocked.slice(0, 3).map((b) => b.label.slice(0, 80)).join("; ") || "none"}. Unverified is reported, never passed.`
+      ? `Workspace ${input.workingDir === undefined ? "not provided — file claims unverified" : "checked"}; ${gathered.blocked.length} requirement(s) could not be checked: ${gathered.blocked.slice(0, 3).map((b) => `${b.label.slice(0, 80)} (${b.reason.slice(0, 200)})`).join("; ") || "none"}. Unverified is reported, never passed.`
       : undefined;
     // The correction prompt: exact issues, exact files, exact commands.
     const remaining = [

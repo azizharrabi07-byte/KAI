@@ -51,12 +51,12 @@ cd core && npm test
 
 | | |
 |---|---|
-| tests | 1194 |
-| pass | 1181 |
+| tests | 1278 |
+| pass | 1265 |
 | fail | 0 |
 | skipped | 13 |
 
-**0 failures.** The one long-standing failure (`core/src/server.test.ts:249`, "POST /chat
+**0 failures.** (The count includes the independent campaign suites below.) The one long-standing failure (`core/src/server.test.ts:249`, "POST /chat
 runs a real turn through Hermes") was an external Hermes misconfiguration, not a KAI
 defect, and it is **fixed and verified** — see the diagnosis below. It is now passing
 against the live worker, not skipped and not relabelled.
@@ -67,6 +67,42 @@ cases), `summary-daily` (11), `summary-audit-commands` (7), plus a LIVE HTTP-bou
 retry-ceiling case in `orch-commands` and the rewritten `orch-orchestrator` budget case.
 The 13 skips are live-integration checks that need both agents or OpenCode (which is
 offline on this machine); each names its reason.
+
+## Independent campaign (2026-10-10) — adversarial verification, 8 defects fixed
+
+An adversarial campaign (independent verification suites + a deterministic stress
+harness, run in a worktree on this branch) found and fixed eight real defects.
+Each has a regression test that now protects it.
+
+| # | Defect (observed) | Fix | Regression test |
+|---|---|---|---|
+| 1 | Artifact evidence was resolved against **KAI's own working directory**: an item with no `workingDir` completed from a file KAI happened to have, and `workingDir` was ignored for the check | `gatherEvidence` requires a workspace and resolves the claimed path inside it; no workspace ⇒ unverifiable | `orch-supervisor-trust` 1c |
+| 2 | A **refused** tool call (out-of-sandbox path) was recorded as an "ABSENT" disk observation KAI never made | a refusal is recorded as unverifiable with the tool's reason, never as an observation | `campaign-evidence` 3, `campaign-gate` 6c |
+| 3 | `/audit` accepted a document that was **not a worker report**, invented `worker status: ok`, and created a durable item | a report must declare a real section; the status claim is only made when the document asserts one | `campaign-audit-summary` 4d |
+| 4 | A reviewer PASS **compensated a criterion whose linked evidence was never observed** (all_criteria + `evidenceLinks` completed) | compensation applies only to criteria with no declared evidence path; linked evidence always binds | `campaign-gate` 5c |
+| 5 | Skill receipts for two **different bodies** of one skill collapsed into one (no version/hash ⇒ `id@?`) | the receipt hashes the body actually handed over (sha256) when the registry exposes none | `campaign-skills-memory` 7b |
+| 6 | A lesson write that **threw** was silently swallowed (a refusal was traced, a throw was not) | the throw is traced; completion still stands | `campaign-skills-memory` memory-10 |
+| 7 | Approving a **review** park re-dispatched the worker, burned an attempt and could park again forever; a plain run on a REVIEW-parked item also re-dispatched | a review park settles through the gate without a dispatch; a plain run on it is refused | `campaign-retry-stress` S4d |
+| 8 | **Duplicate `mission.failed` deliveries** (and a restart) started another re-attempt of one failure, unbounded | a durable `autonomyRetriedAt` stamp plus an in-process marker bound it to one re-attempt | `campaign-approval-lifecycle` 10c |
+
+Also fixed alongside #7: resuming a **parked delegation** now continues the same
+attempt instead of charging a fresh retry (a park is not a dispatch), so a human
+approving twice cannot exhaust the budget with a single real execution.
+
+Campaign parameters: 50 concurrent dispatch requests on one item (exactly 1
+dispatch), 100 independent items (all truthful terminal states, 0 false
+completions), duplicate/out-of-order event delivery, restart between every
+significant transition, fixed seed (`kai-retry-stress-v1`). Invariants asserted:
+zero false completions, zero completion without a passing gate, no duplicate
+authoritative dispatch, no budget bypass by worker rotation or corrective chains,
+no lost contract/evidence after a park or restart, no cross-mission memory leak,
+no contradictory terminal events, no unbounded retries. All held.
+
+Live worker path re-verified end to end against Hermes (`scripts/campaign-hermes-e2e.mjs`):
+an unreachable worker fails honestly with no completion event; a real Hermes
+worker, driven through the approval boundary, completes with **exactly one**
+gate-carrying `worker.completed` (`gate: "PASS"`); the failed item is
+re-attempted successfully.
 
 ## Hermes diagnosis and fix (2026-10-09) — resolved
 

@@ -287,13 +287,58 @@ test("1b the same run completes ONLY once KAI observes the artifact present", as
   try {
     h.state.toolHandlers["filesystem.metadata"] = metadataHandler(true);
     const started = h.orch.startObjective(
-      { objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"] },
+      { objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"], workingDir: "C:/tmp/project" },
       ["worker-1"],
     );
     const out = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
     assert.equal(out.state, "COMPLETED", out.note);
     const item = h.board.get(started.workItemId);
     assert.ok((item?.evidence ?? []).some((r) => r.source === "kai-observed" && r.supports.length > 0));
+  } finally {
+    h.close();
+  }
+});
+
+// ══ 1c. Evidence is scoped to the ITEM's workspace ═══════════════════════════
+
+test("1c an artifact claim is checked inside the item's workspace, never KAI's own tree", async () => {
+  const h = harness();
+  try {
+    const checked: string[] = [];
+    h.state.toolHandlers["filesystem.metadata"] = (input) => {
+      const record = input !== null && typeof input === "object" ? (input as { path?: unknown }) : {};
+      checked.push(typeof record.path === "string" ? record.path : "");
+      return { ok: true, result: { exists: true, size: 12 } };
+    };
+
+    // (a) No workspace: there is nothing to check against, so NO check runs and
+    // the item cannot complete. Before this was scoped, KAI resolved the path
+    // against its OWN working directory and recorded a positive observation for
+    // work it had never inspected.
+    const unscoped = h.orch.startObjective(
+      { objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"] },
+      ["worker-1"],
+    );
+    await h.orch.runWorkItem(unscoped.workItemId, { workerId: "worker-1" });
+    assert.deepEqual(checked, [], "an item with no workspace must not be checked against KAI's own tree");
+    assert.notEqual(h.board.get(unscoped.workItemId)?.state, "COMPLETED", "an unscoped claim can never complete");
+    const unscopedEvidence = (h.board.get(unscoped.workItemId)?.evidence ?? []).filter((r) => r.source === "kai-observed");
+    assert.deepEqual(unscopedEvidence, [], "nothing may be observed without a workspace");
+
+    // (b) With a workspace: the check resolves INSIDE it, and only then can a
+    // present artifact satisfy the requirement.
+    const scoped = h.orch.startObjective(
+      { objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"], workingDir: "C:/tmp/project" },
+      ["worker-1"],
+    );
+    await h.orch.runWorkItem(scoped.workItemId, { workerId: "worker-1" });
+    assert.ok(checked.length > 0, "a scoped item is checked");
+    const inWorkspace = (p: string): boolean => p.replace(/\\/g, "/").startsWith("C:/tmp/project");
+    assert.ok(
+      checked.every(inWorkspace),
+      `every checked path must live inside the item's workspace, got ${JSON.stringify(checked)}`,
+    );
+    assert.equal(h.board.get(scoped.workItemId)?.state, "COMPLETED", "a present artifact in the right workspace completes");
   } finally {
     h.close();
   }
@@ -663,7 +708,7 @@ test("10 idempotency: duplicate resume keys cannot double-execute", async () => 
   const h = harness();
   try {
     h.state.toolHandlers["filesystem.metadata"] = metadataHandler(true);
-    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"] }, ["worker-1"]);
+    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"], workingDir: "C:/tmp/project" }, ["worker-1"]);
     const first = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1", resumeEventId: "evt_1" });
     assert.equal(first.state, "COMPLETED");
     const delegatesAfterFirst = h.state.delegateCalls.length;
@@ -680,7 +725,7 @@ test("10b a settled item refuses re-running at the board boundary", async () => 
   const h = harness();
   try {
     h.state.toolHandlers["filesystem.metadata"] = metadataHandler(true);
-    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"] }, ["worker-1"]);
+    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"], workingDir: "C:/tmp/project" }, ["worker-1"]);
     await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
     const delegates = h.state.delegateCalls.length;
     const rerun = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
@@ -840,7 +885,7 @@ test("14 skill receipts: selection, loading and receipts match what was handed o
     h.state.skillBodies = { "fact-check": "verify claims against files", "plan-review": "critique before running" };
     h.state.skillMeta = { "fact-check": { version: "1.2.0", hash: "abc123" } };
     // No skills named at creation → the orchestrator asks the registry.
-    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"] }, ["worker-1"]);
+    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"], workingDir: "C:/tmp/project" }, ["worker-1"]);
     const planned = h.board.get(started.workItemId);
     assert.deepEqual(planned?.skills, ["fact-check", "plan-review"], "top-N selection happened at planning time");
     await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
@@ -868,7 +913,7 @@ test("14b a skill that cannot be loaded produces NO receipt and is traced", asyn
     h.state.toolHandlers["filesystem.metadata"] = metadataHandler(true);
     h.state.skillsRelevant = ["ghost"];
     // No body registered for "ghost": load fails.
-    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"] }, ["worker-1"]);
+    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"], workingDir: "C:/tmp/project" }, ["worker-1"]);
     await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
     const item = h.board.get(started.workItemId);
     assert.deepEqual(item?.skillReceipts, [], "no receipt without a real load");
@@ -907,7 +952,7 @@ test("16b a failed lesson write is surfaced by the orchestrator, never reported 
     h.state.toolHandlers["filesystem.metadata"] = metadataHandler(true);
     h.state.lessonRefusal = "refused: mission scope unavailable";
     const started = h.orch.startObjective(
-      { objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"], missionId: "mission_lesson" },
+      { objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"], workingDir: "C:/tmp/project", missionId: "mission_lesson" },
       ["worker-1"],
     );
     const out = await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
@@ -926,7 +971,7 @@ test("17 production path: a supervised run emits the correlated lifecycle events
   const h = harness();
   try {
     h.state.toolHandlers["filesystem.metadata"] = metadataHandler(true);
-    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"] }, ["worker-1"]);
+    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"], workingDir: "C:/tmp/project" }, ["worker-1"]);
     await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
     const types = h.published.map((p) => p.type);
     // Planning is visible, dispatch is truthful, completion is real.
@@ -946,7 +991,7 @@ test("17b the completion event is NOT emitted when the gate refuses", async () =
   const h = harness();
   try {
     h.state.toolHandlers["filesystem.metadata"] = metadataHandler(false);
-    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"] }, ["worker-1"]);
+    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"], workingDir: "C:/tmp/project" }, ["worker-1"]);
     await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
     assert.equal(h.published.some((p) => p.type === "worker.completed"), false, "an unmet gate must never announce a completion");
   } finally {
@@ -1056,7 +1101,7 @@ test("retry policy: a worker switch still succeeds when the policy permits it (S
     ];
     h.state.toolHandlers["filesystem.metadata"] = metadataHandler(true);
     const started = h.orch.startObjective(
-      { objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"] },
+      { objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"], workingDir: "C:/tmp/project" },
       ["worker-1"],
     );
     const id = started.workItemId;
@@ -1259,7 +1304,7 @@ test("redaction: a secret-shaped string in a worker's evidence is redacted in th
     const secret = "sk-ant-api03-ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ";
     h.state.delegateQueue = [{ ok: true, reply: okReply(DELIVERABLE).replace("EVIDENCE: tests pass", `EVIDENCE: ran with key ${secret}`) }];
     h.state.toolHandlers["filesystem.metadata"] = metadataHandler(true);
-    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"] }, ["worker-1"]);
+    const started = h.orch.startObjective({ objective: OBJ, deliverable: DELIVERABLE, requiredEvidence: ["file present: src/a.ts"], workingDir: "C:/tmp/project" }, ["worker-1"]);
     await h.orch.runWorkItem(started.workItemId, { workerId: "worker-1" });
     const item = h.board.get(started.workItemId);
     const dumped = JSON.stringify(item?.evidence ?? []);

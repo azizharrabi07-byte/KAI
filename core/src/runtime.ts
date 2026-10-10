@@ -2371,6 +2371,25 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   const supervisor = createMissionSupervisor({
     getMission: (id) => stores.missions.getMission(id),
     startAttempt: (input) => createAndStartMissionImpl(input),
+    /**
+     * Durable half of the duplicate-delivery bound: stamp the settled mission so
+     * a replayed `mission.failed` — or a Core restart re-reading the same FAILED
+     * row — cannot start a second re-attempt for one failure.
+     */
+    markRetried: (missionId) => {
+      try {
+        const mission = stores.missions.getMission(missionId);
+        if (mission === null) return;
+        const stampedAt = new Date().toISOString();
+        stores.missions.upsertMission({
+          ...mission,
+          metadata: { ...(mission.metadata ?? {}), autonomyRetriedAt: stampedAt },
+          updatedAt: stampedAt,
+        });
+      } catch {
+        // The supervisor's in-process marker still bounds duplicates.
+      }
+    },
     notify: (input) => {
       notifications.notify({
         type: "autonomy",
