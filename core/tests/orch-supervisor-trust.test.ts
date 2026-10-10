@@ -568,12 +568,17 @@ test("6b older rows without the v4 fields read back normalized, never crashing",
 // ══ 7 & 8. Success and failure supervision, through the REAL runtime ═════════
 
 function bootRuntime(dir: string) {
-  return createCoreRuntime({
+  const runtime = createCoreRuntime({
     dbPath: join(dir, "core.db"),
     agents: { mode: "mock" },
     startScheduler: false,
     subsystemPaths: { runUpkeepOnStart: false, ledgerPath: join(dir, "ledger.db") },
   });
+  // These tests exercise the AUTONOMOUS supervision loop, which is the KAI Doer:
+  // a fresh Core starts with the Doer OFF, so a test that means to prove the loop
+  // works must switch it on — exactly as a user would.
+  runtime.stores.settings.set("orchestration.doer", "ON", new Date().toISOString());
+  return runtime;
 }
 
 function missionFixture(status: "COMPLETED" | "FAILED", id: string, stepStatus = "COMPLETED", code: "AGENT_TIMEOUT" | "POLICY_DENIED" = "AGENT_TIMEOUT"): Mission {

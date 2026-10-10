@@ -476,7 +476,7 @@ test("prefs: invalid stored values fall back to defaults", () => {
 });
 
 test("prefs: every key validates a good value and refuses one bad value", () => {
-  assert.equal(ORCHESTRATION_KEYS.length, 14);
+  assert.equal(ORCHESTRATION_KEYS.length, 15);
   const cases: Array<{ key: OrchestrationKey; good: unknown; bad: unknown }> = [
     { key: "orchestration.autonomy", good: 2, bad: "9" },
     { key: "orchestration.workerAuto", good: "AUTO", bad: "AUTO_SAFE" },
@@ -492,8 +492,10 @@ test("prefs: every key validates a good value and refuses one bad value", () => 
     { key: "orchestration.taskRetentionDays", good: 365, bad: 0 },
     { key: "orchestration.decision", good: "deterministic+jev", bad: "jev" },
     { key: "orchestration.jevMaxCalls", good: 5, bad: 51 },
+    // KAI Doer: a two-value switch, so anything else is refused.
+    { key: "orchestration.doer", good: "ON", bad: "MAYBE" },
   ];
-  assert.equal(cases.length, 14);
+  assert.equal(cases.length, 15);
   for (const { key, good, bad } of cases) {
     const accepted = validateOrchestrationValue(key, good);
     assert.equal(accepted.ok, true, `${key} accepts ${JSON.stringify(good)}`);

@@ -244,7 +244,16 @@ export type KaiEventType =
   | "command.exit"
   // Optional decision accelerator telemetry (JEV): recorded only when a
   // provider is actually consulted. Live-only; never persisted.
-  | "decision.provider_used";
+  | "decision.provider_used"
+  // KAI Doer — the autonomous goal-execution capability. These record the
+  // switch itself and what happened to a worker result while the Doer was
+  // OFF (parked) or ON (processed). Guard events are unaffected: the policy
+  // engine, approvals and the execution registry keep emitting as always.
+  | "doer.enabled"
+  | "doer.disabled"
+  | "doer.result_pending"
+  | "doer.result_processed"
+  | "doer.result_failed";
 
 export interface KaiEvent<T = unknown> {
   id: string;
@@ -299,6 +308,14 @@ export const PERSISTED_EVENT_TYPES: readonly KaiEventType[] = [
   // Command lifecycle persists (started/exit); stdout/stderr chunks stay live.
   "command.started",
   "command.exit",
+  // Doer lifecycle: the switch and every worker result the Doer accepted,
+  // parked, processed or failed must be auditable after the process is gone.
+  // A parked result is exactly the kind of record a restart must not lose.
+  "doer.enabled",
+  "doer.disabled",
+  "doer.result_pending",
+  "doer.result_processed",
+  "doer.result_failed",
 ];
 
 export function shouldPersist(type: KaiEventType): boolean {

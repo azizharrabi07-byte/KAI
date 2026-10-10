@@ -33,6 +33,10 @@ export const ORCHESTRATION_KEYS = [
   // deterministic kernel and Outcome Gate stay authoritative either way.
   "orchestration.decision",
   "orchestration.jevMaxCalls",
+  // KAI Doer — the autonomous goal-execution capability. NOT the security
+  // layer: Guard (policy, risk, approvals, the execution registry) is never
+  // affected by this switch. A fresh install starts OFF.
+  "orchestration.doer",
 ] as const;
 
 export type OrchestrationKey = (typeof ORCHESTRATION_KEYS)[number];
@@ -88,6 +92,8 @@ export function validateOrchestrationValue(key: OrchestrationKey, value: unknown
       return oneOf(key, value, ["deterministic", "deterministic+jev"]);
     case "orchestration.jevMaxCalls":
       return intIn(key, value, 0, 50);
+    case "orchestration.doer":
+      return oneOf(key, value, ["ON", "OFF"]);
   }
 }
 
@@ -107,6 +113,15 @@ export const DEFAULT_REASONING: ReasoningMode = "SUMMARY";
 export const DEFAULT_TOOLS_VIEW: "COLLAPSED" | "EXPANDED" = "COLLAPSED";
 export const DEFAULT_AGENTS_VIEW: "COMPACT" | "DETAILED" = "COMPACT";
 
+/**
+ * KAI Doer — autonomous goal execution. A fresh installation has no saved
+ * preference, so it starts OFF: KAI answers, plans and observes, but does not
+ * dispatch workers or interpret their results on its own. This is deliberately
+ * separate from Guard, which is always active and is never switched off here.
+ */
+export type DoerState = "ON" | "OFF";
+export const DEFAULT_DOER: DoerState = "OFF";
+
 export interface OrchestrationPrefs {
   autonomy: AutonomyPolicy;
   activity: TraceLevel;
@@ -116,6 +131,8 @@ export interface OrchestrationPrefs {
   /** "deterministic" (default) or "deterministic+jev" (optional accelerator). */
   decision: "deterministic" | "deterministic+jev";
   jevMaxCalls: number;
+  /** Autonomous goal execution. Guard is unaffected: it is always active. */
+  doer: DoerState;
 }
 
 /** Read effective orchestration prefs: stored rows over safe defaults. */
@@ -150,5 +167,6 @@ export function readOrchestrationPrefs(store: SettingsStore): OrchestrationPrefs
     agentsView: pick("orchestration.agentsView", ["COMPACT", "DETAILED"] as const, DEFAULT_AGENTS_VIEW),
     decision: pick("orchestration.decision", ["deterministic", "deterministic+jev"] as const, "deterministic"),
     jevMaxCalls: num("orchestration.jevMaxCalls", 5),
+    doer: pick("orchestration.doer", ["ON", "OFF"] as const, DEFAULT_DOER),
   };
 }

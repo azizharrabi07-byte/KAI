@@ -66,6 +66,16 @@ import { createMcpManager } from "./mcp/manager.ts";
 import { createPluginRegistry } from "./plugins/registry.ts";
 import { dispatchMcpCapability, installMcpCapability } from "./mcp/capability.ts";
 import { createParkedRequestStore, type ParkedRequestStore } from "./approvals/parked.ts";
+import {
+  createDoer,
+  createPendingResultStore,
+  DOER_RESULT_EVENT_TYPES,
+  payloadCorrelation,
+  type Doer,
+  type DoerProcessOutcome,
+  type PendingResult,
+  type PendingResultStore,
+} from "./orchestration/doer.ts";
 import { createMissionExecutor } from "./missions/executor.ts";
 import { createMission } from "./missions/mission.ts";
 import { createScheduler } from "./scheduler/scheduler.ts";
@@ -128,7 +138,7 @@ import { createLearning } from "./orchestration/learn.ts";
 import { parseReviewVerdict, REVIEWER_SYSTEM } from "./orchestration/review.ts";
 import { createOrchestrator, type Orchestrator } from "./orchestration/orchestrator.ts";
 import { createUnavailableJevProvider, DEFAULT_JEV_BUDGET } from "./orchestration/decision.ts";
-import { readOrchestrationPrefs } from "./orchestration/prefs.ts";
+import { readOrchestrationPrefs, type OrchestrationPrefs } from "./orchestration/prefs.ts";
 import { createSettingsService, isSettingKey, type SettingsService, type ValidatedSettingsInput } from "./settings/settings.ts";
 import { isOrchestrationKey, validateOrchestrationValue, type OrchestrationKey } from "./orchestration/prefs.ts";
 import type { StepRunner } from "./missions/executor.ts";
@@ -323,6 +333,8 @@ export interface CoreRuntimeOptions {
     subagentSharesPath?: string;
     /** Parked non-mission approval requests (their own file). Default `<dbDir>/parked-requests.db`. */
     parkedPath?: string;
+    /** Doer pending-result inbox (its own file). Default `<dbDir>/doer-pending.db`. */
+    doerPath?: string;
     /** Checkpoint store root. Default `<dbDir>/checkpoints`. */
     checkpointsDir?: string;
     /** KAI_HOME for identity docs (SOUL.md/USER.md). Defaults to the real KAI_HOME. */
@@ -433,6 +445,13 @@ export interface CoreRuntime {
   approvals: ReturnType<typeof createApprovalService>;
   /** Durable store of parked NON-mission requests, so a verdict can re-issue them. */
   parkedRequests: ParkedRequestStore;
+  /**
+   * KAI Doer — autonomous goal execution. Independent of Guard: switching the
+   * Doer off never disables policy, approvals or the execution registry.
+   */
+  doer: Doer;
+  /** The Doer's durable pending-result inbox (exposed for the UI and tests). */
+  pendingResults: PendingResultStore;
   /** The live Workforce Manager: the employee layer above the agent registry. */
   workforce: ReturnType<typeof createWorkforceManager>;
   /** The live Capability Manager: one instance, in the production runtime. */
@@ -1290,6 +1309,7 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   ) {
     const record = (typeof input === "object" && input !== null ? input : {}) as {
       settings?: Record<string, unknown>;
+      orchestration?: Record<string, string>;
       reset?: string[];
     };
     if (record.reset !== undefined) {
@@ -1310,7 +1330,15 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     const modelPatch: Record<string, unknown> = {};
     const orchClean: Partial<Record<OrchestrationKey, string>> = {};
     let sawModel = false;
-    for (const [key, value] of Object.entries(patch)) {
+    // A parked call is re-issued with the NORMALISED input this function
+    // returned (`{ settings, orchestration }`), so validation must accept that
+    // shape too — otherwise an approved orchestration-only change could never be
+    // resumed: the verdict lands and the setting silently never applies.
+    const claimed: [string, unknown][] = [
+      ...Object.entries(patch),
+      ...Object.entries(record.orchestration ?? {}),
+    ];
+    for (const [key, value] of claimed) {
       if (isOrchestrationKey(key)) {
         const validated = validateOrchestrationValue(key, value);
         if (!validated.ok) return validated;
@@ -1365,6 +1393,10 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   // recipient's access survives a restart exactly as the source fact does.
   const subagentSharesPath = subsystemPaths.subagentSharesPath ?? (dataDir !== undefined ? join(dataDir, "kai-subagent-memory-shares.json") : undefined);
   const parkedPath = subsystemPaths.parkedPath ?? (dataDir !== undefined ? join(dataDir, "parked-requests.db") : ":memory:");
+  // The Doer's pending-result inbox lives in its own file, like the parked
+  // approvals and the scheduler leases: a worker result that arrives while the
+  // Doer is OFF must survive a restart, and it must not reshape `Stores`.
+  const doerPath = subsystemPaths.doerPath ?? (dataDir !== undefined ? join(dataDir, "doer-pending.db") : ":memory:");
   const checkpointsDir = subsystemPaths.checkpointsDir ?? underData("checkpoints");
 
   /**
@@ -2483,21 +2515,11 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     syncViews: () => syncEmployeeViews(),
   });
 
-  // The loop's triggers: a mission settling FAILED is evaluated for retry,
-  // and a mission settling COMPLETED or CANCELLED is supervised for
-  // settlement truth + a provenanced lesson. Fire-and-forget on purpose —
-  // the bus must never wait on the supervisor. observe() itself records and
-  // notifies on internal failure, so the catch here is only a backstop.
-  const detachSupervisor = bus.subscribe(
-    (event) => {
-      const missionId = typeof (event.payload as { missionId?: unknown })?.missionId === "string"
-        ? ((event.payload as { missionId: string }).missionId)
-        : event.missionId;
-      if (typeof missionId !== "string" || missionId.length === 0) return;
-      void supervisor.observe(missionId).catch(() => undefined);
-    },
-    { types: ["mission.failed", "mission.completed", "mission.cancelled"] },
-  );
+  // The loop's triggers live with the KAI Doer (below), because whether a
+  // settled mission is retried, re-planned or supervised for settlement truth
+  // is exactly the autonomous capability the Doer switches on and off. Guard is
+  // not involved: a retry still passes the same policy gate as any other action.
+  let detachDoer: (() => void) | null = null;
 
   /**
    * The scheduled-job catalog (Part F1). A schedule says WHEN; the boundary says
@@ -3527,6 +3549,15 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
         updated.push(...result.value.updated);
       }
       if (updated.length === 0) return { ok: false, reason: "nothing to update: pass at least one settable key" };
+      // The ONE place the Doer preference changes. Emitting the transition here
+      // (rather than at an HTTP handler) means every writer — a direct tool
+      // call, a gated route, and the re-issue that follows an approved park —
+      // produces exactly one switch event, and the Doer drains the backlog it
+      // accumulated while it was OFF.
+      if (updated.includes("orchestration.doer")) {
+        const now = readOrchestrationPrefs(stores.settings).doer;
+        publish(now === "ON" ? "doer.enabled" : "doer.disabled", { source: "core" }, { source: "core" });
+      }
       return { ok: true, updated, effective: settings.effective() };
     },
     cancelMission: (id) => missions.cancel(id),
@@ -3642,7 +3673,7 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   // bypass: the boundary still evaluates every call, irreversible and
   // high-risk operations still park, and ASK still parks everything.
   function syncAutonomyDelegateRule(): void {
-    let prefs: ReturnType<typeof readOrchestrationPrefs>;
+    let prefs: OrchestrationPrefs;
     try {
       prefs = readOrchestrationPrefs(stores.settings);
     } catch {
@@ -3806,6 +3837,104 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     publish: (type, payload, opts) => publish(type as Parameters<typeof publish>[0], payload, opts),
   });
 
+  /**
+   * ── The KAI Doer ──────────────────────────────────────────────────────────
+   *
+   * The switch, read LIVE from the durable preference on every decision, and
+   * the pending-result inbox behind it.
+   *
+   * OFF — the Doer interprets nothing: no mission is re-observed, no worker
+   * result is read, no follow-up is generated, no retry or corrective action
+   * runs, and no model is asked to produce work. Results still arrive and are
+   * recorded (durably, idempotently) so nothing is lost.
+   *
+   * ON — every recorded result is claimed under a lease and processed once:
+   * a mission result wakes the mission supervisor (the same authoritative path
+   * the loop always used), and a work-item result is advanced through
+   * `runWorkItem`, which enforces policy, approvals, the retry ceiling and the
+   * Outcome Gate exactly as a user-triggered run does.
+   */
+  const pendingResults = createPendingResultStore({ path: doerPath });
+  const doerEnabled = (): boolean => readOrchestrationPrefs(stores.settings).doer === "ON";
+
+  async function processPendingResult(result: PendingResult): Promise<DoerProcessOutcome> {
+    // Reload authoritative state; the event payload is a pointer, never truth.
+    if (result.missionId !== undefined && result.missionId.length > 0) {
+      await supervisor.observe(result.missionId);
+      return { processed: true };
+    }
+    if (result.workItemId !== undefined && result.workItemId.length > 0) {
+      const move = orchestrator.nextMove(result.workItemId);
+      // Only the moves that actually advance a live item run autonomously.
+      // `ask`/`wait`/`stop` are real decisions the executive has made, not
+      // failures to act, so the result settles with the reason they carry.
+      if (move.action === "assign" || move.action === "retry" || move.action === "recover") {
+        // The inbox row's idempotency key doubles as the orchestrator's resume
+        // key, so the same recorded result cannot advance the same item twice
+        // even if this drain is retried or a duplicate delivery arrives.
+        await orchestrator.runWorkItem(result.workItemId, { resumeEventId: result.idempotencyKey });
+        return { processed: true };
+      }
+      return { processed: true, reason: `no autonomous action: ${move.action} — ${move.reason}` };
+    }
+    // A terminal event with nothing to correlate against has been seen and
+    // needs no action; it is settled with that explanation rather than left
+    // pending forever, so the inbox is an audit trail and not a leak.
+    return { processed: true, reason: "uncorrelated result: nothing to advance" };
+  }
+
+  const doer = createDoer({
+    store: pendingResults,
+    enabled: doerEnabled,
+    process: (result) => processPendingResult(result),
+    emit: (type, payload) => publish(type as Parameters<typeof publish>[0], payload, { source: "core" }),
+  });
+
+  const detachDoerResults = bus.subscribe(
+    (event) => {
+      // Record FIRST, and unconditionally: this is what makes OFF safe. The
+      // payload is stored redacted as delivered; nothing reads it here.
+      // Correlation: mission/step ride on the event; the worker ids ride inside
+      // the payload. Absent means unknown — never fabricated.
+      const correlation = {
+        missionId: event.missionId ?? payloadCorrelation(event.payload, "missionId"),
+        stepId: event.stepId ?? payloadCorrelation(event.payload, "stepId"),
+        workItemId: payloadCorrelation(event.payload, "workItemId"),
+        turnId: payloadCorrelation(event.payload, "turnId"),
+        scheduleId: payloadCorrelation(event.payload, "scheduleId"),
+      };
+      const recorded = doer.record({
+        type: event.type,
+        eventId: event.id,
+        payload: event.payload,
+        ...(correlation.missionId !== undefined ? { missionId: correlation.missionId } : {}),
+        ...(correlation.stepId !== undefined ? { stepId: correlation.stepId } : {}),
+        ...(correlation.workItemId !== undefined ? { workItemId: correlation.workItemId } : {}),
+        ...(correlation.turnId !== undefined ? { turnId: correlation.turnId } : {}),
+        ...(correlation.scheduleId !== undefined ? { scheduleId: correlation.scheduleId } : {}),
+      });
+      if (!recorded.created) return;
+      // Interpretation is gated on the live preference, never on a captured
+      // value: turning the Doer ON starts draining, OFF stops it, immediately.
+      if (doerEnabled()) void doer.drain().catch(() => undefined);
+    },
+    { types: DOER_RESULT_EVENT_TYPES },
+  );
+
+  // A switch to ON starts working the backlog immediately, whichever writer
+  // flipped it (an approved park included). Guard is untouched by this.
+  const detachDoerSwitch = bus.subscribe(
+    () => {
+      if (doerEnabled()) void doer.drain().catch(() => undefined);
+    },
+    { types: ["doer.enabled"] },
+  );
+
+  detachDoer = () => {
+    detachDoerResults();
+    detachDoerSwitch();
+  };
+
   return {
     stores,
     bus,
@@ -3814,6 +3943,8 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     policy,
     approvals,
     parkedRequests,
+    doer,
+    pendingResults,
     decideApproval,
     workforce,
     capabilities,
@@ -3931,6 +4062,14 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       scheduler.recoverInterrupted();
       if (options.startScheduler !== false) scheduler.start();
 
+      // Results that arrived while the Doer was OFF (or while the Core was
+      // down) are durable, so a restart with the Doer ON resumes them — once
+      // each, in correlation order. With the Doer OFF nothing is claimed and
+      // the inbox simply keeps its rows.
+      if (doerEnabled()) {
+        await doer.drain().catch(() => undefined);
+      }
+
       // The memory upkeep resume path (Part B7). The enabled flag and the last
       // run live in the store, not a closure, so a restart reads them back: we
       // re-enable a pause left behind and run one resume cycle to drain any turns
@@ -3948,7 +4087,7 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       stopped = true;
       // Order matters: nothing may fire a task after the database is gone.
       scheduler.stop();
-      detachSupervisor();
+      detachDoer?.();
       publish("core.stopped", {}, { source: "core" });
       await registry.disconnectAll();
       // MCP servers are child processes this runtime spawned; stop them with
@@ -3994,6 +4133,11 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       }
       try {
         parkedRequests.close();
+      } catch {
+        /* see above */
+      }
+      try {
+        pendingResults.close();
       } catch {
         /* see above */
       }

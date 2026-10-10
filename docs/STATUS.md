@@ -10,6 +10,71 @@ commands shown; nothing is claimed from reading code.
 - **Date:** 2026-10-09
 - **State:** experimental, single-machine, actively developed. Not a released product.
 
+## Product direction: KAI becomes a goal-driven executive (branch `feat/goal-executive`)
+
+The product direction changed. KAI is no longer only a conversational assistant that
+forwards prompts to workers: it is becoming a persistent, goal-driven executive that
+designs a route to a goal, has the plan approved, compiles worker-specific tasks,
+observes results, verifies evidence and continues until the goal is met or a real
+blocker is reached — with the user able to stop the autonomous part without losing the
+security layer.
+
+**Two controls, deliberately separate.** *KAI Guard* (policy engine, risk
+classification, approvals, execution registry) is **always on** and is not
+switchable through the other control. *KAI Doer* (autonomous planning, dispatch,
+result interpretation, corrective action) is a durable ON/OFF preference that
+**starts OFF** on a fresh installation. See `docs/architecture/KAI_DOER.md`.
+
+### Vertical slice 1 — the Doer switch and the pending-result inbox (verified)
+
+- **Durable preference** `orchestration.doer` (`ON`/`OFF`) in the existing settings
+  store; default `OFF`. Read live on every decision, so turning it off stops the
+  autonomous path immediately and turning it on resumes it without a restart.
+- **`core/src/orchestration/doer.ts`** — the switch plus a durable, idempotent
+  pending-result inbox in its own SQLite file (`doer-pending.db`). Terminal
+  worker/mission events are recorded **unconditionally**; interpretation happens only
+  through a claim under a lease, so a result that arrives while the Doer is OFF is
+  kept, not lost, and not interpreted.
+- **Exactly-once.** The idempotency key is `<eventType>:<eventId>` with `INSERT OR
+  IGNORE`; a claim is at-most-once under a lease (an expired lease returns the row to
+  `PENDING`); the attempt ceiling is enforced inside the store, not by the caller; a
+  `DONE` row is never re-processed. The inbox key doubles as the orchestrator's
+  `resumeEventId`, so the two guards are independent barriers against double dispatch.
+- **The wake-up path.** A terminal event → record → (if ON) single-flight drain →
+  mission-correlated results wake the mission supervisor; work-item-correlated results
+  advance through `orchestrator.runWorkItem`, which still enforces policy, approvals,
+  the retry ceiling and the Outcome Gate. No user prompt is needed to continue.
+- **Autonomy now requires the Doer.** The mission supervisor's bus subscription moved
+  behind the Doer, so OFF means no retry, no replan and no settlement lesson.
+- **API.** `GET /doer`, `POST /doer` (policy-gated — a WRITE-policy Core **parks** the
+  switch for a human), `GET /doer/pending`.
+- **Defect found and fixed.** A parked `settings.update` carrying only orchestration
+  keys could not be resumed: the re-issued call was the normalised
+  `{ settings, orchestration }` shape, and validation read only `settings`, so it
+  failed as "nothing to update" — the approval landed and the setting silently never
+  applied. Validation is now idempotent over its own output.
+
+**Not built yet (honest scope):** the Goal Architect's plan-approval gate, the Goal
+Challenger, a per-worker-kind task compiler, improvement proposals, the Island's
+Doer/Guard and worker-cockpit surfaces, and the guest VM. Research for each is
+complete; see the phase report.
+
+### Verification of slice 1 (commands actually run)
+
+- `cd core && npm test` — **1287 tests · 1274 pass · 0 fail · 13 skipped** (was
+  1279/1266/13; the +8 are `core/tests/doer-switch.test.ts`). The 13 skips are
+  live-integration checks that need OpenCode on `127.0.0.1:4096`; each names its
+  reason. No test is reported as passing that did not run.
+- `cd core && npm run typecheck` — clean.
+- Four existing suites that exercise the autonomous loop now enable the Doer
+  explicitly (`tests/autonomy.test.ts`, `tests/orch-supervisor-trust.test.ts`,
+  `tests/campaign-skills-memory.test.ts`) and the prefs enumeration test gained the
+  new key (`tests/orch-commands.test.ts`). That is the intended behaviour change, not
+  a relaxed assertion: autonomy requires the Doer.
+- A real-HTTP smoke (`GET /doer`, `GET /doer/pending`, `POST /doer`) confirmed the
+  routes on a live server: `POST /doer` returned **409** with an approval id, because
+  a WRITE-policy Core parks the switch for a human.
+
 ## What changed since the last status
 
 The supervisor trust repair (started in a previous session) was finished and verified:

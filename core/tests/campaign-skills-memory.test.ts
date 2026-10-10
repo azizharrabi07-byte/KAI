@@ -254,12 +254,17 @@ function harnessWithRealMemory(runtime: CoreRuntime, opts: { maxRetries?: number
 }
 
 function bootRuntime(dir: string) {
-  return createCoreRuntime({
+  const runtime = createCoreRuntime({
     dbPath: join(dir, "core.db"),
     agents: { mode: "mock" },
     startScheduler: false,
     subsystemPaths: { runUpkeepOnStart: false, ledgerPath: join(dir, "ledger.db") },
   });
+  // Lesson capture on the verified-completion path is the KAI Doer's job, and a
+  // fresh Core starts with the Doer OFF. This suite means to prove the lesson
+  // path, so it switches the Doer on the way a user would.
+  runtime.stores.settings.set("orchestration.doer", "ON", new Date().toISOString());
+  return runtime;
 }
 
 const TS = "2026-01-01T00:00:00.000Z";

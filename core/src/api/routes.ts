@@ -1247,6 +1247,54 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
   // GET serves the stored rows plus the EFFECTIVE values with their winning
   // source per key (settings > environment > credential-file > defaults), so a
   // human sees why a value is what it is. POST/POST-reset go through the
+  // ── KAI Doer (the autonomous switch) ─────────────────────────────────────
+  //
+  // GET is a typed read of the DURABLE preference plus the pending-result
+  // inbox summary. POST flips it through the same policy-gated
+  // `settings.update` tool as every other preference — Guard is authoritative,
+  // so a WRITE-policy Core parks the switch for a human instead of applying it
+  // silently. Guard itself is reported, never toggled: it is always active.
+  function getDoer(): ApiResponse {
+    const prefs = readOrchestrationPrefs(runtime.stores.settings);
+    const counts = runtime.pendingResults.counts();
+    return ok({
+      state: prefs.doer,
+      paused: prefs.doer === "OFF",
+      guard: "ON",
+      pending: counts,
+      // Enough for the Island's list without paginating the whole inbox.
+      results: runtime.pendingResults.list({ limit: 25 }),
+    });
+  }
+
+  async function setDoerHandler(req: ApiRequest): Promise<ApiResponse> {
+    const body = asBodyObject(req.body);
+    if (body === null) return bad('"body" must be a JSON object, e.g. {"state": "ON"}');
+    const state = body.state;
+    if (state !== "ON" && state !== "OFF") {
+      return bad('"state" must be "ON" or "OFF"');
+    }
+    const gated = await invokeGate(
+      runtime,
+      MUTATION_TOOL_IDS.settingsUpdate,
+      { settings: { "orchestration.doer": state } },
+      approvalIdOf(body),
+    );
+    if (!gated.ok) return gated.response;
+    // The switch event and the resulting drain belong to the settings write
+    // (runtime `updateSettings`), so an approved park and a direct write take
+    // exactly the same path. Nothing is deferred to a later tick.
+    return ok({ settings: gated.result, doer: getDoer() });
+  }
+
+  function listDoerPending(): ApiResponse {
+    const counts = runtime.pendingResults.counts();
+    return ok({
+      counts,
+      results: runtime.pendingResults.list(),
+    });
+  }
+
   // policy-gated `settings.update` tool, which parks by default: redirecting
   // inference traffic requires a human. The key itself is never stored here —
   // GET reports only whether one is configured.
@@ -2962,6 +3010,10 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     route("POST", "/work-items/audit", "WRITE", (req) => auditWorkItem(req)),
     route("GET", "/bench", "READ", () => Promise.resolve(listBench())),
     route("GET", "/activity", "READ", (req) => Promise.resolve(listActivity(req))),
+    // KAI Doer: the autonomous switch (Guard stays on and is never toggled here).
+    route("GET", "/doer", "READ", () => Promise.resolve(getDoer())),
+    route("POST", "/doer", "WRITE", (req) => setDoerHandler(req)),
+    route("GET", "/doer/pending", "READ", () => Promise.resolve(listDoerPending())),
     // The KAI Visual Engine's seam: structured visual intent, validated HERE.
     // READ: these routes compute and validate; they mutate nothing.
     route("POST", "/visual/compile", "READ", (req) => compileVisualHandler(req)),

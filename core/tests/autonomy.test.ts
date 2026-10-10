@@ -194,6 +194,11 @@ test("the runtime wires the loop: a settled failure is evaluated through the liv
     rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
+  // The autonomous loop IS the KAI Doer: a settled mission is only re-evaluated
+  // while the Doer is ON. A fresh Core starts OFF, so this test — which exists to
+  // prove the live bus reaches the supervisor — turns it on explicitly.
+  runtime.stores.settings.set("orchestration.doer", "ON", new Date().toISOString());
+
   assert.equal(runtime.autonomyDecisions().length, 0, "nothing has been decided yet");
 
   // A step targeting the MCP capability throws inside execute, which the registry
