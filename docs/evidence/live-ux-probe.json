@@ -1,25 +1,25 @@
 {
-  "at": "2026-10-10T00:36:27.815Z",
+  "at": "2026-10-10T13:39:44.329Z",
   "marks": {
     "rawStream": [
-      217,
-      370,
-      541,
-      541,
-      707,
-      871,
-      1054
+      229,
+      383,
+      562,
+      562,
+      718,
+      872,
+      1083
     ],
-    "firstTextMs": 709,
-    "firstToolMs": 709,
-    "firstFinalMs": 1327,
+    "firstTextMs": 798,
+    "firstToolMs": 692,
+    "firstFinalMs": 1377,
     "L1: assistant text appears early (not only at the end)": {
       "pass": true,
-      "detail": "text=709ms final=1327ms"
+      "detail": "text=798ms final=1377ms"
     },
     "L2: tool activity appears BEFORE the final answer": {
       "pass": true,
-      "detail": "tool=709ms final=1327ms"
+      "detail": "tool=692ms final=1377ms"
     },
     "L3: assistant text grows incrementally": {
       "pass": true,
@@ -28,9 +28,9 @@
   },
   "latency": {
     "samples": 13,
-    "firstTextMs": 709,
-    "p50": 709,
-    "p95": 709
+    "firstTextMs": 798,
+    "p50": 798,
+    "p95": 692
   },
   "verdict": "PASS"
 }
