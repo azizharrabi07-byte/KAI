@@ -41,6 +41,7 @@ import type { Benchmark } from "./bench.ts";
 import type { Dispatcher } from "./dispatch.ts";
 import type { ActivityTrace, TraceRef } from "./trace.ts";
 import type { ProposeInput, SkillCandidate, SkillLearning, SubmitResult } from "./learn.ts";
+import { compileTaskPacket, compilerInputFromWorkItem, packetDomain, renderTaskPacket } from "./compiler.ts";
 import { buildWorkerPrompt, recordPatternOutcome, selectPattern } from "./prompts.ts";
 import type { PromptPatternStore } from "../shared/contracts.ts";
 import { buildReviewerPrompt, requestReview, runReviewLoop } from "./review.ts";
@@ -553,51 +554,56 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     previousAttempts: string[],
     preloaded?: Map<string, string>,
   ): string {
-    const skillContext = item.skills.length > 0
-      ? item.skills
-        .map((sid) => {
-          const body = preloaded?.get(sid) ?? (() => {
-            try {
-              const loaded = deps.skills.load(sid);
-              return loaded.ok ? loaded.body : undefined;
-            } catch {
-              return undefined;
-            }
-          })();
-          return body !== undefined ? `## ${sid}\n${body.slice(0, 1500)}` : null;
-        })
-        .filter((s): s is string => s !== null)
-        .join("\n\n")
-        .slice(0, 3000)
-      : undefined;
-    // Full contract threading (Phase 5): criteria, constraints, forbidden
-    // outcomes, and evidence requirements reach the worker verbatim.
-    const criteria = item.criteria.length > 0
-      ? [...item.criteria]
-      : item.deliverable !== undefined
-        ? [`deliverable present: ${item.deliverable}`]
-        : [];
-    return buildWorkerPrompt({
-      mission: item.missionId ?? item.taskId ?? "direct objective",
-      role: workerId,
-      whySelected,
-      objective: item.objective,
-      context: [],
-      knownState: [],
-      previousAttempts,
-      constraints: [...item.constraints, "Stay inside the allowed scope.", "Return the HANDOFF FORMAT exactly."],
-      scope: item.tools.length > 0 ? `tools: ${item.tools.join(", ")}` : "read-only inspection",
-      requiredOutput: item.deliverable ?? item.objective,
-      successCriteria: criteria,
-      verification: [
-        ...item.requiredEvidence.map((e) => `evidence required: ${e}`),
-        "cite evidence",
-        "name blockers plainly",
-      ],
-      budget: `attempt ${item.attempts}`,
-      handoffFormat: HANDOFF_FORMAT,
-      ...(skillContext !== undefined && skillContext.length > 0 ? { skillContext } : {}),
-    });
+    // The worker's task domain decides the packet's SHAPE: a coding task gets
+    // changed-artifact and build/test sections, a research task gets citation
+    // requirements and a no-mutation boundary, and so on. It comes from the same
+    // dispatcher that chose the worker, so the packet cannot disagree with the
+    // routing decision.
+    const domain = ((): TaskDomain => {
+      try {
+        return deps.dispatcher.analyze(item.objective).taskType;
+      } catch {
+        // A classifier that cannot decide must not stop a dispatch: fall back to
+        // the general packet rather than throwing inside prompt construction.
+        return "general";
+      }
+    })();
+
+    // Only the skills this item selected, loaded once, bounded. A skill that
+    // will not load is simply absent from the packet — it is already recorded as
+    // a missing receipt, so silence here is not a lost fact.
+    const skills = item.skills
+      .map((sid) => {
+        const body = preloaded?.get(sid) ?? (() => {
+          try {
+            const loaded = deps.skills.load(sid);
+            return loaded.ok ? loaded.body : undefined;
+          } catch {
+            return undefined;
+          }
+        })();
+        // `relevant: true` is deliberate. These skills came from the registry's
+        // own relevance ranking at planning time and a receipt already records
+        // that their bodies were loaded and handed over. Re-deciding relevance
+        // here would silently drop them while the receipt still claimed the
+        // handover — a false receipt. The compiler still caps COUNT and SIZE.
+        return body !== undefined ? { id: sid, name: sid, body, relevant: true } : null;
+      })
+      .filter((skill): skill is { id: string; name: string; body: string; relevant: true } => skill !== null);
+
+    const packet = compileTaskPacket(
+      compilerInputFromWorkItem(item, {
+        domain,
+        role: workerId,
+        whySelected,
+        // Prior failures are the corrective context; they never widen scope.
+        gateObservations: previousAttempts,
+        ...(skills.length > 0 ? { skills } : {}),
+        // The handoff format stays byte-identical to the one the parser expects.
+        handoffFormat: HANDOFF_FORMAT,
+      }),
+    );
+    return renderTaskPacket(packet, packetDomain(domain));
   }
 
   // ── Evidence collection (Phase 3A/4): KAI inspects the workspace ITSELF ──
@@ -2376,7 +2382,14 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       context: [`Original worker report (UNTRUSTED claims): ${report.slice(0, 1500)}`],
       knownState: observedState.length > 0 ? observedState.slice(0, 10) : ["no independent observations yet — inspect first, then change"],
       previousAttempts: remaining.length > 0 ? remaining.slice(0, 10) : ["none recorded"],
-      constraints: ["Fix ONLY the listed issues; do not redo unrelated work.", "Return the HANDOFF FORMAT exactly."],
+      constraints: [
+        "Fix ONLY the listed issues; do not redo unrelated work.",
+        "Return the HANDOFF FORMAT exactly.",
+        // The contract's forbidden outcomes must reach the worker, not only the
+        // post-hoc Gate: a worker that never saw the prohibition cannot be said
+        // to have been told.
+        ...evaluation.contract.forbiddenOutcomes.map((f) => `forbidden: ${f}`),
+      ],
       scope: withEvidence.workingDir !== undefined ? `repository: ${withEvidence.workingDir}` : "as instructed",
       requiredOutput: objective,
       successCriteria: evaluation.contract.acceptanceCriteria.slice(0, 8),

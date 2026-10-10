@@ -30,6 +30,7 @@
  */
 
 import type { CoreRuntime } from "../runtime.ts";
+import { decideAccess } from "./authz.ts";
 import { isGoalState, routeTo, type Goal, type GoalState } from "../goals/goal.ts";
 import { revisionIdFor } from "../goals/challenger.ts";
 import { loadIdentity } from "../identity.ts";
@@ -94,6 +95,11 @@ export interface ApiRequest {
    * true, an unattested owner-only request is REFUSED.
    */
   ownerAuthConfigured?: boolean;
+  /**
+   * An EXPLICIT developer switch. Never the silent default: it is set only when
+   * the operator asked for it, and the decision records that it was used.
+   */
+  devMode?: boolean;
 }
 
 export interface ApiResponse {
@@ -1511,6 +1517,28 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     return ok(goalView(moved.goal));
   }
 
+  /**
+   * Compile the approved plan into linked work items and dispatch the
+   * dependency-ready ones. This is the explicit, user-initiated path; the Doer's
+   * autonomous path calls the same executor.
+   */
+  async function startGoalHandler(_req: ApiRequest, params: Record<string, string>): Promise<ApiResponse> {
+    const goalId = params.id ?? "";
+    const goal = runtime.goals.getGoal(goalId);
+    if (goal === null) return notFound(`no goal "${goalId}" exists`);
+    const compiled = runtime.goalExecutor.compile(goalId);
+    if (!compiled.ok) return conflict(compiled.reason);
+    const advanced = await runtime.goalExecutor.advance(goalId);
+    const status = runtime.goalExecutor.status(goalId);
+    return ok({ compiled, advanced, execution: status });
+  }
+
+  function goalExecutionHandler(_req: ApiRequest, params: Record<string, string>): ApiResponse {
+    const status = runtime.goalExecutor.status(params.id ?? "");
+    if (status === null) return notFound(`no goal "${params.id ?? ""}" exists`);
+    return ok(status);
+  }
+
   // ── KAI Doer (the autonomous switch) ─────────────────────────────────────
   //
   // GET is a typed read of the DURABLE preference plus the pending-result
@@ -2464,8 +2492,17 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
   // cannot tell a stale Core from the current one will believe whichever answers
   // first — which is exactly how a build under review was once queried while an
   // older Core served the port.
-  async function getIdentity(): Promise<ApiResponse> {
-    return ok(loadIdentity());
+  async function getIdentity(req: ApiRequest): Promise<ApiResponse> {
+    // The authorization POSTURE is part of the identity: an operator must be able
+    // to see, without guessing, whether this Core enforces owner-only controls or
+    // is running with no credential at all. Reported, never inferred.
+    const ownerAuth =
+      req.ownerAuthConfigured === true
+        ? "enforced"
+        : req.devMode === true
+          ? "disabled-by-explicit-dev-mode"
+          : "unconfigured";
+    return ok({ ...loadIdentity(), ownerAuth });
   }
 
   // ── Action trace (Phase 1 observability, readable) ───────────────────────────
@@ -3252,7 +3289,7 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
   // (it is not in KAI_INTERNAL_STATE_TOOLS): changing what KAI is authorized to do
   // is security-relevant, so it requires a human by default.
   const routeDefs: RouteDef[] = [
-    route("GET", "/identity", "READ", () => getIdentity()),
+    route("GET", "/identity", "READ", (req) => getIdentity(req)),
     // KAI's live soul: READ serves the current text + version; WRITE replaces
     // it through the policy-gated soul.set tool (parks by default).
     route("GET", "/soul", "READ", () => getSoul()),
@@ -3288,6 +3325,10 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     route("POST", "/goals/:id/plan", "WRITE", (req, p) => planGoalHandler(req, p), { requiresOwner: true }),
     route("POST", "/goals/:id/approve", "WRITE", (req, p) => approvePlanHandler(req, p), { requiresOwner: true }),
     route("POST", "/goals/:id/reject", "WRITE", (req, p) => rejectPlanHandler(req, p), { requiresOwner: true }),
+    // Execution: compile the approved plan and dispatch what is ready. The
+    // authoritative gate is the orchestration boundary, not this route.
+    route("POST", "/goals/:id/start", "EXTERNAL", (req, p) => startGoalHandler(req, p), { requiresOwner: true }),
+    route("GET", "/goals/:id/execution", "READ", (req, p) => Promise.resolve(goalExecutionHandler(req, p))),
     // KAI Doer: the autonomous switch (Guard stays on and is never toggled here).
     route("GET", "/doer", "READ", () => Promise.resolve(getDoer())),
     // Changes KAI's autonomy: owner-only.
@@ -3503,10 +3544,25 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
       return notFound(`no route for ${method || "(no method)"} ${path}`);
     }
 
-    // Owner-only routes: a local process that cannot present the owner
-    // credential must not be able to widen KAI's autonomy, approve a plan or
-    // release a parked action. Enforced only when a credential exists.
-    if (hit.def.requiresOwner === true && request.ownerAuthConfigured === true && request.attested !== true) {
+    // ── Authorization ─────────────────────────────────────────────────────────
+    // ONE decision for the whole surface, from the policy table in `authz.ts`
+    // (which is proven to classify every registered route). The route's own
+    // `requiresOwner` flag is a second, local declaration; either one refusing
+    // is enough, so a route cannot be left unprotected by forgetting a flag.
+    const decision = decideAccess({
+      method,
+      path,
+      attested: request.attested === true,
+      ownerAuthConfigured: request.ownerAuthConfigured === true,
+      ...(request.devMode === true ? { devMode: true } : {}),
+    });
+    if (!decision.allowed) {
+      return {
+        status: decision.status,
+        body: { error: true, code: "OWNER_AUTH_REQUIRED", reason: decision.reason },
+      };
+    }
+    if (hit.def.requiresOwner === true && request.ownerAuthConfigured === true && request.attested !== true && request.devMode !== true) {
       return {
         status: 401,
         body: {

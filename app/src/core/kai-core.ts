@@ -327,6 +327,18 @@ export interface CoreWorkItemSummary {
   workerId?: string;
   missionId?: string;
   taskId?: string;
+  /**
+   * The goal and the exact plan revision that authorised this item (schema v5).
+   * Absent means the item is not part of a goal — which is a fact the cockpit
+   * must show as "no plan link", never as a guessed one.
+   */
+  goalId?: string;
+  goalRevisionId?: string;
+  /** The item's acceptance criteria, so the UI can show what must be proven. */
+  criteria?: string[];
+  requiredEvidence?: string[];
+  /** The item's recorded evidence (kai-observed vs worker-reported). */
+  evidence?: { id: string; kind: string; source: string; detail: string; supports: string[]; at?: string }[];
   valueScore?: number;
   attempts?: number;
   retries?: number;
@@ -1059,9 +1071,35 @@ function parseWorkItem(raw: unknown): CoreWorkItemSummary | null {
   const state = asString(raw.state);
   if (id === undefined || state === undefined) return null;
   const out: CoreWorkItemSummary = { id, state };
-  for (const k of ["objective", "deliverable", "workerId", "missionId", "taskId", "createdAt", "updatedAt"] as const) {
+  for (const k of [
+    "objective", "deliverable", "workerId", "missionId", "taskId", "createdAt", "updatedAt",
+    // The goal linkage (schema v5): a work item created from an approved plan.
+    "goalId", "goalRevisionId",
+  ] as const) {
     const v = asString(raw[k]);
     if (v !== undefined) out[k] = v;
+  }
+  for (const k of ["criteria", "requiredEvidence"] as const) {
+    const v = raw[k];
+    if (Array.isArray(v) && v.every((e) => typeof e === "string")) out[k] = v;
+  }
+  // Evidence records carry the trust split: a `worker-reported` claim must stay
+  // distinguishable from a `kai-observed` fact all the way to the UI.
+  const evidence = raw.evidence;
+  if (Array.isArray(evidence)) {
+    const records: NonNullable<CoreWorkItemSummary["evidence"]> = [];
+    for (const entry of evidence) {
+      if (!isObject(entry)) continue;
+      const id = asString(entry.id);
+      const kind = asString(entry.kind);
+      const source = asString(entry.source);
+      const detail = asString(entry.detail);
+      if (id === undefined || kind === undefined || source === undefined || detail === undefined) continue;
+      const supports = Array.isArray(entry.supports) && entry.supports.every((e) => typeof e === "string") ? entry.supports : [];
+      const at = asString(entry.at);
+      records.push({ id, kind, source, detail, supports, ...(at !== undefined ? { at } : {}) });
+    }
+    if (records.length > 0) out.evidence = records;
   }
   for (const k of ["valueScore", "attempts", "retries", "tokensIn", "tokensOut", "latencyMs"] as const) {
     const v = asNumber(raw[k]);

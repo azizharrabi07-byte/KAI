@@ -28,6 +28,7 @@ const EXPECTED_ORDER = [
   "goals",
   "agents",
   "workers",
+  "cockpit",
   "tools",
   "mcp",
   "activity",

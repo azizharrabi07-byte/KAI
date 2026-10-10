@@ -77,6 +77,7 @@ import {
   type PendingResultStore,
 } from "./orchestration/doer.ts";
 import { createGoalStore, type GoalStore } from "./goals/store.ts";
+import { createGoalExecutor, type GoalExecutor } from "./goals/executor.ts";
 import { createGoalChallenger, type ChallengeMode, type GoalChallenger } from "./goals/challenger.ts";
 import { createGoalArchitect, type GoalArchitect } from "./goals/architect.ts";
 import { buildCriticPrompt, CRITIC_SYSTEM, parseFinding, PLANNER_SYSTEM } from "./goals/runners.ts";
@@ -477,6 +478,11 @@ export interface CoreRuntime {
   challengerFor(mode: ChallengeMode, maxRounds?: number): GoalChallenger;
   /** The Goal Architect: turns a goal into a validated, verifiable plan. */
   architect: GoalArchitect;
+  /**
+   * The goal executor: compiles an approved plan into linked work items and
+   * advances it through the existing orchestrator. Not a second executor.
+   */
+  goalExecutor: GoalExecutor;
   /** The live Workforce Manager: the employee layer above the agent registry. */
   workforce: ReturnType<typeof createWorkforceManager>;
   /** The live Capability Manager: one instance, in the production runtime. */
@@ -3779,10 +3785,13 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   syncAutonomyDelegateRule();
   const reviewBrain: KaiBrain = createKaiBrain({ provider: modelProvider });
 
+  // ONE board instance, shared by the orchestrator and the goal executor: two
+  // boards over the same rows would be two sources of truth for work state.
+  const workBoard = createWorkBoard(stores.workItems, {
+    onEvent: (type, payload) => publish(type as Parameters<typeof publish>[0], payload, { source: "core" }),
+  });
   const orchestrator = createOrchestrator({
-    board: createWorkBoard(stores.workItems, {
-      onEvent: (type, payload) => publish(type as Parameters<typeof publish>[0], payload, { source: "core" }),
-    }),
+    board: workBoard,
     bench: createBenchmark(stores.workerProfiles),
     dispatcher: createDispatcher({
       bench: createBenchmark(stores.workerProfiles),
@@ -3967,6 +3976,15 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       return { processed: true };
     }
     if (result.workItemId !== undefined && result.workItemId.length > 0) {
+      // A goal-linked item settles its GOAL's next step: dispatch the tasks whose
+      // dependencies are now satisfied, and settle the goal when every
+      // acceptance criterion is backed by observed evidence. Bounded by the
+      // plan's own dependency graph and per-pass concurrency.
+      const item = stores.workItems.get(result.workItemId);
+      if (item?.goalId !== undefined && item.goalId.length > 0) {
+        const advanced = await goalExecutor.advance(item.goalId);
+        return { processed: true, reason: advanced.reason };
+      }
       const move = orchestrator.nextMove(result.workItemId);
       // Only the moves that actually advance a live item run autonomously.
       // `ask`/`wait`/`stop` are real decisions the executive has made, not
@@ -4038,6 +4056,7 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     detachDoerSwitch();
   };
 
+
   /**
    * ── The goal layer ────────────────────────────────────────────────────────
    *
@@ -4078,6 +4097,23 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     },
   });
 
+  /**
+   * The goal executor: an approved plan becomes linked work items, and
+   * dependency-ready work is dispatched through the SAME `runWorkItem` every
+   * other caller uses — so policy, approvals, the retry ledger and the Outcome
+   * Gate all still apply. Compilation is idempotent and refuses an unapproved
+   * revision, so it cannot manufacture work the user never authorised.
+   */
+  const goalExecutor = createGoalExecutor({
+    goals,
+    board: workBoard,
+    runWorkItem: (id) => orchestrator.runWorkItem(id),
+    doerEnabled,
+    maxParallel: () => readOrchestrationPrefs(stores.settings).autonomy.maxParallel,
+    emit: (type, payload) => publish(type as Parameters<typeof publish>[0], payload, { source: "core" }),
+  });
+
+
   return {
     stores,
     bus,
@@ -4091,6 +4127,7 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     goals,
     challengerFor,
     architect,
+    goalExecutor,
     decideApproval,
     workforce,
     capabilities,

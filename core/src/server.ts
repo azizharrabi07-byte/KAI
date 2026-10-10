@@ -1356,6 +1356,9 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
           // fact — the API module never re-reads a header.
           attested: hostAttested(req),
           ownerAuthConfigured: hostToken !== undefined && hostToken.length > 0,
+          // An explicit developer switch, never inferred. A normal installation
+          // (the app always injects the token) never sets this.
+          devMode: process.env.KAI_DEV_MODE === "1",
         });
         if (result.status !== 404) {
           sendJson(res, result.status, result.body);

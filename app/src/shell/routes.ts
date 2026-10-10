@@ -16,6 +16,7 @@ export type RouteId =
   | "goals"
   | "agents"
   | "workers"
+  | "cockpit"
   | "tools"
   | "mcp"
   | "activity"
@@ -44,6 +45,7 @@ export const ROUTES: readonly ShellRoute[] = [
   { id: "goals", label: "Goals", blurb: "Challenged, planned, approved — then run.", accent: "#a855f7" },
   { id: "agents", label: "Agents", blurb: "KAI's own personas.", accent: "#f472b6" },
   { id: "workers", label: "Workers", blurb: "The engines KAI drives.", accent: "#34d399" },
+  { id: "cockpit", label: "Cockpit", blurb: "Goals, tasks, workers and the evidence behind them.", accent: "#0ea5e9" },
   { id: "tools", label: "Tools", blurb: "What KAI can do.", accent: "#6366f1" },
   { id: "mcp", label: "MCP", blurb: "Servers and capabilities KAI has been given.", accent: "#22d3ee" },
   { id: "activity", label: "Activity", blurb: "What KAI has been doing.", accent: "#8b93a1" },

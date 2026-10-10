@@ -59,6 +59,70 @@ Challenger, a per-worker-kind task compiler, improvement proposals, the Island's
 Doer/Guard and worker-cockpit surfaces, and the guest VM. Research for each is
 complete; see the phase report.
 
+### Vertical slice 3 — the full execution loop, authorization, compiler and cockpit
+
+The gap between "approved plan" and "work actually runs" is closed.
+
+- **Goal executor** (`core/src/goals/executor.ts`): an approved plan compiles into
+  work items linked to `(goalId, revisionId, taskId)`, so compilation is IDEMPOTENT
+  across retries and restarts. Dependency-ready work dispatches through the SAME
+  `runWorkItem` every other caller uses. Items in `CHANGES_REQUESTED`/`FAILED` are
+  re-attempted (bounded by the orchestrator's retry ledger), and `BLOCKED` counts as
+  terminal FOR SETTLEMENT — without that, a goal whose task blocked sat in RUNNING
+  forever, which was a real defect found by the E2E suite.
+- **Settlement is evidence-bound**: a goal reaches COMPLETED only when every
+  acceptance criterion is settled by a `kai-observed` record that supports it. A
+  worker's confident claim with no artifact on disk settles nothing.
+- **Authorization policy** (`core/src/api/authz.ts`): all **141** routes classified
+  (1 public / 60 read / 80 owner), enforced in `coreApi.handle` before any handler
+  runs. A set-equality test fails if a route is added without classification — it
+  caught two of mine. `devMode` is explicit (`KAI_DEV_MODE=1`), never inferred.
+- **Task Compiler** (`core/src/orchestration/compiler.ts`): per-`TaskDomain` section
+  sets (coding/debugging/testing/research/review/document/security/verification/…),
+  with `forbiddenOutcomes` and every criterion PAIRED with its verification method
+  now reaching the worker prompt. `buildPrompt` is cut over to it.
+- **Codex adapter** (`core/src/agents/codex.ts` + `adapters/codexAdapter.ts`): real
+  `codex exec --json` JSONL transport with a bounded, cancellable read; exit 0 with
+  no terminal event is a FAILURE, never a success. Reported unavailable here because
+  the CLI is not installed.
+- **Workstation/CUA** (`core/src/workstation/*`): a provider contract with typed
+  `effect`/`verified` results (a delivered event is not an applied change), a real
+  driver integration, and a mock. The installed driver was probed for real.
+- **UI**: a Goals surface and a worker/execution **Cockpit** backed only by real
+  Core state, with four separate sections for assigned tasks, worker-reported
+  results, KAI-observed activity and KAI-performed verification.
+
+### Authorization posture (read this before deploying)
+
+Every one of the **141** registered routes is classified in `core/src/api/authz.ts`
+and the decision is made in `coreApi.handle` before any handler runs. The posture
+is reported by `GET /identity` as `ownerAuth`:
+
+| `ownerAuth` | When | What it means |
+|---|---|---|
+| `enforced` | a host token is configured (the installed app always injects one) | owner routes require the credential; an unattested caller gets **401** |
+| `disabled-by-explicit-dev-mode` | `KAI_DEV_MODE=1` | owner routes are allowed and the decision SAYS so — never the default |
+| `unconfigured` | no token and no dev flag (a developer running `npm start`) | owner routes are allowed **and reported as unprotected** |
+
+The third row is deliberate residual exposure, not an oversight: a Core with no
+credential cannot check anything, and pretending to refuse would make a standalone
+developer Core unusable. A normal installation — the app spawns the Core and injects
+the token — is always in the first row. **Read `GET /identity` before trusting a
+Core's authorization.**
+
+### Verification of slice 3 (commands actually run)
+
+- `cd core && npm test` — see the counts below.
+- `cd core && npm run typecheck` — clean.
+- `cd app && npx tsc --noEmit -p tsconfig.json` — clean; `npm test` — **338 pass**.
+- `cd app/src-tauri && cargo test --lib owner_call` — **2 passed**.
+- `core/tests/goal-execution-e2e.test.ts` — **7/7**: an approved plan compiles,
+  dispatches in dependency order, verifies and settles COMPLETED; a failing worker
+  yields a truthful BLOCKED; a success CLAIM without the artifact is not verified;
+  Doer OFF dispatches nothing; Doer ON resumes without duplicates; goals, revisions,
+  approvals and work items survive a real close/reopen; a material plan edit makes
+  the goal undispatchable again.
+
 ### Vertical slice 2 — the goal executive (intake → challenge → plan → approval)
 
 A goal is now a durable contract ABOVE the orchestrator. Nothing dispatches until an
