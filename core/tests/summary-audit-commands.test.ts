@@ -43,7 +43,7 @@ async function runCommand(
   const request: ApiRequest = {
     method: "POST",
     path: `/commands/${id}/run`,
-    query: new URLSearchParams(),
+    query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
     body,
   };
   return route.handler(request, { id });

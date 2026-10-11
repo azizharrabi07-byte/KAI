@@ -97,7 +97,7 @@ test("L2: a learned lesson produces an action trace AND changes a later composed
   const composed = await api.handle({
     method: "POST",
     path: "/prompts/compose",
-    query: new URLSearchParams(),
+    query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
     body: { request: REQUEST },
   });
   assert.equal(composed.status, 200, JSON.stringify(composed.body));

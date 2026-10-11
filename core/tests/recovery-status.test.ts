@@ -45,7 +45,7 @@ function boot(dir: string): { rt: CoreRuntime; api: CoreApi } {
 }
 
 async function status(api: CoreApi): Promise<{ ledger: string; open: ExecutionRecord[]; total: number }> {
-  const resp = await api.handle({ method: "GET", path: "/recovery/status", query: new URLSearchParams() });
+  const resp = await api.handle({ method: "GET", path: "/recovery/status", query: new URLSearchParams(), attested: true, ownerAuthConfigured: true });
   assert.equal(resp.status, 200, JSON.stringify(resp.body));
   return resp.body as { ledger: string; open: ExecutionRecord[]; total: number };
 }

@@ -47,7 +47,7 @@ function boot(dbPath: string) {
 }
 
 function post(api: CoreApi, path: string, body: unknown) {
-  return api.handle({ method: "POST", path, query: new URLSearchParams(), body });
+  return api.handle({ method: "POST", path, query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body });
 }
 
 function get(api: CoreApi, path: string, q?: Record<string, string>) {

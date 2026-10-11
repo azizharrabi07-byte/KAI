@@ -75,9 +75,22 @@ function planWorkItem(runtime: CoreRuntime, objective: string) {
 }
 
 /** Drive one API request through the real route table (no sockets). */
+/**
+ * A request from the INSTALLED APP, which holds the per-install owner credential.
+ * The Core fails closed, so an unattested mutation is refused before any policy
+ * runs; modelling the real caller is what keeps these tests about the DOER rather
+ * than about authorization.
+ */
 async function api(runtime: CoreRuntime, method: string, path: string, body?: unknown) {
   const core = createCoreApi(runtime);
-  return core.handle({ method, path, query: new URLSearchParams(), ...(body !== undefined ? { body } : {}) });
+  return core.handle({
+    method,
+    path,
+    query: new URLSearchParams(),
+    ...(body !== undefined ? { body } : {}),
+    attested: true,
+    ownerAuthConfigured: true,
+  });
 }
 
 test("a fresh installation starts with the Doer OFF, and the API says so", async (t) => {

@@ -392,6 +392,12 @@ async function call(
     path,
     query: new URLSearchParams(opts.query ?? {}),
     ...(opts.body !== undefined ? { body: opts.body } : {}),
+    // This suite drives a hand-written STUB runtime directly, so it models the
+    // INSTALLED APP (which holds the owner credential). The Core fails closed, so
+    // an unattested mutation would be refused before the route's own validation
+    // could report the 400 these tests are about.
+    attested: true,
+    ownerAuthConfigured: true,
   };
   return (await api.handle(request)) as { status: number; body: any };
 }

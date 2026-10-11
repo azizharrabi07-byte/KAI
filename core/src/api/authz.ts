@@ -53,15 +53,21 @@
  * `core/src/agent/identity-routes.ts`). `GET /events` (the SSE mount) lives in
  * `core/src/server.ts`, outside the route table, and is out of scope here.
  *
- * `devMode` IS NEVER THE SILENT DEFAULT
- * -------------------------------------
- * `decideAccess` refuses an unattested caller on an `owner` route whenever this
- * Core HAS an owner credential to verify against. It allows the route without one
- * only in two states that are both visible in the returned `reason`: an explicit
- * `devMode: true` (a documented developer switch), or a Core with NO owner
- * credential configured at all — the bare developer Core `routes.ts` already
- * documents, where there is nothing to verify against. Absence of information
- * never produces a silent allow: the reason always names which of the two applied.
+ * FAIL CLOSED
+ * -----------
+ * An `owner` route is served only when the caller PRESENTED the owner credential
+ * (`attested: true`) or the operator explicitly asked for a developer instance
+ * (`devMode: true`, set by `KAI_DEV_MODE=1`).
+ *
+ * A Core with NO credential configured used to allow these routes with a reason.
+ * It now REFUSES them (403): a normal installation must never be able to run with
+ * its owner controls open to any local process just because a credential was
+ * missing. The installed app always injects one, so a real installation is never
+ * in that state; a developer must opt in, and the choice is visible in
+ * `GET /identity` as `ownerAuth`.
+ *
+ * `read` and `public` stay open in every state, so such a Core is still
+ * inspectable — it simply cannot be told to do anything.
  */
 
 /** The three access levels. `owner` is the strictest. */
@@ -424,9 +430,24 @@ export function decideAccess(input: AccessInput): AccessDecision {
       reason: `this control changes what KAI is authorized to do (${entry.reason}), so it requires the owner credential from the installed desktop app`,
     };
   }
+  // ── FAIL CLOSED ───────────────────────────────────────────────────────────
+  // No credential and no explicit developer flag. This used to be allowed with a
+  // reason, which meant a normal autonomous installation could silently run with
+  // its owner controls open to any local process — the exact posture a product
+  // gaining autonomous capabilities must not have. It is now REFUSED, and the
+  // refusal names both ways forward:
+  //   - the installed app always injects a credential, so a real installation is
+  //     never in this branch;
+  //   - a developer running the Core directly must ASK for it with KAI_DEV_MODE=1,
+  //     which is explicit, documented, and visible in `GET /identity`.
+  // Reads and the public surface stay open, so a Core in this state is still
+  // inspectable — it just cannot be told to do anything.
   return {
-    allowed: true,
-    status: 200,
-    reason: `owner route allowed on an UNCONFIGURED Core: no owner credential exists to verify against, so the bare developer Core behaves as it does today (${entry.reason}) — reported here, never silent`,
+    allowed: false,
+    status: 403,
+    reason:
+      `this control changes what KAI is authorized to do (${entry.reason}), and this Core has NO owner credential configured, ` +
+      "so the request cannot be authorized. Start the Core from the installed desktop app (it injects the credential), " +
+      "or set KAI_DEV_MODE=1 to run a deliberate developer instance — the gate is never off by default.",
   };
 }

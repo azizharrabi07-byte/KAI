@@ -196,7 +196,7 @@ test("POST /subagents creates a persona and POST /subagents/:id/message parks th
 
     // CREATE through the real route (WRITE + internal-state policy => no park).
     const created = jsonResult(
-      await api.handle({ method: "POST", path: "/subagents", query: new URLSearchParams(), body: { ...NODE_SMITH } }),
+      await api.handle({ method: "POST", path: "/subagents", query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body: { ...NODE_SMITH } }),
     );
     assert.equal(created.status, 201, JSON.stringify(created));
     assert.equal((created.body.subagent as Record<string, unknown>).name, "Node Smith");
@@ -206,7 +206,7 @@ test("POST /subagents creates a persona and POST /subagents/:id/message parks th
       await api.handle({
         method: "POST",
         path: "/subagents/node-smith/message",
-        query: new URLSearchParams(),
+        query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
         body: { input: "Write a failing test for the two-run invariant." },
       }),
     );
@@ -222,7 +222,7 @@ test("POST /subagents creates a persona and POST /subagents/:id/message parks th
       await api.handle({
         method: "POST",
         path: "/subagents/node-smith/message",
-        query: new URLSearchParams(),
+        query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
         body: { input: "Write a failing test for the two-run invariant.", sessionId, approvalId },
       }),
     );
@@ -247,7 +247,7 @@ test("POST /subagents creates a persona and POST /subagents/:id/message parks th
       await api.handle({
         method: "GET",
         path: `/subagents/node-smith/sessions/${sessionId}/turns`,
-        query: new URLSearchParams(),
+        query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
         body: null,
       }),
     );
@@ -277,14 +277,14 @@ test("two concurrent persona runs report DISTINCT execution ids with overlapping
 
     for (const spec of [NODE_SMITH, DEEP_WORKER]) {
       const r = jsonResult(
-        await api.handle({ method: "POST", path: "/subagents", query: new URLSearchParams(), body: { ...spec } }),
+        await api.handle({ method: "POST", path: "/subagents", query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body: { ...spec } }),
       );
       assert.equal(r.status, 201, JSON.stringify(r));
     }
 
     const defineRun = async (id: string, input: string) => {
       const parked = jsonResult(
-        await api.handle({ method: "POST", path: `/subagents/${id}/message`, query: new URLSearchParams(), body: { input } }),
+        await api.handle({ method: "POST", path: `/subagents/${id}/message`, query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body: { input } }),
       );
       assert.equal(parked.status, 409, JSON.stringify(parked));
       return { id, input, approvalId: parked.body.approvalId as string, sessionId: parked.body.sessionId as string };
@@ -300,13 +300,13 @@ test("two concurrent persona runs report DISTINCT execution ids with overlapping
       api.handle({
         method: "POST",
         path: "/subagents/node-smith/message",
-        query: new URLSearchParams(),
+        query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
         body: { input: a.input, sessionId: a.sessionId, approvalId: a.approvalId },
       }),
       api.handle({
         method: "POST",
         path: "/subagents/deep-worker/message",
-        query: new URLSearchParams(),
+        query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
         body: { input: b.input, sessionId: b.sessionId, approvalId: b.approvalId },
       }),
     ]);
@@ -349,38 +349,38 @@ test("a persona's turns never merge into KAI's own session (session isolation)",
     const api = createCoreApi(runtime);
 
     const kaiSession = jsonResult(
-      await api.handle({ method: "POST", path: "/sessions", query: new URLSearchParams(), body: { title: "KAI main" } }),
+      await api.handle({ method: "POST", path: "/sessions", query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body: { title: "KAI main" } }),
     );
     assert.equal(kaiSession.status, 201, JSON.stringify(kaiSession));
     const kaiId = (kaiSession.body.session as Record<string, unknown>).id as string;
 
     const created = jsonResult(
-      await api.handle({ method: "POST", path: "/subagents", query: new URLSearchParams(), body: { ...NODE_SMITH } }),
+      await api.handle({ method: "POST", path: "/subagents", query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body: { ...NODE_SMITH } }),
     );
     assert.equal(created.status, 201);
 
     const parked = jsonResult(
-      await api.handle({ method: "POST", path: "/subagents/node-smith/message", query: new URLSearchParams(), body: { input: "hi" } }),
+      await api.handle({ method: "POST", path: "/subagents/node-smith/message", query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body: { input: "hi" } }),
     );
     const approvalId = parked.body.approvalId as string;
     const subSessionId = parked.body.sessionId as string;
     await api.handle({
       method: "POST",
       path: "/subagents/node-smith/message",
-      query: new URLSearchParams(),
+      query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
       body: { input: "hi", sessionId: subSessionId, approvalId },
     });
 
     // KAI's own session is untouched; the persona's session holds the turns.
     const kaiTurns = jsonResult(
-      await api.handle({ method: "GET", path: `/sessions/${kaiId}/turns`, query: new URLSearchParams(), body: null }),
+      await api.handle({ method: "GET", path: `/sessions/${kaiId}/turns`, query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body: null }),
     );
     assert.equal((kaiTurns.body.turns as unknown[]).length, 0, "KAI's history must be unchanged");
     const subTurns = jsonResult(
       await api.handle({
         method: "GET",
         path: `/subagents/node-smith/sessions/${subSessionId}/turns`,
-        query: new URLSearchParams(),
+        query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
         body: null,
       }),
     );
@@ -415,13 +415,13 @@ test("POST /subagents/:id/run forwards the body's approvalId, so a re-issue cons
     const api = createCoreApi(runtime);
 
     const created = jsonResult(
-      await api.handle({ method: "POST", path: "/subagents", query: new URLSearchParams(), body: { ...NODE_SMITH } }),
+      await api.handle({ method: "POST", path: "/subagents", query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body: { ...NODE_SMITH } }),
     );
     assert.equal(created.status, 201, JSON.stringify(created));
 
     const listApprovals = async (): Promise<Array<{ id: string; status: string; toolId: string }>> => {
       const r = jsonResult(
-        await api.handle({ method: "GET", path: "/approvals", query: new URLSearchParams(), body: null }),
+        await api.handle({ method: "GET", path: "/approvals", query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body: null }),
       );
       assert.equal(r.status, 200, JSON.stringify(r));
       return r.body.approvals as Array<{ id: string; status: string; toolId: string }>;
@@ -432,7 +432,7 @@ test("POST /subagents/:id/run forwards the body's approvalId, so a re-issue cons
       await api.handle({
         method: "POST",
         path: "/subagents/node-smith/run",
-        query: new URLSearchParams(),
+        query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
         body: { input: "Run the probe." },
       }),
     );
@@ -447,7 +447,7 @@ test("POST /subagents/:id/run forwards the body's approvalId, so a re-issue cons
       await api.handle({
         method: "POST",
         path: `/approvals/${granted}/decide`,
-        query: new URLSearchParams(),
+        query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
         body: { approved: true },
       }),
     );
@@ -462,7 +462,7 @@ test("POST /subagents/:id/run forwards the body's approvalId, so a re-issue cons
       await api.handle({
         method: "POST",
         path: "/subagents/node-smith/run",
-        query: new URLSearchParams(),
+        query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
         body: { input: "Run the probe.", approvalId: granted },
       }),
     );
@@ -491,7 +491,7 @@ test("POST /subagents/:id/run forwards the body's approvalId, so a re-issue cons
       await api.handle({
         method: "POST",
         path: "/subagents/node-smith/run",
-        query: new URLSearchParams(),
+        query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
         body: { input: "Run the probe." },
       }),
     );

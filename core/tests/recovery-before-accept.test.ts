@@ -159,7 +159,7 @@ test("a side-effecting step parked on approval records BEFORE_ACCEPT, and POST /
     const resp = await api.handle({
       method: "POST",
       path: "/recovery/classify",
-      query: new URLSearchParams(),
+      query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
       body: { executionId: id },
     });
     assert.equal(resp.status, 200, JSON.stringify(resp.body));

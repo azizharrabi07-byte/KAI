@@ -144,7 +144,7 @@ test("the runtime exposes self-maintenance, and the routes inspect and repair th
   });
 
   const api = createCoreApi(runtime);
-  const get = api.handle({ method: "GET", path: "/maintenance/status", query: new URLSearchParams() });
+  const get = api.handle({ method: "GET", path: "/maintenance/status", query: new URLSearchParams(), attested: true, ownerAuthConfigured: true });
   const inspected = await get;
   assert.equal(inspected.status, 200, JSON.stringify(inspected.body));
   const report = (inspected.body as { maintenance: { checks: Array<{ name: string; status: string }>; identity: { current: boolean } } }).maintenance;
@@ -153,7 +153,7 @@ test("the runtime exposes self-maintenance, and the routes inspect and repair th
   assert.ok(report.checks.some((c) => c.name === "sessions" && c.status === "pass"));
   assert.ok(report.checks.some((c) => c.name === "recovery-ledger" && c.status === "pass"));
 
-  const ran = await api.handle({ method: "POST", path: "/maintenance/run", query: new URLSearchParams(), body: {} });
+  const ran = await api.handle({ method: "POST", path: "/maintenance/run", query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body: {} });
   assert.equal(ran.status, 200, JSON.stringify(ran.body));
   const repairs = (ran.body as { maintenance: { repairs: Array<{ name: string; performed: boolean }> } }).maintenance.repairs;
   assert.equal(repairs.length, 4, JSON.stringify(repairs));

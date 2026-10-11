@@ -30,6 +30,8 @@ scroll / drag, and a verdict on the result.
 | `core/src/workstation/cua.ts` | The real provider: one-shot `cua-driver call`, bounded, typed failures |
 | `core/src/workstation/mock.ts` | Deterministic scripted provider; the seam's executable specification |
 | `core/tests/workstation.test.ts` | One contract suite run against **both** providers |
+| `core/tests/workstation-live.test.ts` | The provider against the **real** driver: recorded transcript assertions (always) + opt-in read-only live calls |
+| `docs/evidence/workstation-live.json` | The verbatim read-only driver transcript those tests assert against |
 
 ### The central rule: a delivered event is not an applied change
 
@@ -140,13 +142,54 @@ This is the trap the provider is built around. Four distinct failure shapes, and
 | Trigger | Exit | Stream | Output |
 |---|---|---|---|
 | Unknown tool | 1 | stderr | `Permission denied: tool 'no_such_tool' has no reviewed risk classification` |
-| Schema violation | **0** | **stdout** | `Missing required integer field: pid` |
+| Schema violation | **0** | **stdout** | `Missing required integer field pid.` |
 | Unparseable argv JSON | 2 | stderr | `error: positional JSON arg to 'cua-driver call' did not parse: …` |
 | Daemon not running | 1 | stderr | `Cua Driver daemon is not running on \\.\pipe\<socket>.` |
 
 So `classifyCliRun` treats **both** the exit code and whether stdout parsed as
 load-bearing. Exit 0 with unparseable stdout is a plain-text rejection, not a
 success.
+
+All four shapes are re-captured verbatim, with exit codes and both streams, in
+`docs/evidence/workstation-live.json` and asserted against the provider in
+`core/tests/workstation-live.test.ts`. The daemon-not-running shape is produced
+against a **second, dead pipe name** (`\\.\pipe\kai-no-such-daemon`) so the real
+daemon is never touched.
+
+That transcript carries one deliberate redaction, recorded in its own
+`redaction` block: the window inventories' `title` fields are replaced with a
+placeholder, and the accessibility tree's process list is replaced by its count.
+Those fields name what the **operator** had open on their own desktop, which is
+not load-bearing for this contract — the tests assert window ids, geometry,
+`app_name` and counts, never a title's text. Everything else is verbatim.
+
+### What the live exercise changed in `cua.ts`
+
+Running the real driver through the provider found three defects that no fixture
+would have shown. All three are fixed, and each is pinned by a test:
+
+1. **The desktop window inventory had no geometry.** `get_accessibility_tree` —
+   the tool the provider calls for a desktop observation — returns each window's
+   geometry **flat** on the entry (`x` / `y` / `width` / `height`), while
+   `list_windows` nests it under `bounds`. `readWindows` read only the nested
+   form, so every window in a desktop observation came back without bounds: a
+   caller could list windows but never address one by point. `readWindows` now
+   accepts both real shapes.
+2. **A refusal that did not use the explicit marker was reported as
+   `unverifiable`.** The driver has two observed refusal shapes and both happen
+   to carry `effect: "refused"` or `status: "refused"`, but its published reason
+   set (`route_unavailable`, `delivery_failed`, `background_unavailable`,
+   `permission_required`, …) can arrive as a bare code. Those payloads yielded
+   *no verdict*, so a deliberate refusal was reported as a delivered-but-unproven
+   action. `readDriverVerdict` now reads a `refusal` object or a code from the
+   refusal vocabulary as `refused`. `effect_unconfirmed` is deliberately excluded:
+   a delivery whose effect could not be proven is `unverifiable`, not a refusal.
+3. **The daemon probe ignored the configured socket.** `availability()` ran
+   `cua-driver status` with no `--socket`, which reports the **default** pipe. A
+   provider constructed against any other socket therefore reported
+   `daemonRunning: true` for a pipe with nothing behind it — measured live
+   against `\\.\pipe\kai-no-such-daemon`. `probeStatus()` now names the same
+   socket every `call` uses.
 
 ### Refusals arrive in-band, with a verdict
 
@@ -456,3 +499,181 @@ Goal: a workspace KAI may drive freely, which reverting makes **totally** undone
 * **No recording / trajectory replay.** The driver ships `start_recording` and
   `replay_trajectory`; the seam does not expose them.
 * **No browser navigation.** The action union has no URL member on purpose (§3).
+* **`list_windows` is not on the provider's closed surface.** The provider builds
+  its desktop inventory from `get_accessibility_tree`, which returns the same
+  window set with flat geometry but without `app_name` / `z_index` / `layer`.
+  `list_windows` is exercised live by the test suite and parsed by the same
+  `readWindows`, but the provider does not call it.
+
+### What is NOT verified — stated plainly
+
+1. **No VM exists.** No guest, no hypervisor change, no switch, no checkpoint, no
+   bridge. Every driver fact in this document was measured on the **host** it was
+   written on. The §4 host/guest boundary and the §8 runbook are architecture and
+   plan, not observed behaviour.
+2. **No input was ever injected.** No click, keystroke, scroll or drag was
+   delivered to any window. The two refusal payloads in §2 came from calls that
+   *cannot* deliver input (a pid that does not exist; a fabricated snapshot
+   handle the driver fails closed on), and they are recorded in
+   `docs/evidence/workstation-live.json` as fixtures rather than re-run, because
+   reproducing them means invoking `click`.
+3. **No screen pixels were read.** No `get_desktop_state` call was made, and the
+   live test asserts that the accessibility-tree payload it reads carries no
+   `screenshot_png_b64`. The only screenshot ever taken in this work was one
+   window-scoped capture whose **byte size** was read and whose pixels were never
+   displayed.
+4. **The desktop-scope path is untested end to end.** `observe({kind:"desktop"})`
+   is exercised against the mock and against fake runners, never against a real
+   desktop, precisely because it captures the operator's whole screen.
+5. **`desktop_capture_authorized` was never granted.** Every real `start_session`
+   reported `false` with `effective_scope: "window"`. The escalation path has
+   never been walked.
+6. **The two-client concurrency story is unverified.** One provider at a time was
+   exercised. Two providers sharing `\\.\pipe\cua-driver` with different session
+   labels was not.
+7. **Behaviour on a locked or disconnected desktop is unverified.** The driver
+   reports `desktop_unlocked: false` in its own session payload; that a call
+   degrades rather than hangs in that state was not observed.
+8. **The recorded transcript is a point-in-time capture.** It records
+   `EnumWindows visible: 15 windows` and daemon pid 19208 on 2026-10-11. Those
+   numbers move with the machine; the tests assert the *shape* and the stable
+   facts (version, socket, permission mode, tool count, screen size), not the
+   window list.
+
+## 10. Reproducing this on THIS machine
+
+Everything in §2, §3 and §6 was measured here. This is the exact procedure to
+reproduce it, and it is bounded to read-only calls for one reason: the machine is
+somebody's working desktop, not a fixture.
+
+### 10.1 The machine and the install
+
+| Fact | Value |
+|---|---|
+| Host | `DESKTOP-2L3HISO`, Windows 10.0.26200 (x64) |
+| Binary | `C:\Users\DELL\AppData\Local\Programs\Cua\cua-driver\bin\cua-driver.exe` |
+| Version | `cua-driver 0.28.2` — `cua-driver --version` |
+| Daemon | running, **pid 19208**, permission mode `standard` (`built_in_default`) |
+| Socket | `\\.\pipe\cua-driver` — a Windows **named pipe**, not a TCP port and not a unix socket |
+| Driver home | `C:\Users\DELL\.cua-driver` (one cached release dir) |
+| Tool registry | **57** tools — `cua-driver list-tools` |
+| Display | 1920 × 1080, `scale_factor` 1.1041666666666667 |
+| Token | `check_permissions` → `elevated: true`, `integrity_level: "High"`, `uia: true`, `post_message: true` |
+| Doctor | 7/7 probes `ok`, including `interactive session` and `UI Automation` |
+
+The binary path and the pipe name are **not** discovered at runtime — they are
+the two constants in `REAL_DRIVER_SEAM` (`core/src/capabilities/computer/transport.ts:185`)
+and the provider's defaults. Pointing the provider at another machine means
+overriding both `executable` and `socket`.
+
+### 10.2 The invocation
+
+Every call is one short-lived process. **The JSON arguments go on stdin, never in
+argv** — the driver's own `call --help` warns that PowerShell 5.1 mangles quoted
+JSON in argv, and keeping caller data out of the command line is also what makes
+the argv rule enforceable (§3).
+
+```powershell
+# a bare subcommand (no daemon round-trip for --version; `status` does use the daemon)
+& $exe --version
+& $exe status --socket \\.\pipe\cua-driver
+& $exe doctor --json
+& $exe list-tools
+
+# one tool through the running daemon: JSON on STDIN
+'{}'                                             | & $exe call get_screen_size     --socket \\.\pipe\cua-driver
+'{}'                                             | & $exe call check_permissions   --socket \\.\pipe\cua-driver
+'{}'                                             | & $exe call health_report       --socket \\.\pipe\cua-driver
+'{}'                                             | & $exe call list_windows        --socket \\.\pipe\cua-driver
+'{}'                                             | & $exe call get_accessibility_tree --socket \\.\pipe\cua-driver
+'{"session":"kai-workstation"}'                  | & $exe call start_session       --socket \\.\pipe\cua-driver
+```
+
+In Node (what the provider and the test suite actually do):
+
+```ts
+spawn(exe, ["call", tool, "--socket", socket], { stdio: ["pipe", "pipe", "pipe"] })
+  // then write JSON.stringify(args) to child.stdin
+```
+
+`status` is the one subcommand whose `--socket` matters twice over: without it,
+`status` reports the **default** pipe, which is how a provider pointed elsewhere
+could claim a daemon it cannot reach (§2).
+
+To reproduce the whole transcript:
+
+```powershell
+cd core
+node --test --experimental-strip-types tests/workstation-live.test.ts                 # recorded layer only; live tests skip by name
+$env:KAI_WORKSTATION_LIVE = "1"
+node --test --experimental-strip-types tests/workstation-live.test.ts                 # recorded layer + read-only live calls
+```
+
+### 10.3 Autostart — and why the daemon needs an interactive session
+
+`cua-driver autostart status` → `registered (running)`.
+
+The registered task, queried read-only with
+`schtasks /query /tn "\cua-driver-serve" /v /fo list`:
+
+| Field | Value |
+|---|---|
+| Task | `\cua-driver-serve` |
+| Run as | `DELL` |
+| **Logon type** | **Interactive only** |
+| **Trigger** | **At logon** |
+| Run level | Highest — the task's own comment: *"RunLevel=Highest for UWP/AppContainer support"* |
+| Action | `powershell.exe -NoProfile -WindowStyle Hidden -NonInteractive -Command "Start-Process -FilePath '<exe>' -ArgumentList 'serve' -WindowStyle Hidden -WorkingDirectory 'C:\Users\DELL'"` |
+| Last result | `0` |
+| State | Enabled |
+
+**Why `Interactive` and not a service.** Windows isolates services into
+**Session 0**, which has no desktop and no interactive window station. The
+driver's own Windows guidance (`%USERPROFILE%\.cua-driver\skills\cua-driver\WINDOWS.md`,
+read-only) states that in Session 0 UI Automation enumeration, `PrintWindow`
+capture and `IApplicationActivationManager` all *silently* return empty or time
+out, and that the direct runtime refuses a runtime owner whose `SessionId == 0`
+before any action runs. So a Session-0 daemon does not fail loudly — it returns
+plausible emptiness. That is the worst possible failure mode for this seam, whose
+entire job is to distinguish "nothing is there" from "I could not see".
+
+The task therefore triggers **at logon**, in the user's own session, and the
+daemon it starts lands in that session. `cua-driver doctor` confirms the result
+on this machine:
+
+```
+interactive session  ok  session 1 has an attached interactive desktop
+                         (session=1; window_station=attached; thread_desktop=Default;
+                          input_desktop=Default; foreground_hwnd=0x40646)
+```
+
+If the daemon is ever started over SSH, that login is usually Session 0 and the
+daemon must instead be kicked into the interactive session —
+`schtasks /Run /TN cua-driver-serve`. **This provider never does that, and never
+starts, stops, installs, updates or reconfigures the daemon**: those are host
+changes made on the operator's behalf, which this seam must not make.
+
+### 10.4 Which capabilities need an interactive session
+
+The guest VM does not exist yet (§9), so "guest" here means *whatever interactive
+desktop the daemon runs in*. Every capability below is **unavailable** — silently
+or by refusal — to a Session-0 daemon:
+
+| Capability | Provider surface | Why it needs a desktop |
+|---|---|---|
+| UI Automation enumeration | `observe({kind:"window"})`, `observe({kind:"desktop"})`, `list_windows` | `CUIAutomation` walks the desktop's window station; Session 0 has none |
+| Accessibility tree | `get_accessibility_tree` | Same enumeration, same empty result |
+| Screen capture | `get_desktop_state`, `get_window_state` screenshot | D3D11 / `PrintWindow` needs a real desktop surface; Session 0 returns blank |
+| Input injection | `click`, `type`, `key`, `hotkey`, `scroll`, `drag` | `SendInput` / `PostMessage` address windows on the input desktop |
+| UWP / AppContainer activation | (driver's `launch_app`) | `IApplicationActivationManager` needs an interactive session |
+| Browser tools | (driver's `browser_*`) | Chrome/Edge must run in an interactive user session, not Session 0 |
+| Session scope reporting | `start_session` → `desktop_unlocked`, `effective_scope` | Reports what the daemon can actually reach |
+
+The narrow exception is the **lifecycle and probe surface**, which works with no
+desktop at all: `--version`, `status`, `doctor`, `list-tools`, `health_report`,
+`check_permissions`, `get_screen_size`, `start_session` / `end_session`. Those are
+exactly the calls the live test layer is allowed to make.
+
+On this machine the question does not arise — `doctor` reports an attached
+interactive desktop in session 1 — but it decides whether the whole seam is
+usable, so it is the first probe to check anywhere else.

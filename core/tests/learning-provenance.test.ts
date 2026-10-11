@@ -298,7 +298,7 @@ test("HTTP /learning/propose refuses a caller-supplied source:user and stamps ex
   const api = createCoreApi(runtime);
 
   const post = (body: unknown) =>
-    api.handle({ method: "POST", path: "/learning/propose", query: new URLSearchParams(), body });
+    api.handle({ method: "POST", path: "/learning/propose", query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body });
 
   // 1. Asking for user authority over HTTP is refused outright (400).
   const claimed = await post({

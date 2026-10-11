@@ -131,7 +131,8 @@ CREATE TABLE IF NOT EXISTS goals (
   workItemIdsJson    TEXT NOT NULL,
   lastCause          TEXT,
   lastActor          TEXT,
-  challengeJson      TEXT
+  challengeJson      TEXT,
+  acceptanceCriteriaJson TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS idx_goals_state ON goals(state);
 
@@ -233,6 +234,13 @@ export function createGoalStore(opts: { path: string; now?: () => Date }): GoalS
     // Some filesystems reject WAL; single-statement updates stay atomic anyway.
   }
   db.exec(SCHEMA);
+  // A goals.db created before the criteria column existed is upgraded in place:
+  // additive, idempotent, and a no-op on a fresh file.
+  try {
+    db.exec(`ALTER TABLE goals ADD COLUMN acceptanceCriteriaJson TEXT NOT NULL DEFAULT '[]'`);
+  } catch {
+    // The column already exists (or the table was just created with it).
+  }
 
   const stmts = {
     goalGet: db.prepare(`SELECT * FROM goals WHERE id = ?`),
@@ -241,8 +249,8 @@ export function createGoalStore(opts: { path: string; now?: () => Date }): GoalS
       `INSERT INTO goals
          (id, statement, state, createdAt, updatedAt, createdBy, assumptionsJson, constraintsJson,
           uncertaintiesJson, blocker, nextActionJson, missionId, taskId, workItemIdsJson, lastCause, lastActor,
-          challengeJson)
-       VALUES (?, ?, 'DRAFT', ?, ?, ?, '[]', '[]', '[]', NULL, NULL, NULL, NULL, '[]', NULL, NULL, NULL)`,
+          challengeJson, acceptanceCriteriaJson)
+       VALUES (?, ?, 'DRAFT', ?, ?, ?, '[]', '[]', '[]', NULL, NULL, NULL, NULL, '[]', NULL, NULL, NULL, '[]')`,
     ),
     // The full-row write is deliberate: `setGoalFields` merges a patch in memory
     // and rewrites one row, so there is no per-column statement zoo and no
@@ -251,7 +259,7 @@ export function createGoalStore(opts: { path: string; now?: () => Date }): GoalS
       `UPDATE goals
           SET statement = ?, state = ?, updatedAt = ?, createdBy = ?, assumptionsJson = ?, constraintsJson = ?,
               uncertaintiesJson = ?, blocker = ?, nextActionJson = ?, missionId = ?, taskId = ?,
-              workItemIdsJson = ?, lastCause = ?, lastActor = ?, challengeJson = ?
+              workItemIdsJson = ?, lastCause = ?, lastActor = ?, challengeJson = ?, acceptanceCriteriaJson = ?
         WHERE id = ?`,
     ),
     revisionGet: db.prepare(`SELECT * FROM goal_plan_revisions WHERE id = ?`),
@@ -298,6 +306,7 @@ export function createGoalStore(opts: { path: string; now?: () => Date }): GoalS
       constraints: stringArray(row.constraintsJson),
       uncertainties: stringArray(row.uncertaintiesJson),
       workItemIds: stringArray(row.workItemIdsJson),
+      acceptanceCriteria: stringArray(row.acceptanceCriteriaJson),
     };
     optional(goal, "createdBy", row.createdBy);
     optional(goal, "blocker", row.blocker);
@@ -417,6 +426,7 @@ export function createGoalStore(opts: { path: string; now?: () => Date }): GoalS
       goal.lastCause ?? null,
       goal.lastActor ?? null,
       goal.challenge === undefined ? null : JSON.stringify(goal.challenge),
+      JSON.stringify(goal.acceptanceCriteria ?? []),
       goal.id,
     );
     return goal;
@@ -452,6 +462,7 @@ export function createGoalStore(opts: { path: string; now?: () => Date }): GoalS
     if (patch.assumptions !== undefined) goal.assumptions = patch.assumptions;
     if (patch.constraints !== undefined) goal.constraints = patch.constraints;
     if (patch.uncertainties !== undefined) goal.uncertainties = patch.uncertainties;
+    if (patch.acceptanceCriteria !== undefined) goal.acceptanceCriteria = patch.acceptanceCriteria;
     if (patch.workItemIds !== undefined) goal.workItemIds = patch.workItemIds;
     if (patch.challenge !== undefined) {
       if (patch.challenge === null) delete goal.challenge;

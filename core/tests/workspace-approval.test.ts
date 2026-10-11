@@ -34,8 +34,21 @@ function boot(dbPath: string) {
   });
 }
 
+/**
+ * A mutation from the INSTALLED APP, which holds the per-install owner credential.
+ * The Core fails closed, so an unattested mutation is refused before any policy
+ * runs; modelling the real caller keeps these tests about approvals, not about
+ * authorization.
+ */
 function post(api: CoreApi, path: string, body: unknown) {
-  return api.handle({ method: "POST", path, query: new URLSearchParams(), body });
+  return api.handle({
+    method: "POST",
+    path,
+    query: new URLSearchParams(),
+    body,
+    attested: true,
+    ownerAuthConfigured: true,
+  });
 }
 
 // ── (a) a non-mission approval actually re-issues the parked request ──────────

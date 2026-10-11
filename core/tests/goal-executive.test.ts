@@ -110,7 +110,7 @@ function makeHarness(opts?: {
       const res = await core.handle({
         method,
         path,
-        query: new URLSearchParams(),
+        query: new URLSearchParams(), attested: true, ownerAuthConfigured: true,
         ...(body !== undefined ? { body } : {}),
         // Model the INSTALLED APP: it holds the owner credential. A test that
         // wants to model an unrelated local process passes attested: false.

@@ -319,6 +319,39 @@ export function createGoalExecutor(deps: GoalExecutorDeps): GoalExecutor {
     const SETTLED_ITEM_STATES = ["COMPLETED", "FAILED", "CANCELLED", "BLOCKED"];
     const allTerminal = after.length > 0 && after.every((item) => SETTLED_ITEM_STATES.includes(item.state));
     if (!allTerminal) {
+      // ── A stalled dependency chain is a SETTLEMENT, not a wait ──────────────
+      // If nothing is dispatchable and nothing is in flight, no further progress
+      // is possible: a BLOCKED/FAILED prerequisite strands its dependents in
+      // READY forever. Observed in a live run — the goal sat in RUNNING with one
+      // item BLOCKED and three dependents READY, and would have stayed there.
+      const byTask = new Map(after.map((item) => [item.taskId ?? "", item]));
+      const stranded = after.filter(
+        (item) =>
+          item.state === "READY" &&
+          content.tasks.some(
+            (task) =>
+              task.id === item.taskId &&
+              task.dependsOn.some((dep) => {
+                const parent = byTask.get(dep);
+                return parent !== undefined && ["BLOCKED", "FAILED", "CANCELLED"].includes(parent.state);
+              }),
+          ),
+      );
+      const inFlight = after.some((item) => ["RUNNING", "CLAIMED", "REVIEW", "CHANGES_REQUESTED", "WAITING"].includes(item.state));
+      if (stranded.length > 0 && !inFlight) {
+        const reason = `${stranded.length} task(s) can never run because a prerequisite ended BLOCKED/FAILED: ${stranded
+          .map((i) => i.objective.slice(0, 80))
+          .join(" | ")}`;
+        deps.goals.setGoalFields(goalId, {
+          blocker: reason,
+          nextAction: { action: "ASK_USER", reason, at: new Date().toISOString() },
+        });
+        const settled = deps.goals.setGoalState(goalId, "BLOCKED", "a prerequisite ended without satisfying its criteria", "kai");
+        deps.emit?.("goal.settled", { goalId, state: "BLOCKED", stranded: stranded.length });
+        return settled.ok
+          ? { skipped: false, dispatched, settled: "BLOCKED", reason }
+          : { skipped: false, dispatched, reason: settled.reason };
+      }
       return { skipped: false, dispatched, reason: dispatched.length > 0 ? undefined : "no dependency-ready work" };
     }
 

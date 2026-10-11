@@ -1,0 +1,434 @@
+{
+  "$comment": "Verbatim, read-only cua-driver 0.28.2 outputs captured on the machine described below, with the redaction noted in `redaction`. No input was injected, no pixels were read, no host setting was changed: every argv below is a probe, an inventory, or a deliberately invalid invocation that the driver refuses. Consumed by core/tests/workstation-live.test.ts.",
+  "capturedAt": "2026-10-10T23:49:51.280Z",
+  "host": {
+    "platform": "win32",
+    "os": "Windows_NT 10.0.26200",
+    "arch": "x64",
+    "node": "v24.11.0",
+    "hostname": "DESKTOP-2L3HISO"
+  },
+  "driver": {
+    "executable": "C:\\Users\\DELL\\AppData\\Local\\Programs\\Cua\\cua-driver\\bin\\cua-driver.exe",
+    "socket": "\\\\.\\pipe\\cua-driver",
+    "version": "cua-driver 0.28.2",
+    "parsedVersion": "0.28.2",
+    "daemonRunning": true,
+    "daemonPid": 19208,
+    "permissionMode": "standard",
+    "doctorOk": true,
+    "doctorProbes": [
+      {
+        "label": "binary",
+        "status": "ok"
+      },
+      {
+        "label": "install dir",
+        "status": "ok"
+      },
+      {
+        "label": "home dir",
+        "status": "ok"
+      },
+      {
+        "label": "telemetry",
+        "status": "ok"
+      },
+      {
+        "label": "interactive session",
+        "status": "ok"
+      },
+      {
+        "label": "UI Automation",
+        "status": "ok"
+      },
+      {
+        "label": "EnumWindows visible",
+        "status": "ok"
+      }
+    ],
+    "toolCount": 57,
+    "toolNames": [
+      "bring_to_front",
+      "browser_click",
+      "browser_dialog",
+      "browser_download",
+      "browser_navigate",
+      "browser_pointer",
+      "browser_prepare",
+      "browser_set_input_files",
+      "browser_type",
+      "check_for_update",
+      "check_permissions",
+      "click",
+      "clipboard_read",
+      "clipboard_write",
+      "debug_window_info",
+      "double_click",
+      "drag",
+      "end_session",
+      "escalate_session",
+      "get_accessibility_tree",
+      "get_agent_cursor_state",
+      "get_browser_state",
+      "get_config",
+      "get_cursor_position",
+      "get_desktop_state",
+      "get_recording_state",
+      "get_screen_size",
+      "get_session",
+      "get_session_state",
+      "get_window_state",
+      "health_report",
+      "hotkey",
+      "install_ffmpeg",
+      "invoke_menu",
+      "kill_app",
+      "launch_app",
+      "list_apps",
+      "list_sessions",
+      "list_windows",
+      "move_cursor",
+      "page",
+      "press_key",
+      "replay_trajectory",
+      "right_click",
+      "scroll",
+      "set_agent_cursor_enabled",
+      "set_agent_cursor_motion",
+      "set_agent_cursor_theme",
+      "set_config",
+      "set_value",
+      "set_window_frame",
+      "start_recording",
+      "start_session",
+      "stop_recording",
+      "type_text",
+      "verify_state",
+      "zoom"
+    ]
+  },
+  "invocation": {
+    "probes": "cua-driver <subcommand>  |  cua-driver call <tool> --socket \\\\.\\pipe\\cua-driver",
+    "args": "JSON on STDIN, never in argv",
+    "example": "'{}' | cua-driver call get_screen_size --socket \\\\.\\pipe\\cua-driver"
+  },
+  "facts": {
+    "screen": {
+      "height": 1080,
+      "scale_factor": 1.1041666666666667,
+      "width": 1920
+    },
+    "permissions": {
+      "elevated": true,
+      "integrity_level": "High",
+      "integrity_level_rid": 12288,
+      "post_message": true,
+      "uia": true
+    },
+    "health": {
+      "driver_version": "0.28.2",
+      "overall": "ok",
+      "platform": "win32",
+      "schema_version": "1"
+    },
+    "windowCount": 15,
+    "legacyWindowCount": 15,
+    "accessibilityTree": {
+      "windowCount": 15,
+      "processCount": 410
+    },
+    "startSession": {
+      "active": true,
+      "capture_scope": "auto",
+      "desktop_capture_authorized": false,
+      "desktop_unlocked": false,
+      "effective_scope": "window",
+      "escalation_detail": null,
+      "escalation_reason": null,
+      "revived": false,
+      "session": "kai-workstation-live"
+    },
+    "endSession": {
+      "active": false,
+      "session": "kai-workstation-live"
+    }
+  },
+  "recordedRefusals": {
+    "$comment": "Verbatim refusal payloads from the prior read-only probe session recorded in docs/architecture/KAI_WORKSTATION.md section 2. NOT re-run by this capture: reproducing either one means invoking `click`, and this capture injects no input. Both calls were chosen precisely because they cannot deliver input — a pid that does not exist, and a fabricated snapshot handle the driver fails closed on. Both exited 0.",
+    "window_target_not_found": {
+      "tool": "click",
+      "stdin": {
+        "pid": 999999,
+        "window_id": 1,
+        "x": 10,
+        "y": 10
+      },
+      "exitCode": 0,
+      "payload": {
+        "code": "window_target_not_found",
+        "effect": "refused",
+        "pid": 999999,
+        "window_id": 1
+      }
+    },
+    "stale_element_token": {
+      "tool": "click",
+      "stdin": {
+        "pid": 19084,
+        "window_id": 263402,
+        "element_index": 9999,
+        "snapshot_id": "s00000000"
+      },
+      "exitCode": 0,
+      "payload": {
+        "refusal": {
+          "code": "stale_element_token",
+          "message": "element_token is stale; call get_window_state again to refresh"
+        },
+        "status": "refused"
+      }
+    }
+  },
+  "redaction": {
+    "$comment": "The two window inventories are the driver's REAL output with one field removed: every `title` is replaced by REDACTED_TITLE, and the accessibility tree's process list is replaced by its count (`processes_redacted`). Those fields describe what the OPERATOR was doing on their own desktop and are not load-bearing for this contract — the tests assert window ids, geometry, `app_name` and counts, never a title's text. Everything else (pids, window ids, bounds, z_index, layer, is_on_screen, minimized, app_name, and every other probe in this file) is verbatim.",
+    "title": "<redacted: operator window title>",
+    "removedFields": [
+      "windows[].title and _legacy_windows[].title (list_windows)",
+      "windows[].title (get_accessibility_tree)",
+      "processes[] (get_accessibility_tree)"
+    ]
+  },
+  "probes": {
+    "version": {
+      "args": [
+        "--version"
+      ],
+      "stdin": null,
+      "code": 0,
+      "signal": null,
+      "ms": 35,
+      "stdout": "cua-driver 0.28.2\n",
+      "stderr": "",
+      "error": null
+    },
+    "status": {
+      "args": [
+        "status"
+      ],
+      "stdin": null,
+      "code": 0,
+      "signal": null,
+      "ms": 3133,
+      "stdout": "Cua Driver daemon is running\n  socket: \\\\.\\pipe\\cua-driver\n  pid: 19208\n  permission mode: standard (built_in_default)\n  user policy: configured=false, active=false, valid=true\n  managed policy: configured=false, active=false, valid=true\n  authorization host: unavailable (unavailable)\n  capability manifest: configured=false, approved_at_startup=false, valid=true\n",
+      "stderr": "",
+      "error": null
+    },
+    "status-dead-socket": {
+      "args": [
+        "status",
+        "--socket",
+        "\\\\.\\pipe\\kai-no-such-daemon"
+      ],
+      "stdin": null,
+      "code": 1,
+      "signal": null,
+      "ms": 3123,
+      "stdout": "",
+      "stderr": "Cua Driver daemon is not running\n",
+      "error": null
+    },
+    "doctor": {
+      "args": [
+        "doctor",
+        "--json"
+      ],
+      "stdin": null,
+      "code": 0,
+      "signal": null,
+      "ms": 3775,
+      "stdout": "{\n  \"ok\": true,\n  \"probes\": [\n    {\n      \"label\": \"binary\",\n      \"message\": \"cua-driver 0.28.2 (x86_64-windows)\",\n      \"status\": \"ok\"\n    },\n    {\n      \"detail\": \"argv exe:  C:\\\\Users\\\\DELL\\\\AppData\\\\Local\\\\Programs\\\\Cua\\\\cua-driver\\\\bin\\\\cua-driver.exe\\nresolved:  \\\\\\\\?\\\\C:\\\\Users\\\\DELL\\\\.cua-driver\\\\packages\\\\releases\\\\0.28.2-x86_64-pc-windows-msvc\\\\cua-driver.exe\",\n      \"label\": \"install dir\",\n      \"message\": \"\\\\\\\\?\\\\C:\\\\Users\\\\DELL\\\\.cua-driver\\\\packages\\\\releases\\\\0.28.2-x86_64-pc-windows-msvc\\\\cua-driver.exe\",\n      \"status\": \"ok\"\n    },\n    {\n      \"label\": \"home dir\",\n      \"message\": \"C:\\\\Users\\\\DELL\\\\.cua-driver (1 release dir cached)\",\n      \"status\": \"ok\"\n    },\n    {\n      \"label\": \"telemetry\",\n      \"message\": \"enabled via default (install-id present)\",\n      \"status\": \"ok\"\n    },\n    {\n      \"label\": \"interactive session\",\n      \"message\": \"session 1 has an attached interactive desktop (session=1; window_station=attached; thread_desktop=Default; input_desktop=Default; foreground_hwnd=0x40646)\",\n      \"status\": \"ok\"\n    },\n    {\n      \"label\": \"UI Automation\",\n      \"message\": \"CoCreateInstance(CUIAutomation) succeeded\",\n      \"status\": \"ok\"\n    },\n    {\n      \"label\": \"EnumWindows visible\",\n      \"message\": \"15 windows\",\n      \"status\": \"ok\"\n    }\n  ]\n}\n",
+      "stderr": "",
+      "error": null
+    },
+    "list-tools": {
+      "args": [
+        "list-tools"
+      ],
+      "stdin": null,
+      "code": 0,
+      "signal": null,
+      "ms": 1691,
+      "stdout": "bring_to_front: Activate `pid`'s window (or `window_id` if specified) -- bring it to the OS foreground\nbrowser_click: Click a page element (by ref) or viewport coordinates in an exactly-bound tab\nbrowser_dialog: Inspect or resolve a page-owned JavaScript alert, confirm, prompt, or beforeunload dialog on one exactly-bound tab\nbrowser_download: Trigger one download through an exact live browser ref and save it inside an explicitly approved directory\nbrowser_navigate: Navigate one tab of an exactly-bound browser target to a new URL (http/https/about only)\nbrowser_pointer: Perform hover, right-click, double-click, scroll, or drag in an exactly-bound browser tab\nbrowser_prepare: Explicitly prepare an owned DevTools endpoint for a browser\nbrowser_set_input_files: Assign one or more explicit absolute local files to an exact live <input type=file> ref through CDP\nbrowser_type: Type text into an exactly-bound tab via the Input domain\ncheck_for_update: Check the saved stable/nightly Cua Driver channel for a release on GitHub\ncheck_permissions: Check required permissions for cua-driver-rs on Windows\nclick: Left-click against a target pid\nclipboard_read: List available system clipboard types and optionally return privacy-sensitive plain text\nclipboard_write: Replace the system clipboard with exactly one value: plain text, an image from an absolute local path, or a file URL from an absolute local path\ndebug_window_info: Diagnostic: dump everything cua-driver sees about a pid's top-level windows from the daemon's session perspective\ndouble_click: Double-click against a target pid\ndrag: Press-drag-release gesture from (from_x, from_y) to (to_x, to_y) in window-local screenshot pixels\nend_session: End one visible lifecycle session and run its cursor, recording, configuration, and other cleanup hooks exactly once\nescalate_session: Deprecated compatibility tool for legacy capture-scope sessions\nget_accessibility_tree: Return a lightweight snapshot of the desktop: running processes and on-screen visible windows with their bounds and owner pid\nget_agent_cursor_state: Return the session cursor's theme, semantic playback, position, visibility, and motion\nget_browser_state: Read-only browser inspection\nget_config: Report the current persistent driver config\nget_cursor_position: Return the current mouse cursor position in screen points (origin top-left)\nget_desktop_state: Capture the full display in true screen pixels with no downscale\nget_recording_state: Report the current trajectory recorder state: whether recording is enabled, the output directory (when enabled), and the 1-based counter for the next turn folder that will be written\nget_screen_size: Return the size of the main display in physical pixels plus its display scale factor\nget_session: Read content-free lifecycle, cursor, recording, and idle status for one session visible to this authenticated transport\nget_session_state: Deprecated compatibility alias that reads a live legacy session's capture policy\nget_window_state: Walk a running app's UIA tree and return BOTH a structured `elements` array (preferred) AND a Markdown rendering of the same tree (back-compat)\nhealth_report: Single-call end-to-end driver diagnostics\nhotkey: Press a combination of keys simultaneously — e.g\ninstall_ffmpeg: Install the ffmpeg binary used by start_recording's video capture (Linux/Windows; macOS records natively and needs no ffmpeg)\ninvoke_menu: Resolve an exact application-menu path one live native level at a time and invoke its final item through accessibility APIs\nkill_app: Force-terminate a process by pid\nlaunch_app: Launch a Windows app hidden — the driver never brings the target to the foreground, the target's window is launched with SW_SHOWNOACTIVATE so it does not steal focus from whatever is currently frontmost\nlist_apps: List Windows apps — both currently running and installed-but-not-running — with per-app state flags:\nlist_sessions: List content-free lifecycle summaries attached to this authenticated transport lease\nlist_windows: List every top-level window currently known to the window manager\nmove_cursor: Move the agent cursor overlay to (x, y)\npage: Legacy browser compatibility tool\npress_key: Press and release a single key, delivered directly to the target pid's top-level window via PostMessage(WM_KEYDOWN/WM_KEYUP)\nreplay_trajectory: Replay a recorded trajectory by re-invoking every turn's tool call in lexical order\nright_click: Right-click against a target pid\nscroll: Scroll the target pid's focused region\nset_agent_cursor_enabled: Show or hide the agent cursor owned by a session\nset_agent_cursor_motion: Configure only movement physics and visibility timing for a session cursor\nset_agent_cursor_theme: Select an already-installed cursor theme for a session\nset_config: Write a setting into the persistent driver config\nset_value: Set a value on a UIA element via the ValuePattern interface\nset_window_frame: Set one exact top-level window's frame in the desktop-coordinate space reported by list_windows and verify the resulting geometry through an independent readback\nstart_recording: Start trajectory recording\nstart_session: Optionally create or return a lifecycle session before acting\nstop_recording: Stop trajectory recording\ntype_text: Insert text into the target pid via character-by-character PostMessage(WM_CHAR) to the focused window\nverify_state: Deterministically verify bounded predicates against one exact window\nzoom: Zoom into a rectangular region of a window screenshot at full (native) resolution\n",
+      "stderr": "",
+      "error": null
+    },
+    "screen-size": {
+      "args": [
+        "call",
+        "get_screen_size",
+        "--socket",
+        "\\\\.\\pipe\\cua-driver"
+      ],
+      "stdin": "{}",
+      "code": 0,
+      "signal": null,
+      "ms": 2423,
+      "stdout": "{\n  \"height\": 1080,\n  \"scale_factor\": 1.1041666666666667,\n  \"width\": 1920\n}\n",
+      "stderr": "",
+      "error": null
+    },
+    "check-permissions": {
+      "args": [
+        "call",
+        "check_permissions",
+        "--socket",
+        "\\\\.\\pipe\\cua-driver"
+      ],
+      "stdin": "{}",
+      "code": 0,
+      "signal": null,
+      "ms": 3968,
+      "stdout": "{\n  \"elevated\": true,\n  \"integrity_level\": \"High\",\n  \"integrity_level_rid\": 12288,\n  \"post_message\": true,\n  \"uia\": true\n}\n",
+      "stderr": "",
+      "error": null
+    },
+    "health-report": {
+      "args": [
+        "call",
+        "health_report",
+        "--socket",
+        "\\\\.\\pipe\\cua-driver"
+      ],
+      "stdin": "{}",
+      "code": 0,
+      "signal": null,
+      "ms": 3196,
+      "stdout": "{\n  \"checks\": [\n    {\n      \"message\": \"cua-driver 0.28.2\",\n      \"name\": \"binary_version\",\n      \"status\": \"pass\"\n    },\n    {\n      \"data\": {\n        \"architecture\": \"x86_64\",\n        \"os_version\": \"Microsoft Windows [version 10.0.26200.9457]\"\n      },\n      \"message\": \"Windows Microsoft Windows [version 10.0.26200.9457] (x86_64)\",\n      \"name\": \"platform_supported\",\n      \"status\": \"pass\"\n    },\n    {\n      \"message\": \"MCP session is active.\",\n      \"name\": \"session_active\",\n      \"status\": \"pass\"\n    },\n    {\n      \"message\": \"not applicable on Windows\",\n      \"name\": \"bundle_identity\",\n      \"status\": \"skip\"\n    },\n    {\n      \"message\": \"not applicable on Windows\",\n      \"name\": \"tcc_accessibility\",\n      \"status\": \"skip\"\n    },\n    {\n      \"message\": \"not applicable on Windows\",\n      \"name\": \"tcc_screen_recording\",\n      \"status\": \"skip\"\n    },\n    {\n      \"message\": \"UIAutomation is reachable; UI tree walking will succeed.\",\n      \"name\": \"ax_capability\",\n      \"status\": \"pass\"\n    },\n    {\n      \"message\": \"D3D11 device reachable; Windows Graphics Capture will succeed.\",\n      \"name\": \"screen_capture_capability\",\n      \"status\": \"pass\"\n    }\n  ],\n  \"driver_version\": \"0.28.2\",\n  \"overall\": \"ok\",\n  \"platform\": \"win32\",\n  \"schema_version\": \"1\"\n}\n",
+      "stderr": "",
+      "error": null
+    },
+    "list-windows": {
+      "args": [
+        "call",
+        "list_windows",
+        "--socket",
+        "\\\\.\\pipe\\cua-driver"
+      ],
+      "stdin": "{}",
+      "code": 0,
+      "signal": null,
+      "ms": 2753,
+      "stdout": "{\n  \"_legacy_windows\": [\n    {\n      \"height\": 9,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 18572,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 345,\n      \"window_id\": 131854,\n      \"x\": 208,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 15012,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1919,\n      \"window_id\": 66672,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 16856,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1920,\n      \"window_id\": 263750,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 5372,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1920,\n      \"window_id\": 132552,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 12788,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1920,\n      \"window_id\": 132728,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 78,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 8248,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 918,\n      \"window_id\": 1181468,\n      \"x\": 501,\n      \"y\": 962\n    },\n    {\n      \"height\": 16,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 18572,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 16,\n      \"window_id\": 329572,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 0,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 8248,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 0,\n      \"window_id\": 131796,\n      \"x\": 960,\n      \"y\": 540\n    },\n    {\n      \"height\": 16,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 19560,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 16,\n      \"window_id\": 262608,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 14116,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1920,\n      \"window_id\": 132296,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 19208,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1920,\n      \"window_id\": 196820,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 15012,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1919,\n      \"window_id\": 66668,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 30,\n      \"is_on_screen\": false,\n      \"minimized\": true,\n      \"pid\": 18572,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 162,\n      \"window_id\": 853864,\n      \"x\": -31993,\n      \"y\": -32000\n    },\n    {\n      \"height\": 1080,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 11768,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1920,\n      \"window_id\": 66074,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 176,\n      \"is_on_screen\": true,\n      \"minimized\": false,\n      \"pid\": 19084,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 183,\n      \"window_id\": 132616,\n      \"x\": 1704,\n      \"y\": 33\n    }\n  ],\n  \"current_space_id\": null,\n  \"windows\": [\n    {\n      \"app_name\": \"kai.exe\",\n      \"bounds\": {\n        \"height\": 9,\n        \"width\": 345,\n        \"x\": 208,\n        \"y\": 0\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 18572,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 131854,\n      \"z_index\": 14\n    },\n    {\n      \"app_name\": \"NVIDIA Overlay.exe\",\n      \"bounds\": {\n        \"height\": 1080,\n        \"width\": 1919,\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 15012,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 66672,\n      \"z_index\": 13\n    },\n    {\n      \"app_name\": \"brave.exe\",\n      \"bounds\": {\n        \"height\": 1080,\n        \"width\": 1920,\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 16856,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 263750,\n      \"z_index\": 12\n    },\n    {\n      \"app_name\": \"Hermes.exe\",\n      \"bounds\": {\n        \"height\": 1080,\n        \"width\": 1920,\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 5372,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 132552,\n      \"z_index\": 11\n    },\n    {\n      \"app_name\": \"WindowsTerminal.exe\",\n      \"bounds\": {\n        \"height\": 1080,\n        \"width\": 1920,\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 12788,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 132728,\n      \"z_index\": 10\n    },\n    {\n      \"app_name\": \"Nexus.exe\",\n      \"bounds\": {\n        \"height\": 78,\n        \"width\": 918,\n        \"x\": 501,\n        \"y\": 962\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 8248,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 1181468,\n      \"z_index\": 9\n    },\n    {\n      \"app_name\": \"kai.exe\",\n      \"bounds\": {\n        \"height\": 16,\n        \"width\": 16,\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 18572,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 329572,\n      \"z_index\": 8\n    },\n    {\n      \"app_name\": \"Nexus.exe\",\n      \"bounds\": {\n        \"height\": 0,\n        \"width\": 0,\n        \"x\": 960,\n        \"y\": 540\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 8248,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 131796,\n      \"z_index\": 7\n    },\n    {\n      \"app_name\": \"handy.exe\",\n      \"bounds\": {\n        \"height\": 16,\n        \"width\": 16,\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 19560,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 262608,\n      \"z_index\": 6\n    },\n    {\n      \"app_name\": \"TextInputHost.exe\",\n      \"bounds\": {\n        \"height\": 1080,\n        \"width\": 1920,\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 14116,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 132296,\n      \"z_index\": 5\n    },\n    {\n      \"app_name\": \"cua-driver.exe\",\n      \"bounds\": {\n        \"height\": 1080,\n        \"width\": 1920,\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 19208,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 196820,\n      \"z_index\": 4\n    },\n    {\n      \"app_name\": \"NVIDIA Overlay.exe\",\n      \"bounds\": {\n        \"height\": 1080,\n        \"width\": 1919,\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 15012,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 66668,\n      \"z_index\": 3\n    },\n    {\n      \"app_name\": \"kai.exe\",\n      \"bounds\": {\n        \"height\": 30,\n        \"width\": 162,\n        \"x\": -31993,\n        \"y\": -32000\n      },\n      \"is_on_screen\": false,\n      \"layer\": 0,\n      \"minimized\": true,\n      \"pid\": 18572,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 853864,\n      \"z_index\": 2\n    },\n    {\n      \"app_name\": \"explorer.exe\",\n      \"bounds\": {\n        \"height\": 1080,\n        \"width\": 1920,\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 11768,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 66074,\n      \"z_index\": 1\n    },\n    {\n      \"app_name\": \"ApplicationFrameHost.exe\",\n      \"bounds\": {\n        \"height\": 176,\n        \"width\": 183,\n        \"x\": 1704,\n        \"y\": 33\n      },\n      \"is_on_screen\": true,\n      \"layer\": 0,\n      \"minimized\": false,\n      \"pid\": 19084,\n      \"title\": \"<redacted: operator window title>\",\n      \"window_id\": 132616,\n      \"z_index\": 0\n    }\n  ]\n}\n",
+      "stderr": "",
+      "error": null
+    },
+    "accessibility-tree": {
+      "args": [
+        "call",
+        "get_accessibility_tree",
+        "--socket",
+        "\\\\.\\pipe\\cua-driver"
+      ],
+      "stdin": "{}",
+      "code": 0,
+      "signal": null,
+      "ms": 1974,
+      "stdout": "{\n  \"processes\": [],\n  \"windows\": [\n    {\n      \"height\": 9,\n      \"pid\": 18572,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 345,\n      \"window_id\": 131854,\n      \"x\": 208,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"pid\": 15012,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1919,\n      \"window_id\": 66672,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"pid\": 16856,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1920,\n      \"window_id\": 263750,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"pid\": 5372,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1920,\n      \"window_id\": 132552,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"pid\": 12788,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1920,\n      \"window_id\": 132728,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 78,\n      \"pid\": 8248,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 918,\n      \"window_id\": 1181468,\n      \"x\": 501,\n      \"y\": 962\n    },\n    {\n      \"height\": 16,\n      \"pid\": 18572,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 16,\n      \"window_id\": 329572,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 0,\n      \"pid\": 8248,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 0,\n      \"window_id\": 131796,\n      \"x\": 960,\n      \"y\": 540\n    },\n    {\n      \"height\": 16,\n      \"pid\": 19560,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 16,\n      \"window_id\": 262608,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"pid\": 14116,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1920,\n      \"window_id\": 132296,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"pid\": 19208,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1920,\n      \"window_id\": 196820,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 1080,\n      \"pid\": 15012,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1919,\n      \"window_id\": 66668,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 30,\n      \"pid\": 18572,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 162,\n      \"window_id\": 853864,\n      \"x\": -31993,\n      \"y\": -32000\n    },\n    {\n      \"height\": 1080,\n      \"pid\": 11768,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 1920,\n      \"window_id\": 66074,\n      \"x\": 0,\n      \"y\": 0\n    },\n    {\n      \"height\": 176,\n      \"pid\": 19084,\n      \"title\": \"<redacted: operator window title>\",\n      \"width\": 183,\n      \"window_id\": 132616,\n      \"x\": 1704,\n      \"y\": 33\n    }\n  ]\n}\n",
+      "stderr": "",
+      "error": null,
+      "processes_redacted": 410
+    },
+    "err-unknown-tool": {
+      "args": [
+        "call",
+        "no_such_tool",
+        "--socket",
+        "\\\\.\\pipe\\cua-driver"
+      ],
+      "stdin": "{}",
+      "code": 1,
+      "signal": null,
+      "ms": 1488,
+      "stdout": "",
+      "stderr": "Permission denied: tool 'no_such_tool' has no reviewed risk classification\n",
+      "error": null
+    },
+    "err-schema-violation": {
+      "args": [
+        "call",
+        "get_window_state",
+        "--socket",
+        "\\\\.\\pipe\\cua-driver"
+      ],
+      "stdin": "{}",
+      "code": 0,
+      "signal": null,
+      "ms": 985,
+      "stdout": "Missing required integer field pid.\n",
+      "stderr": "",
+      "error": null
+    },
+    "err-argv-json": {
+      "args": [
+        "call",
+        "get_screen_size",
+        "not-json",
+        "--socket",
+        "\\\\.\\pipe\\cua-driver"
+      ],
+      "stdin": null,
+      "code": 2,
+      "signal": null,
+      "ms": 1656,
+      "stdout": "",
+      "stderr": "error: positional JSON arg to 'cua-driver call' did not parse: expected ident at line 1 column 2\n       received: not-json\n\nhint: PowerShell 5.1 strips quotes around JSON field names in\n      multi-field args. Pipe the JSON via stdin instead:\n        '{\"pid\":1234,\"window_id\":5678}' | cua-driver call get_screen_size\n\n      Or use PowerShell 7+ (pwsh) which preserves the quotes.\n",
+      "error": null
+    },
+    "err-daemon-absent": {
+      "args": [
+        "call",
+        "get_screen_size",
+        "--socket",
+        "\\\\.\\pipe\\kai-no-such-daemon"
+      ],
+      "stdin": "{}",
+      "code": 1,
+      "signal": null,
+      "ms": 370,
+      "stdout": "",
+      "stderr": "Cua Driver daemon is not running on \\\\.\\pipe\\kai-no-such-daemon.\nStart it first with: cua-driver serve --socket \\\\.\\pipe\\kai-no-such-daemon\n",
+      "error": null
+    },
+    "start-session": {
+      "args": [
+        "call",
+        "start_session",
+        "--socket",
+        "\\\\.\\pipe\\cua-driver"
+      ],
+      "stdin": "{\"session\":\"kai-workstation-live\"}",
+      "code": 0,
+      "signal": null,
+      "ms": 704,
+      "stdout": "{\n  \"active\": true,\n  \"capture_scope\": \"auto\",\n  \"desktop_capture_authorized\": false,\n  \"desktop_unlocked\": false,\n  \"effective_scope\": \"window\",\n  \"escalation_detail\": null,\n  \"escalation_reason\": null,\n  \"revived\": false,\n  \"session\": \"kai-workstation-live\"\n}\n",
+      "stderr": "",
+      "error": null
+    },
+    "end-session": {
+      "args": [
+        "call",
+        "end_session",
+        "--socket",
+        "\\\\.\\pipe\\cua-driver"
+      ],
+      "stdin": "{\"session\":\"kai-workstation-live\"}",
+      "code": 0,
+      "signal": null,
+      "ms": 392,
+      "stdout": "{\n  \"active\": false,\n  \"session\": \"kai-workstation-live\"\n}\n",
+      "stderr": "",
+      "error": null
+    }
+  }
+}

@@ -1356,8 +1356,13 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     const forbidden = strings(body.forbiddenOutcomes, "forbiddenOutcomes");
     if (!Array.isArray(forbidden)) return forbidden;
 
+    const criteria = strings(body.acceptanceCriteria, "acceptanceCriteria");
+    if (!Array.isArray(criteria)) return criteria;
     const goal = runtime.goals.createGoal({ statement: intent, createdBy: "user" });
-    runtime.goals.setGoalFields(goal.id, { constraints, ...(forbidden.length > 0 ? {} : {}) });
+    runtime.goals.setGoalFields(goal.id, {
+      constraints,
+      ...(criteria.length > 0 ? { acceptanceCriteria: criteria } : {}),
+    });
     // Forbidden outcomes ride the plan/contract, not the goal row; keep them on
     // the goal's constraints so nothing is dropped before a plan exists.
     if (forbidden.length > 0) {
@@ -1408,11 +1413,14 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
       outcome = await runtime.challengerFor(mode).challenge({
         goalRevisionId,
         goal: goal.statement,
+        // The panel judges the goal against the USER'S OWN criteria. Passing an
+        // empty list here made every challenge start from "no criteria stated",
+        // which is a fair objection but not a useful review.
         contract: {
-          acceptanceCriteria: [],
+          acceptanceCriteria: goal.acceptanceCriteria,
           constraints: goal.constraints,
           forbiddenOutcomes: [],
-          requiredEvidence: [],
+          requiredEvidence: goal.acceptanceCriteria,
         },
       });
     } catch (error) {
@@ -1442,16 +1450,44 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     if (goal.state !== "READY_FOR_PLAN" && goal.state !== "CONDITIONAL") {
       return conflict(`a plan is proposed from READY_FOR_PLAN (or CONDITIONAL), not from ${goal.state}`);
     }
+    // The owner may name the workspace this goal is allowed to touch. It is the
+    // AUTHORITY the plan is built inside: the architect unions it with the goal's
+    // constraints and trims any workspace the model proposes beyond it, and it
+    // becomes the working directory every evidence check is scoped to — so a
+    // check can never verify KAI's own tree instead of the work's.
+    const body = asBodyObject(req.body) ?? {};
+    const workspace = Array.isArray(body.authorizedWorkspace)
+      ? body.authorizedWorkspace.filter((w): w is string => typeof w === "string" && w.trim().length > 0)
+      : [];
     const planned = await runtime.architect.planGoal({
       goalId: goal.id,
       intent: goal.statement,
       constraints: goal.constraints,
+      ...(workspace.length > 0 ? { authorizedWorkspace: workspace } : {}),
+      // The user's criteria are the contract the plan must satisfy. They are
+      // passed as AUTHORITATIVE criteria (unioned into the plan and guaranteed a
+      // covering task), not merely as facts the model may paraphrase away.
+      ...(goal.acceptanceCriteria.length > 0 ? { acceptanceCriteria: goal.acceptanceCriteria } : {}),
+      ...(goal.acceptanceCriteria.length > 0 ? { facts: goal.acceptanceCriteria.map((c) => `acceptance criterion: ${c}`) } : {}),
       ...(goal.assumptions.length > 0 ? { facts: goal.assumptions } : {}),
       mode: "QUICK",
     });
     if (!planned.ok) {
       // A refused plan is a refusal, not an empty plan presented as valid.
       return conflict(planned.reason);
+    }
+    // A plan must COVER the goal's acceptance criteria. A plan that quietly drops
+    // one would let the goal settle COMPLETED while a criterion the user asked for
+    // was never planned at all — the silent-scope-loss failure, caught at the door.
+    const plannedCriteria = new Set([
+      ...planned.content.acceptanceCriteria,
+      ...planned.content.tasks.flatMap((t) => t.acceptanceCriteria),
+    ]);
+    const uncovered = goal.acceptanceCriteria.filter((c) => !plannedCriteria.has(c));
+    if (uncovered.length > 0) {
+      return conflict(
+        `the plan does not cover ${uncovered.length} of the goal's acceptance criteria: ${uncovered.map((c) => JSON.stringify(c)).join(", ")}`,
+      );
     }
     const revision = runtime.goals.addRevision(goal.id, planned.content, "kai");
     runtime.goals.setGoalFields(goal.id, {
@@ -2496,12 +2532,17 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     // The authorization POSTURE is part of the identity: an operator must be able
     // to see, without guessing, whether this Core enforces owner-only controls or
     // is running with no credential at all. Reported, never inferred.
+    // The posture, reported as the DECISION this Core actually makes:
+    //   enforced                     — a credential exists; owner routes need it.
+    //   disabled-by-explicit-dev-mode — the operator asked for a developer Core.
+    //   owner-controls-refused        — no credential and no opt-in, so every
+    //                                   owner route is refused (fail closed).
     const ownerAuth =
       req.ownerAuthConfigured === true
         ? "enforced"
         : req.devMode === true
           ? "disabled-by-explicit-dev-mode"
-          : "unconfigured";
+          : "owner-controls-refused";
     return ok({ ...loadIdentity(), ownerAuth });
   }
 

@@ -434,6 +434,13 @@ export interface PlanGoalInput {
   constraints?: string[];
   forbiddenOutcomes?: string[];
   authorizedWorkspace?: string[];
+  /**
+   * The USER'S acceptance criteria. Authoritative: they are unioned into the plan
+   * and guaranteed to be covered by a task, because a model that paraphrases or
+   * drops one would leave the goal settling on a weaker check than the user
+   * asked for.
+   */
+  acceptanceCriteria?: string[];
   budgets?: Partial<GoalBudgets>;
   mode?: ChallengeMode;
 }
@@ -467,7 +474,13 @@ function clean(values: string[] | undefined): string[] {
  */
 function withGoalAuthority(
   content: GoalPlanContent,
-  ctx: { facts: string[]; constraints: string[]; forbiddenOutcomes: string[]; authorizedWorkspace: string[] },
+  ctx: {
+    facts: string[];
+    constraints: string[];
+    forbiddenOutcomes: string[];
+    authorizedWorkspace: string[];
+    acceptanceCriteria: string[];
+  },
 ): GoalPlanContent {
   const uncertainties = [...content.uncertainties];
   let authorizedWorkspace = content.authorizedWorkspace;
@@ -484,8 +497,36 @@ function withGoalAuthority(
   if (ctx.facts.length === 0 && uncertainties.length === 0) {
     uncertainties.push("no facts were supplied for this goal: the plan rests on assumptions, not verified context");
   }
+  // ── The user's criteria are AUTHORITATIVE ──────────────────────────────────
+  // Unioned into the plan, and every one that no task claims is assigned to the
+  // first task. A criterion nobody verifies is a criterion the goal can never
+  // settle on, and a model that paraphrases one would silently substitute its own
+  // words for the user's — so the wording is preserved EXACTLY.
+  const acceptanceCriteria = [...new Set([...ctx.acceptanceCriteria, ...content.acceptanceCriteria])];
+  const tasks = content.tasks.map((task) => ({ ...task, acceptanceCriteria: [...task.acceptanceCriteria] }));
+  if (tasks.length > 0) {
+    const claimed = new Set(tasks.flatMap((task) => task.acceptanceCriteria));
+    const unclaimed = ctx.acceptanceCriteria.filter((c) => !claimed.has(c));
+    if (unclaimed.length > 0) {
+      const first = tasks[0];
+      if (first !== undefined) {
+        first.acceptanceCriteria = [...first.acceptanceCriteria, ...unclaimed];
+        // Each criterion needs a verification METHOD or the plan is refused — and
+        // for a machine-checkable label the label IS the method: the gate routes
+        // `file content equals: …` to KAI's own byte comparison. Recording the
+        // label here is what makes the criterion executable rather than declared.
+        first.verification = [...first.verification, ...unclaimed];
+      }
+    }
+  } else if (ctx.acceptanceCriteria.length > 0) {
+    uncertainties.push(
+      "the plan has no tasks, so the goal's acceptance criteria cannot be covered by any work item",
+    );
+  }
   return {
     ...content,
+    tasks,
+    acceptanceCriteria,
     constraints: [...new Set([...ctx.constraints, ...content.constraints])],
     forbiddenOutcomes: [...new Set([...ctx.forbiddenOutcomes, ...content.forbiddenOutcomes])],
     authorizedWorkspace,
@@ -521,7 +562,13 @@ export function createGoalArchitect(deps: GoalArchitectDeps): GoalArchitect {
       const parsed = parsePlanContent(text, { budgets, fallbackSummary: intent });
       if (!parsed.ok) return { ok: false, reason: parsed.reason };
 
-      const content = withGoalAuthority(parsed.value, { facts, constraints, forbiddenOutcomes, authorizedWorkspace });
+      const content = withGoalAuthority(parsed.value, {
+        facts,
+        constraints,
+        forbiddenOutcomes,
+        authorizedWorkspace,
+        acceptanceCriteria: clean(input.acceptanceCriteria),
+      });
       const valid = validatePlanContent(content, { maxTasks: budgets.maxTasks });
       if (!valid.ok) return { ok: false, reason: valid.reason };
 

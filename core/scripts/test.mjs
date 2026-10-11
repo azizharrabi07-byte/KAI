@@ -80,6 +80,15 @@ console.log(`api key: ${loadApiKey()}`);
 for (const f of files) console.log(`  ${relative(CORE, f)}`);
 console.log("");
 
+// ── Developer mode for the suite ─────────────────────────────────────────────
+// The Core FAILS CLOSED: with no owner credential configured, every owner route
+// is refused. Many suites drive the real HTTP server against a Core that has no
+// credential, which is exactly the state this flag exists for. Setting it HERE —
+// explicitly, in the test runner — is the documented developer configuration; it
+// is never a production default, and the suites that ASSERT the authorization
+// rules call `decideAccess` directly with explicit inputs, so they are unaffected.
+process.env.KAI_DEV_MODE = "1";
+
 const result = spawnSync(process.execPath, ["--test", ...files], {
   stdio: "inherit",
   cwd: CORE,

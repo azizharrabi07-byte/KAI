@@ -102,17 +102,114 @@ is reported by `GET /identity` as `ownerAuth`:
 |---|---|---|
 | `enforced` | a host token is configured (the installed app always injects one) | owner routes require the credential; an unattested caller gets **401** |
 | `disabled-by-explicit-dev-mode` | `KAI_DEV_MODE=1` | owner routes are allowed and the decision SAYS so — never the default |
-| `unconfigured` | no token and no dev flag (a developer running `npm start`) | owner routes are allowed **and reported as unprotected** |
+| `owner-controls-refused` | no token and no dev flag | **every owner route is refused (403)** — fail closed |
 
-The third row is deliberate residual exposure, not an oversight: a Core with no
-credential cannot check anything, and pretending to refuse would make a standalone
-developer Core unusable. A normal installation — the app spawns the Core and injects
-the token — is always in the first row. **Read `GET /identity` before trusting a
-Core's authorization.**
+**The third row is the fix for the previously reported unsafe default.** A Core with
+no credential used to ALLOW owner routes with a reason, which meant a normal
+installation could silently run with its owner controls open to any local process.
+It now refuses them: a real installation is never in that state (the app always
+injects the token), and a developer must ASK for a developer Core with
+`KAI_DEV_MODE=1`. Reads and the public surface stay open, so such a Core is still
+inspectable — it simply cannot be told to do anything. **Read `GET /identity`
+before trusting a Core's authorization.**
+
+### The live run: a REAL worker, a REAL model, and independent verification
+
+Run against a live model (the local Hermes gateway) and the real Hermes worker
+adapter, in an isolated Core/DB/workspace:
+
+| Step | Observed |
+|---|---|
+| `GET /identity` | `ownerAuth: "enforced"` |
+| unattested `POST /goals` | **401** (fail closed over real HTTP) |
+| goal created | `201 DRAFT`, criteria persisted |
+| plan (live model) | `200`, 4 tasks with dependencies |
+| approve | `200 APPROVED` / `PAUSED_DOER_OFF` |
+| Doer ON | parked, then decided |
+| `POST /goals/:id/start` | compiled 4 work items, **dispatched 1** |
+| the WORKER | `worker=hermes-worker`, **the real Hermes agent ran**, attempts 1–3 |
+| the workspace | **`journey.txt` existed with content `OK`** — the worker really created it |
+| KAI's verification | **criterion MET**, `kai-observed` record: *"content matches hex 4f4b (2 bytes)"* |
+| item | `BLOCKED` after 3 attempts (its own extra criteria were prose, not machine-checkable) |
+
+So the loop goal → plan → approve → compile → **dispatch through a real adapter →
+worker writes the file → KAI independently verifies the bytes** is exercised for
+real. What did NOT happen in that run: the goal did not reach `COMPLETED`, because
+the live model added task criteria of its own ("the final report states …") that no
+machine check can settle, so the item honestly blocked instead of passing.
+
+### What a live run requires (two facts found by running one)
+
+Running the whole loop against a LIVE model and the REAL Hermes worker surfaced
+two configuration facts that are deliberate but must be stated, because without
+them a goal compiles and then dispatches nothing:
+
+1. **Autonomous dispatch is opt-in.** The default is `orchestration.workerAuto =
+   "ASK"` at autonomy level 2, so the router answers `ASK_USER` and no worker is
+   dispatched. A user (or an operator) must grant worker autonomy
+   (`orchestration.workerAuto = "AUTO"`, level 3) before goal work can run
+   unattended. This is the intended safety default, not a defect.
+2. **A fresh Core has no available worker.** The dispatcher's availability is the
+   set of registered **subagent personas**, so a goal compiles into work items and
+   then refuses to dispatch with *"no workers are available"* until at least one
+   persona exists. Registering one through the real tool path
+   (`workforce.subagent`, backed by `workerId: "hermes"`) is what makes the worker
+   selectable. **This is a genuine onboarding gap** and is reported as such rather
+   than papered over: a first-run experience that expects goal execution should
+   offer to create a default worker.
+
+Both were found by running the loop, not by reading it.
+
+### File CONTENT is now verified by KAI (a gap the live panel exposed)
+
+Running the Goal Challenger against a LIVE model produced objections that were
+correct, specific, and about a real hole:
+
+> "The acceptance criterion checks only that the path exists, never its bytes, so
+> the single most probable defect — a trailing newline making the file 3 bytes
+> ("OK\\n") instead of 2 — passes acceptance undetected."
+> "Existence-only acceptance is satisfiable with zero work by a pre-existing or
+> leftover file."
+> "`node --test` succeeds vacuously: with zero test files it exits 0 and reports
+> 'tests 0 / pass 0'." (the critic verified this on this host)
+
+All three were right. The evidence collector verified file PRESENCE and command
+EXIT CODES, never CONTENT — so any byte-exact goal was either refused by the panel
+or settled on a weaker check than the user asked for.
+
+**Added:** a content requirement of the form
+`file content equals: <path> = hex:4f4b` (or `= "OK"`) is now verified by KAI
+reading the file itself and comparing the bytes (`orchestrator.ts`
+`contentCheckFor` + the content branch of `gatherEvidence`). A mismatch records a
+`kai-observed` record with EMPTY `supports`, so it informs and never satisfies.
+Covered by tests: the exact bytes settle the criterion; a **trailing newline does
+not**; a missing file does not; a refused read is not a fact.
+
+### Why the goal model calls returned HTTP 429 (diagnosed, not worked around)
+
+One minimal request through KAI's own model path returned:
+
+```json
+{"status":429,"message":"the \"opencode-go\" model provider answered HTTP 429",
+ "detail":"{\"type\":\"error\",\"error\":{\"type\":\"GoUsageLimitError\",
+            \"message\":\"Go usage limit exceeded\"},
+            \"metadata\":{\"workspace\":\"wrk_01M298R3SA1WN8J6G3XYF4XB6R\",
+                          \"limitName\":\"monthly\"}}"}
+```
+
+So it is **`GoUsageLimitError` — the `opencode-go` provider's MONTHLY quota is
+exhausted** for that workspace, not a transient rate limit. Nothing was retried,
+no account was switched and no paid service was changed. The already-configured
+**local Hermes gateway is OpenAI-compatible** (`POST /v1/chat/completions` → 200)
+and is used as the model backend for live verification instead.
 
 ### Verification of slice 3 (commands actually run)
 
-- `cd core && npm test` — see the counts below.
+- `cd core && npm test` — **1538 tests · 1514 pass · 0 fail · 24 skipped** (at
+  `f2f6ba8` the baseline was 1492/1475/0/17). The 24 skips are all NAMED: 13 need
+  OpenCode on `:4096`, 2 are Codex LIVE tests (CLI absent), 2 are workstation
+  live-capture (opt-in), 6 are the new adapter live tests whose runtime is absent,
+  1 is the workstation CUA live screen (opt-in).
 - `cd core && npm run typecheck` — clean.
 - `cd app && npx tsc --noEmit -p tsconfig.json` — clean; `npm test` — **338 pass**.
 - `cd app/src-tauri && cargo test --lib owner_call` — **2 passed**.

@@ -218,29 +218,37 @@ test("an unattested caller is refused (401) on EVERY owner route when a credenti
   assert.ok(owners > 0, "the policy must contain owner routes");
 });
 
-test("an owner route is allowed without a credential only with the reason recorded", () => {
+test("an owner route FAILS CLOSED: only a credential or an explicit developer switch allows it", () => {
   for (const [key, entry] of Object.entries(ACCESS_POLICY)) {
     if (entry.access !== "owner") continue;
     const { method, pattern } = splitKey(key);
     const path = concretePath(pattern);
 
-    // No credential configured at all: the bare developer Core — allowed, and the
-    // reason says exactly that rather than reading like a verified allow.
+    // 1. No credential configured at all. This MUST be refused: a normal
+    //    autonomous installation must never run with its owner controls open
+    //    merely because a credential was missing. (This assertion is the inverse
+    //    of what it used to be — the old allow was the unsafe default.)
     const bare = decideAccess({ method, path, attested: false, ownerAuthConfigured: false });
-    assert.equal(bare.allowed, true, `${key} is allowed on an unconfigured Core`);
-    assert.equal(bare.status, 200);
-    assert.match(bare.reason, /UNCONFIGURED Core/, `${key}: the bare-Core allow must say so`);
+    assert.equal(bare.allowed, false, `${key} must be REFUSED on a Core with no credential`);
+    assert.equal(bare.status, 403, `${key}: a missing credential is a refusal, not a 200`);
+    assert.match(bare.reason, /NO owner credential/, `${key}: the refusal must name the real cause`);
+    assert.match(bare.reason, /KAI_DEV_MODE=1/, `${key}: the refusal must name the way forward`);
 
-    // An EXPLICIT developer switch: allowed even with a credential, and named.
+    // 2. An EXPLICIT developer switch: allowed, and the reason says it was asked
+    //    for rather than inferred.
     const dev = decideAccess({ method, path, attested: false, ownerAuthConfigured: true, devMode: true });
     assert.equal(dev.allowed, true, `${key} is allowed under explicit devMode`);
     assert.match(dev.reason, /developer mode/, `${key}: devMode must be named in the reason`);
 
-    // Omitted devMode is NOT developer mode: with a credential configured the same
-    // call is still refused, so devMode can never be the silent default.
+    // 3. Omitted devMode is NOT developer mode: with a credential configured the
+    //    same call is refused, so devMode can never be the silent default.
     const omitted = decideAccess({ method, path, attested: false, ownerAuthConfigured: true });
     assert.equal(omitted.allowed, false, `${key}: devMode must never be assumed`);
     assert.ok(!/developer mode/.test(omitted.reason));
+
+    // 4. A valid credential always allows it.
+    const ok = decideAccess({ method, path, attested: true, ownerAuthConfigured: true });
+    assert.equal(ok.allowed, true, `${key} is allowed with the owner credential`);
   }
 });
 

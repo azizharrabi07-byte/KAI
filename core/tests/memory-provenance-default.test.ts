@@ -83,7 +83,7 @@ test("POST /memory/write refuses a caller-claimed user provenance and defaults o
   });
   const api = createCoreApi(runtime);
   const post = (body: unknown) =>
-    api.handle({ method: "POST", path: "/memory/write", query: new URLSearchParams(), body });
+    api.handle({ method: "POST", path: "/memory/write", query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body });
 
   // 1. Claiming user provenance is refused outright, with the reason named.
   const claimedProvenance = await post({ content: "claimed as the user", provenance: "user_statement" });

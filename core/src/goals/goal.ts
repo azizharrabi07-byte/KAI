@@ -258,6 +258,12 @@ export interface Goal {
   assumptions: string[];
   constraints: string[];
   uncertainties: string[];
+  /**
+   * The user's OWN success criteria, captured at intake. They are what the
+   * challenge panel is judged against and what the plan must satisfy — without
+   * them a goal is only prose, and a reviewer can say nothing useful about it.
+   */
+  acceptanceCriteria: string[];
   /** Why the goal is blocked, when it is. */
   blocker?: string;
   nextAction?: GoalNextAction;
@@ -281,6 +287,7 @@ export interface GoalFieldPatch {
   assumptions?: string[];
   constraints?: string[];
   uncertainties?: string[];
+  acceptanceCriteria?: string[];
   /** `null` clears the stored next action. */
   nextAction?: GoalNextAction | null;
   /** `null` clears a blocker. */

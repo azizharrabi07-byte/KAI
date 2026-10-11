@@ -239,6 +239,13 @@ function readEffect(value: unknown): WorkstationObservation["effect"] | null {
  * Returning `null` for the effect is the important part: an unrecognised shape
  * yields NO verdict, and the caller then reports `unverifiable` rather than
  * assuming the action worked.
+ *
+ * One inference is made, and only in the safe direction: a payload that names a
+ * refusal — a `refusal` object, or a code from the driver's refusal vocabulary —
+ * is read as `refused` even when the explicit marker is absent. `refused` never
+ * claims the action landed, so this cannot manufacture a false success; the
+ * opposite default (leaving it `unverifiable`) would throw away the driver's own
+ * statement that it declined to act.
  */
 export function readDriverVerdict(payload: unknown): DriverVerdict {
   if (!isRecord(payload)) return { effect: null };
@@ -267,6 +274,12 @@ export function readDriverVerdict(payload: unknown): DriverVerdict {
   // is not evidence of anything. The driver's own docs are explicit that
   // `unknown` never implies success.
   if (effect === null && status === "unsatisfied") effect = "suspected_noop";
+  // A payload that NAMES a refusal is a refusal even when it omits the explicit
+  // `effect` / `status: "refused"` marker: a `refusal` object, or a code drawn
+  // from the driver's refusal vocabulary. Reporting those as `unverifiable`
+  // would discard the driver's own statement that it did not act. An explicit
+  // `status` above still wins, because the driver said something more specific.
+  if (effect === null && (refusal !== undefined || isRefusalCode(code))) effect = "refused";
 
   const routeValue = source.route ?? payload.route;
   const route =
@@ -288,7 +301,17 @@ export function readDriverVerdict(payload: unknown): DriverVerdict {
   return verdict;
 }
 
-/** Driver-native refusal codes → the seam's failure kinds. */
+/**
+ * Driver-native refusal codes → the seam's failure kinds.
+ *
+ * Every code in this table means the driver deliberately did NOT deliver: it
+ * could not resolve the target, had no route, or was not permitted. One code
+ * in the driver's published reason set is deliberately NOT a refusal —
+ * `effect_unconfirmed` describes a delivery whose effect could not be proven —
+ * so it stays in this table (a refusal that arrives with it still needs a kind)
+ * but is excluded from {@link isRefusalCode}, keeping such a payload
+ * `unverifiable` rather than overstating it as `refused`.
+ */
 const FAILURE_KIND_BY_DRIVER_CODE: Record<string, WorkstationFailure["kind"]> = {
   stale_element_token: "stale_session",
   stale_snapshot: "stale_session",
@@ -308,6 +331,12 @@ const FAILURE_KIND_BY_DRIVER_CODE: Record<string, WorkstationFailure["kind"]> = 
 function kindForDriverCode(code: string | undefined): WorkstationFailure["kind"] {
   if (code === undefined) return "route";
   return FAILURE_KIND_BY_DRIVER_CODE[code] ?? "route";
+}
+
+/** Driver codes that are refusals. `effect_unconfirmed` is not one (see above). */
+function isRefusalCode(code: string | undefined): boolean {
+  if (code === undefined || code === "effect_unconfirmed") return false;
+  return FAILURE_KIND_BY_DRIVER_CODE[code] !== undefined;
 }
 
 /** Non-JSON text the driver prints. Two streams, two meanings. */
@@ -494,15 +523,19 @@ export function readWindows(payload: unknown): WindowSummary[] {
     if (typeof minimized === "boolean") summary.minimized = minimized;
     const onScreen = entry.is_on_screen;
     if (typeof onScreen === "boolean") summary.onScreen = onScreen;
-    const bounds = entry.bounds;
-    if (isRecord(bounds)) {
-      const x = numberField(bounds, "x");
-      const y = numberField(bounds, "y");
-      const width = numberField(bounds, "width");
-      const height = numberField(bounds, "height");
-      if (x !== undefined && y !== undefined && width !== undefined && height !== undefined) {
-        summary.bounds = { x, y, width, height };
-      }
+    // Two real 0.28.2 shapes, both captured live: `list_windows` nests the
+    // geometry under `bounds`, while `get_accessibility_tree` — the tool this
+    // provider actually uses for the desktop inventory — returns it FLAT on the
+    // entry (`x`/`y`/`width`/`height`). Reading only the nested form silently
+    // dropped the geometry of every window in a desktop observation, so a
+    // caller could list windows but never address one by point.
+    const geometry = isRecord(entry.bounds) ? entry.bounds : entry;
+    const x = numberField(geometry, "x");
+    const y = numberField(geometry, "y");
+    const width = numberField(geometry, "width");
+    const height = numberField(geometry, "height");
+    if (x !== undefined && y !== undefined && width !== undefined && height !== undefined) {
+      summary.bounds = { x, y, width, height };
     }
     out.push(summary);
   }
@@ -661,7 +694,11 @@ export function createCuaWorkstationProvider(options: CuaProviderOptions = {}): 
   }
 
   async function probeStatus(): Promise<WorkstationResult<{ daemonRunning: boolean; permissionMode: string | null }>> {
-    const run = await runner(executable, [CUA_PROBE_COMMANDS.status], null, probeTimeoutMs);
+    // The daemon probe MUST name the same socket every `call` uses. `status`
+    // with no `--socket` reports the DEFAULT pipe, so a provider pointed at any
+    // other socket would report `daemonRunning: true` for a pipe with nothing
+    // behind it — measured live against `\\.\pipe\kai-no-such-daemon`.
+    const run = await runner(executable, [CUA_PROBE_COMMANDS.status, "--socket", socket], null, probeTimeoutMs);
     const text = `${run.stdout}\n${run.stderr}`;
     const daemonRunning = !run.spawnFailed && !run.timedOut && run.code === 0 && /daemon is running/i.test(text);
     const modeMatch = /permission mode:\s*([A-Za-z_-]+)/.exec(text);

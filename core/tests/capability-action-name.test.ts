@@ -38,7 +38,7 @@ function boot(dbPath: string) {
 }
 
 function post(api: CoreApi, path: string, body: unknown) {
-  return api.handle({ method: "POST", path, query: new URLSearchParams(), body });
+  return api.handle({ method: "POST", path, query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body });
 }
 
 test("an unknown capability action is refused by NAME, never blamed on a transport", async (t) => {

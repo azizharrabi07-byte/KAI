@@ -645,6 +645,39 @@ export function createOrchestrator(deps: OrchestratorDeps) {
    * ROUTING, not adjudication: the real exit code decides. Anything else
    * returns null (recorded unsupported, never guessed).
    */
+  /**
+   * Parse a CONTENT requirement: `file content equals: <path> = <spec>`.
+   *
+   * The goal panel kept (correctly) refusing goals whose acceptance criterion was
+   * "the file exists" while the stated outcome was byte-exact — because existence
+   * cannot detect a trailing newline, and it cannot tell a freshly written file
+   * from a leftover one. This is the check that closes that gap: KAI reads the
+   * file ITSELF and compares the bytes, so a content requirement is VERIFIED
+   * rather than assumed from the worker's word.
+   *
+   * Specs: `hex:4f4b` (exact bytes) or a quoted literal (`"OK"`, `'OK'`).
+   * The comparison is on the file's bytes as re-encoded from its decoded text, so
+   * it is exact for UTF-8 (and therefore for every ASCII case) and is reported as
+   * a mismatch — never as a pass — for a file that is not valid UTF-8.
+   */
+  function contentCheckFor(label: string): { path: string; bytes: Buffer; describe: string } | null {
+    const m = /^\s*file content equals:\s*(.+?)\s*=\s*(.+?)\s*$/i.exec(label);
+    if (m === null || m[1] === undefined || m[2] === undefined) return null;
+    const path = m[1].trim();
+    const spec = m[2].trim();
+    if (path.length === 0) return null;
+    const hex = /^hex:([0-9a-fA-F]*)$/.exec(spec);
+    if (hex !== null && hex[1] !== undefined && hex[1].length % 2 === 0) {
+      return { path, bytes: Buffer.from(hex[1], "hex"), describe: `hex ${hex[1].toLowerCase()}` };
+    }
+    const quoted = /^(["'])([\s\S]*)\1$/.exec(spec);
+    if (quoted !== null && quoted[2] !== undefined) {
+      const literal = quoted[2].replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\r/g, "\r");
+      return { path, bytes: Buffer.from(literal, "utf8"), describe: `the literal ${JSON.stringify(literal)}` };
+    }
+    return null;
+  }
+
   function testCommandFor(label: string): { command: string; args: string[] } | null {
     if (/[;&|><$`(){}\[\]!*?]/.test(label)) return null;
     const m = /\b((?:npm|npx|node|cargo|pytest|python|go|tsc)(?:\s+[A-Za-z0-9_./:=-]+)*)/i.exec(label);
@@ -706,6 +739,55 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     const tools = deps.tools;
     const policy = autonomy();
     for (const label of entries) {
+      // 0. CONTENT checks: KAI reads the file ITSELF and compares the bytes.
+      //    This runs before the existence check so a content requirement is
+      //    settled by a real comparison, not by the file merely being there.
+      const content = contentCheckFor(label);
+      if (content !== null) {
+        if (cwd === undefined) {
+          blocked.push({
+            label,
+            reason: "no working directory on this work item: a content check cannot be scoped to its own workspace",
+          });
+          continue;
+        }
+        const target = isAbsolute(content.path) ? content.path : join(cwd, content.path);
+        try {
+          const read = await tools.invoke("filesystem.read", { path: target }, invokeOpts);
+          if (!read.ok) {
+            blocked.push({
+              label,
+              reason: `content check refused: ${read.error?.code ?? "unknown"} — ${read.error?.message ?? ""}`.slice(0, 200),
+            });
+            continue;
+          }
+          const info = typeof read.result === "object" && read.result !== null
+            ? (read.result as { content?: unknown; bytes?: unknown })
+            : {};
+          const text = typeof info.content === "string" ? info.content : "";
+          const actual = Buffer.from(text, "utf8");
+          const matches = actual.equals(content.bytes);
+          observed.push({
+            id: mkId(),
+            kind: "file content",
+            source: "kai-observed",
+            method: "filesystem.read + byte comparison",
+            detail: matches
+              ? `${target} content matches ${content.describe} (${actual.length} bytes) in ${cwd}.`
+              : `${target} content does NOT match ${content.describe}: observed ${actual.length} bytes ${JSON.stringify(actual.toString("hex").slice(0, 80))} (text ${JSON.stringify(text.slice(0, 80))}).`,
+            path: target,
+            // A mismatch records EMPTY supports: it informs, it never satisfies.
+            supports: matches ? [label] : [],
+            at,
+          });
+        } catch (error) {
+          blocked.push({
+            label,
+            reason: `content check threw: ${error instanceof Error ? error.message : String(error)}`.slice(0, 200),
+          });
+        }
+        continue;
+      }
       // 1. Claimed-artifact checks: existence + working-tree state.
       //
       // SCOPED TO THE ITEM'S WORKSPACE. `filesystem.metadata` resolves a bare

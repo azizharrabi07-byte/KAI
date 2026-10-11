@@ -40,8 +40,21 @@ function boot(dbPath: string) {
   });
 }
 
+/**
+ * A mutation from the INSTALLED APP: it holds the per-install owner credential.
+ * The Core now fails closed, so an unattested mutation is refused before any
+ * policy runs — which is the correct production posture and would make these
+ * policy tests vacuous if they did not model the real caller.
+ */
 function post(api: CoreApi, path: string, body: unknown) {
-  return api.handle({ method: "POST", path, query: new URLSearchParams(), body });
+  return api.handle({
+    method: "POST",
+    path,
+    query: new URLSearchParams(),
+    body,
+    attested: true,
+    ownerAuthConfigured: true,
+  });
 }
 
 function get(api: CoreApi, path: string, q?: Record<string, string>) {

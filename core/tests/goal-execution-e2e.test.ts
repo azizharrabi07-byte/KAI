@@ -98,6 +98,8 @@ interface Harness {
   delegateCalls: DelegateInput[];
   /** Artifacts that exist on disk, per the stubbed filesystem port. */
   present: Set<string>;
+  /** Real file contents, so the CONTENT check can be exercised. */
+  files: Map<string, string>;
   toolsCalled: string[];
   doerOn: boolean;
   close(): void;
@@ -118,6 +120,7 @@ function harness(opts: { dbPath?: string; dir?: string; goalsPath?: string } = {
     delegateQueue: [] as DelegateResult[],
     delegateCalls: [] as DelegateInput[],
     present: new Set<string>(),
+    files: new Map<string, string>(),
     toolsCalled: [] as string[],
     doerOn: true,
   };
@@ -145,6 +148,12 @@ function harness(opts: { dbPath?: string; dir?: string; goalsPath?: string } = {
           const path = String((input as { path?: unknown }).path ?? "");
           const exists = state.present.has(path);
           return { ok: true, result: { exists, size: exists ? 42 : 0 } };
+        }
+        if (id === "filesystem.read") {
+          const path = String((input as { path?: unknown }).path ?? "");
+          if (!state.files.has(path)) return { ok: false, error: { code: "NOT_FOUND", message: `no file at ${path}` } };
+          const text = state.files.get(path) as string;
+          return { ok: true, result: { path, bytes: Buffer.from(text, "utf8").length, truncated: false, content: text } };
         }
         return { ok: true, result: {} };
       },
@@ -180,6 +189,9 @@ function harness(opts: { dbPath?: string; dir?: string; goalsPath?: string } = {
     },
     get present() {
       return state.present;
+    },
+    get files() {
+      return state.files;
     },
     get toolsCalled() {
       return state.toolsCalled;
@@ -491,4 +503,149 @@ test("G2: a material plan edit after approval makes the goal undispatchable agai
   assert.equal(report.dispatched.length, 0, "a stale approval cannot dispatch");
   assert.equal(h.delegateCalls.length, 0, "no worker was reached");
   assert.match(report.reason ?? "", /not approved/i);
+});
+
+
+// ══ Content verification (the gap the live goal panel exposed) ═══════════════
+
+test("a byte-exact content criterion is VERIFIED by KAI, and a trailing newline is caught", async (t) => {
+  // The live challenge panel refused a presence-only criterion because it cannot
+  // detect the single most likely defect: a file that is "OK\n" instead of "OK".
+  // These two runs are that pair.
+  const mk = (content: string) => {
+    const h = harness();
+    const planContent = plan(
+      [{ id: "t1", title: "only", objective: "produce the artifact", dependsOn: [], role: "coding",
+         acceptanceCriteria: ["file content equals: out.txt = hex:4f4b"], verification: ["filesystem.read"] }],
+      ["file content equals: out.txt = hex:4f4b"],
+    );
+    h.present.add(join(".", "out.txt"));
+    h.files.set(join(".", "out.txt"), content);
+    h.delegateQueue = [{ ok: true, reply: reply("the artifact", "out.txt") }];
+    return h;
+  };
+
+  // 1. Exactly the two bytes 4F 4B -> MET.
+  const good = mk("OK");
+  t.after(() => {
+    good.close();
+    rmSync(good.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  });
+  const goodGoal = approvedGoal(good, plan(
+    [{ id: "t1", title: "only", objective: "produce the artifact", dependsOn: [], role: "coding",
+       acceptanceCriteria: ["file content equals: out.txt = hex:4f4b"], verification: ["filesystem.read"] }],
+    ["file content equals: out.txt = hex:4f4b"],
+  ));
+  assert.equal(await runToSettle(good, goodGoal), "COMPLETED", "the exact bytes settle the criterion");
+  assert.ok(good.toolsCalled.includes("filesystem.read"), "KAI read the file itself");
+
+  // 2. A TRAILING NEWLINE (the exact defect the panel named) -> NOT met.
+  const bad = mk("OK\n");
+  t.after(() => {
+    bad.close();
+    rmSync(bad.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  });
+  const badGoal = approvedGoal(bad, plan(
+    [{ id: "t1", title: "only", objective: "produce the artifact", dependsOn: [], role: "coding",
+       acceptanceCriteria: ["file content equals: out.txt = hex:4f4b"], verification: ["filesystem.read"] }],
+    ["file content equals: out.txt = hex:4f4b"],
+  ));
+  assert.equal(await runToSettle(bad, badGoal), "BLOCKED", "3 bytes is not 2: the criterion is NOT met");
+  const status = bad.executor.status(badGoal);
+  assert.equal(status?.criteria[0]?.met, false);
+  assert.match(status?.criteria[0]?.detail ?? "", /no evidence recorded|does NOT match/);
+});
+
+test("a content check on a missing file is not a pass, and a refused read is not a fact", async (t) => {
+  const h = harness();
+  t.after(() => {
+    h.close();
+    rmSync(h.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  });
+  const content = plan(
+    [{ id: "t1", title: "only", objective: "produce the artifact", dependsOn: [], role: "coding",
+       acceptanceCriteria: ["file content equals: missing.txt = hex:4f4b"], verification: ["filesystem.read"] }],
+    ["file content equals: missing.txt = hex:4f4b"],
+  );
+  const goalId = approvedGoal(h, content);
+  h.delegateQueue = [{ ok: true, reply: reply("the artifact", "missing.txt") }];
+  assert.equal(await runToSettle(h, goalId), "BLOCKED", "a file that is not there cannot satisfy a content criterion");
+  assert.equal(h.executor.status(goalId)?.criteria[0]?.met, false);
+});
+
+
+test("a content check is byte-exact: CRLF, a BOM and a longer file all fail the hex:4f4b criterion", async (t) => {
+  // The live panel objected that "the criterion fixes no measurement mode, so a
+  // newline-normalising reader accepts the 3-byte file OK\n". These cases pin the
+  // measurement mode: KAI compares the file's BYTES, so every near-miss fails.
+  const cases: { label: string; content: string }[] = [
+    { label: "trailing LF", content: "OK\n" },
+    { label: "trailing CRLF", content: "OK\r\n" },
+    { label: "leading BOM", content: "\ufeffOK" },
+    { label: "extra byte", content: "OK!" },
+    { label: "lowercase is different bytes", content: "ok" },
+  ];
+  for (const { label, content } of cases) {
+    const h = harness();
+    const criteria = ["file content equals: out.txt = hex:4f4b"];
+    const planContent = plan(
+      [{ id: "t1", title: "only", objective: "produce the artifact", dependsOn: [], role: "coding",
+         acceptanceCriteria: criteria, verification: ["filesystem.read"] }],
+      criteria,
+    );
+    const goalId = approvedGoal(h, planContent);
+    h.present.add(join(".", "out.txt"));
+    h.files.set(join(".", "out.txt"), content);
+    h.delegateQueue = [{ ok: true, reply: reply("the artifact", "out.txt") }];
+    const settled = await runToSettle(h, goalId);
+    assert.equal(settled, "BLOCKED", `${label} must NOT satisfy the byte-exact criterion`);
+    assert.equal(h.executor.status(goalId)?.criteria[0]?.met, false, `${label}: criterion must stay unmet`);
+    h.close();
+    rmSync(h.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
+});
+
+
+test("a blocked prerequisite settles the goal BLOCKED instead of stranding its dependents", async (t) => {
+  // Found in a LIVE run: one item blocked, three dependents sat READY forever and
+  // the goal stayed RUNNING with nothing able to make progress.
+  const h = harness();
+  t.after(() => {
+    h.close();
+    rmSync(h.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  });
+
+  const content = plan(
+    [
+      { id: "t1", title: "first", objective: "the prerequisite", dependsOn: [], role: "coding",
+        acceptanceCriteria: ["file present: out.txt"], verification: ["filesystem.metadata"] },
+      { id: "t2", title: "second", objective: "the dependent", dependsOn: ["t1"], role: "coding",
+        acceptanceCriteria: ["file present: out2.txt"], verification: ["filesystem.metadata"] },
+    ],
+    ["file present: out.txt"],
+  );
+  const goalId = approvedGoal(h, content);
+  // The artifact never appears and the worker keeps failing: t1 exhausts its budget.
+  h.delegateQueue = [
+    { ok: false, error: "worker unavailable" },
+    { ok: false, error: "worker unavailable" },
+    { ok: false, error: "worker unavailable" },
+    { ok: false, error: "worker unavailable" },
+  ];
+
+  const settled = await runToSettle(h, goalId);
+  assert.equal(settled, "BLOCKED", `a stranded chain must settle: ${JSON.stringify(h.executor.status(goalId)?.items)}`);
+  const status = h.executor.status(goalId);
+  // A worker that cannot be reached FAILS the item (vs BLOCKED when the retry
+  // budget is spent). Both are terminal for settlement, which is the point here.
+  assert.ok(
+    ["BLOCKED", "FAILED"].includes(status?.items.find((i) => i.taskId === "t1")?.state ?? ""),
+    `the prerequisite ended terminal, got ${status?.items.find((i) => i.taskId === "t1")?.state}`,
+  );
+  assert.equal(status?.items.find((i) => i.taskId === "t2")?.state, "READY", "the dependent never ran");
+  assert.match(h.goals.getGoal(goalId)?.blocker ?? "", /prerequisite ended BLOCKED\/FAILED/);
+  assert.ok(
+    h.goals.getGoal(goalId)?.nextAction?.action === "ASK_USER",
+    "and the blocker carries a next action for the user, so the stall is visible rather than silent",
+  );
 });

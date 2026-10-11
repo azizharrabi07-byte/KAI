@@ -180,7 +180,7 @@ test("the session routes create, switch, rename and archive through the boundary
     rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
   const api: CoreApi = createCoreApi(runtime);
-  const post = (path: string, body: unknown) => api.handle({ method: "POST", path, query: new URLSearchParams(), body });
+  const post = (path: string, body: unknown) => api.handle({ method: "POST", path, query: new URLSearchParams(), attested: true, ownerAuthConfigured: true, body });
   const get = (path: string, q: Record<string, string> = {}) =>
     api.handle({ method: "GET", path, query: new URLSearchParams(q) });
 

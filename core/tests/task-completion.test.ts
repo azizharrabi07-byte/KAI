@@ -321,7 +321,17 @@ test("H: LIVE HTTP /models use parks -> approve -> applies -> survives restart",
   const mk = () => boot(dir, (async () => completion("hi")) as ModelFn);
   const rt = mk();
   await rt.start();
-  const server = createKaiServer(loadConfig(process.env), { core: rt });
+  // Give this Core a REAL owner credential and present it, so the test exercises
+  // the ENFORCED production posture rather than the no-credential one (which now
+  // refuses every owner route, by design).
+  const previousToken = process.env.KAI_HOST_TOKEN;
+  process.env.KAI_HOST_TOKEN = "test-owner-token-0123456789abcdef";
+  t.after(() => {
+    if (previousToken === undefined) delete process.env.KAI_HOST_TOKEN;
+    else process.env.KAI_HOST_TOKEN = previousToken;
+  });
+  const config = loadConfig(process.env);
+  const server = createKaiServer(config, { core: rt });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", () => resolve());
@@ -332,8 +342,16 @@ test("H: LIVE HTTP /models use parks -> approve -> applies -> survives restart",
     rmSync(dir, { recursive: true, force: true });
   });
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  // The installed app holds the per-install owner credential and presents it on
+  // every mutation. The Core now FAILS CLOSED, so a test that drove a mutation
+  // without it would be testing the authorization gate, not the approval flow.
+  const hostToken = config.server.hostToken;
+  const headers = (): Record<string, string> => ({
+    "content-type": "application/json",
+    ...(typeof hostToken === "string" && hostToken.length > 0 ? { "x-kai-host-token": hostToken } : {}),
+  });
   const post = async (path: string, body: unknown) => {
-    const res = await fetch(`${base}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const res = await fetch(`${base}${path}`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
     return { status: res.status, body: (await res.json()) as Record<string, unknown> };
   };
 

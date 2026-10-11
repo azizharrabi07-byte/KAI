@@ -36,6 +36,7 @@ import { createAgentRegistry } from "./agents/registry.ts";
 import { createHermesAdapter } from "./agents/adapters/hermesAdapter.ts";
 import { resolveHermesKey } from "./agents/hermes-key.ts";
 import { createOpenCodeAdapter } from "./agents/adapters/opencodeAdapter.ts";
+import { createCodexAdapter } from "./agents/adapters/codexAdapter.ts";
 import { createMockHermes, createMockOpenCode } from "./agents/mock.ts";
 import { createPolicyEngine } from "./policies/gate.ts";
 import { createApprovalService } from "./approvals/service.ts";
@@ -262,6 +263,8 @@ export interface CoreRuntimeOptions {
     mode?: "real" | "mock";
     hermes?: { baseUrl?: string; apiKey?: string };
     opencode?: { baseUrl?: string };
+    /** Codex CLI transport (command override for tests and unusual installs). */
+    codex?: { command?: string; model?: string; cwd?: string; timeoutMs?: number };
   };
   /**
    * KAI's OWN model/inference backend. This is the brain KAI uses for normal chat —
@@ -1511,6 +1514,13 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       }),
     );
     registry.register(createOpenCodeAdapter(options.agents?.opencode ?? {}));
+    // Codex: the adapter exists and is registered HERE, so a machine that has the
+    // CLI gets a working worker and a machine without one gets an honest
+    // "unavailable" health from the adapter's own probe. Leaving it unregistered
+    // made the adapter dead code — an implemented integration nobody could reach.
+    // The binary is probed by the adapter itself, never assumed: `health()`
+    // reports the real reason when it is absent.
+    registry.register(createCodexAdapter(options.agents?.codex ?? {}));
   }
 
   /**
