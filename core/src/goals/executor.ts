@@ -27,9 +27,12 @@
  * settle a criterion, so a goal cannot complete on a worker's say-so.
  */
 
+import { existsSync } from "node:fs";
+import { isAbsolute, resolve, sep } from "node:path";
 import type { WorkBoard } from "../orchestration/board.ts";
 import type { VerifiedEvidence, WorkItem } from "../orchestration/types.ts";
-import type { Goal, GoalPlanContent, PlanRevision } from "./goal.ts";
+import { artifactPathsForAll, classifyCriterion } from "./criteria.ts";
+import type { Goal, GoalPlanContent, HumanDecision, PlanRevision } from "./goal.ts";
 import type { GoalStore } from "./store.ts";
 
 /** How a criterion was settled, or why it was not. */
@@ -61,6 +64,12 @@ export interface AdvanceReport {
   /** Set when the goal reached a terminal state in this pass. */
   settled?: "COMPLETED" | "BLOCKED" | "FAILED";
   reason?: string;
+  /**
+   * One line per dispatched item that did NOT move. Without this, a dispatch that
+   * silently refuses (a spent budget, an unavailable worker, a policy gate) looks
+   * identical to one that worked, and the goal just sits in RUNNING.
+   */
+  notes: string[];
 }
 
 export interface GoalExecutorDeps {
@@ -72,6 +81,11 @@ export interface GoalExecutorDeps {
   doerEnabled: () => boolean;
   /** Concurrent dispatches allowed in one pass. Default 2. */
   maxParallel?: () => number;
+  /**
+   * Injected so the workspace proof is testable without touching a real disk.
+   * Defaults to `existsSync`.
+   */
+  fileExists?: (path: string) => boolean;
   emit?: (type: string, payload: unknown) => void;
 }
 
@@ -123,9 +137,29 @@ function requiredCriteria(content: GoalPlanContent): string[] {
   return labels;
 }
 
-/** Is this criterion settled by a KAI-OBSERVED record that supports it? */
-function criterionStatuses(criteria: readonly string[], items: readonly WorkItem[]): CriterionStatus[] {
+/**
+ * Is this criterion settled?
+ *
+ * Two sources, kept strictly distinct:
+ *   - a KAI-OBSERVED evidence record that supports the label (machine verified);
+ *   - a recorded HUMAN decision (a person judged it), which is attributed and
+ *     never presented as something KAI observed.
+ *
+ * A worker-reported record is NOT proof and is named as such rather than silently
+ * ignored, so a reader can see why a claim did not count.
+ */
+function criterionStatuses(
+  criteria: readonly string[],
+  items: readonly WorkItem[],
+  humanDecisions: readonly HumanDecision[] = [],
+): CriterionStatus[] {
   return criteria.map((criterion) => {
+    const decided = humanDecisions.find((d) => d.criterion === criterion);
+    if (decided !== undefined) {
+      return decided.decision === "MET"
+        ? { criterion, met: true, detail: `decided by ${decided.by}${decided.note !== undefined ? `: ${decided.note}` : ""}` }
+        : { criterion, met: false, detail: `a human decided this is NOT met (${decided.by})${decided.note !== undefined ? `: ${decided.note}` : ""}` };
+    }
     for (const item of items) {
       const record = item.evidence.find(
         (e: VerifiedEvidence) => e.source === "kai-observed" && e.supports.includes(criterion),
@@ -153,6 +187,54 @@ export function createGoalExecutor(deps: GoalExecutorDeps): GoalExecutor {
     const content = revision.content;
 
     const existing = itemsFor(deps.board, goalId, revision.id);
+
+    // ── Prove the workspace BEFORE anything is dispatched ────────────────────
+    // ONCE per revision: the artifact must not pre-exist when the run STARTS. On a
+    // later compile the run has legitimately created it, so re-checking would
+    // refuse every retry — which is exactly what it did until this guard existed.
+    // A stale artifact from an earlier run must never satisfy a new goal, and a
+    // criterion must never point outside the workspace the owner authorized.
+    // Both are checked here, once, against the resolved absolute paths.
+    const root = content.authorizedWorkspace[0];
+    if (existing.length > 0) {
+      // Already underway: the pre-dispatch proof has been made and the artifacts
+      // belong to THIS run.
+      deps.emit?.("goal.workspace_reused", { goalId, revisionId: revision.id, items: existing.length });
+    } else if (root === undefined || root.trim().length === 0) {
+      return {
+        ok: false,
+        reason:
+          "the approved plan names no authorized workspace, so there is nothing to verify the artifacts against — a plan must be scoped to a directory the owner approved",
+      };
+    }
+    const canonicalRoot = resolve(root ?? ".");
+    const artifacts = artifactPathsForAll(requiredCriteria(content));
+    const fileExists = deps.fileExists ?? existsSync;
+    for (const artifact of existing.length === 0 ? artifacts : []) {
+      const target = isAbsolute(artifact) ? resolve(artifact) : resolve(canonicalRoot, artifact);
+      // Containment, not string prefixing: `/ws` must not contain `/ws-evil`.
+      if (target !== canonicalRoot && !target.startsWith(canonicalRoot + sep)) {
+        return {
+          ok: false,
+          reason: `criterion artifact "${artifact}" resolves to ${target}, which is OUTSIDE the authorized workspace ${canonicalRoot}`,
+        };
+      }
+      if (fileExists(target)) {
+        return {
+          ok: false,
+          reason: `criterion artifact ${target} ALREADY EXISTS — a fresh run must not be able to satisfy a criterion with a leftover file. Use a new workspace, or remove it deliberately.`,
+        };
+      }
+    }
+    if (existing.length === 0) {
+      deps.emit?.("goal.workspace_verified", {
+        goalId,
+        revisionId: revision.id,
+        workspace: canonicalRoot,
+        artifacts: artifacts.map((a) => (isAbsolute(a) ? resolve(a) : resolve(canonicalRoot, a))),
+      });
+    }
+
     const byTask = new Map(existing.map((item) => [item.taskId ?? "", item]));
     const ids: string[] = [];
     let created = 0;
@@ -248,7 +330,7 @@ export function createGoalExecutor(deps: GoalExecutorDeps): GoalExecutor {
       state: goal.state,
       approved: approval.approved,
       revisionId: revision?.id ?? null,
-      criteria: criterionStatuses(criteria, items),
+      criteria: criterionStatuses(criteria, items, goal.humanDecisions),
       items: [...items]
         .sort((a, b) => {
           const order = (item: WorkItem): number => content?.tasks.findIndex((t) => t.id === item.taskId) ?? -1;
@@ -273,19 +355,19 @@ export function createGoalExecutor(deps: GoalExecutorDeps): GoalExecutor {
 
   async function advance(goalId: string): Promise<AdvanceReport> {
     const goal = deps.goals.getGoal(goalId);
-    if (goal === null) return { skipped: false, dispatched: [], reason: `no goal "${goalId}" exists` };
+    if (goal === null) return { skipped: false, dispatched: [], reason: `no goal "${goalId}" exists`, notes: [] };
 
     // Autonomous dispatch is the Doer's capability. OFF means: no claim, no
     // dispatch, no settlement — the durable rows simply wait.
     if (!deps.doerEnabled()) {
-      return { skipped: true, dispatched: [], reason: "the KAI Doer is OFF" };
+      return { skipped: true, dispatched: [], reason: "the KAI Doer is OFF", notes: [] };
     }
 
     const approved = approvedContent(deps.goals, goalId);
     if (!approved.ok) {
       // Not approved (or a stale approval). Nothing may dispatch, and the goal
       // is reported as waiting rather than silently stuck.
-      return { skipped: false, dispatched: [], reason: approved.reason };
+      return { skipped: false, dispatched: [], reason: approved.reason, notes: [] };
     }
     const { revision } = approved;
     const content = revision.content;
@@ -294,19 +376,24 @@ export function createGoalExecutor(deps: GoalExecutorDeps): GoalExecutor {
     // approved revision exists — `setGoalState` re-checks that itself.
     if (deps.goals.getGoal(goalId)?.state === "APPROVED") {
       const moved = deps.goals.setGoalState(goalId, "RUNNING", "execution started on an approved plan", "kai");
-      if (!moved.ok) return { skipped: false, dispatched: [], reason: moved.reason };
+      if (!moved.ok) return { skipped: false, dispatched: [], reason: moved.reason, notes: [] };
     }
 
     const compiled = compile(goalId);
-    if (!compiled.ok) return { skipped: false, dispatched: [], reason: compiled.reason };
+    if (!compiled.ok) return { skipped: false, dispatched: [], reason: compiled.reason, notes: [] };
 
     const items = itemsFor(deps.board, goalId, revision.id);
     const limit = deps.maxParallel?.() ?? 2;
     const ready = dispatchableItems(content, items).slice(0, Math.max(1, limit));
     const dispatched: string[] = [];
+    const notes: string[] = [];
     for (const item of ready) {
       const outcome = await deps.runWorkItem(item.id);
       dispatched.push(item.id);
+      const settledItem = deps.board.get(item.id);
+      if (settledItem !== null && settledItem.state === item.state) {
+        notes.push(`dispatched ${item.id} (task ${item.taskId ?? "?"}) stayed ${item.state}: ${outcome.note ?? "no reason given"}`);
+      }
       deps.emit?.("goal.task_dispatched", { goalId, workItemId: item.id, state: outcome.state });
     }
 
@@ -349,10 +436,15 @@ export function createGoalExecutor(deps: GoalExecutorDeps): GoalExecutor {
         const settled = deps.goals.setGoalState(goalId, "BLOCKED", "a prerequisite ended without satisfying its criteria", "kai");
         deps.emit?.("goal.settled", { goalId, state: "BLOCKED", stranded: stranded.length });
         return settled.ok
-          ? { skipped: false, dispatched, settled: "BLOCKED", reason }
-          : { skipped: false, dispatched, reason: settled.reason };
+          ? { skipped: false, dispatched, settled: "BLOCKED", reason, notes }
+          : { skipped: false, dispatched, reason: settled.reason, notes };
       }
-      return { skipped: false, dispatched, reason: dispatched.length > 0 ? undefined : "no dependency-ready work" };
+      return {
+        skipped: false,
+        dispatched,
+        ...(dispatched.length > 0 ? {} : { reason: "no dependency-ready work" }),
+        notes,
+      };
     }
 
     const criteria = criterionStatuses(requiredCriteria(content), after);
@@ -361,8 +453,29 @@ export function createGoalExecutor(deps: GoalExecutorDeps): GoalExecutor {
       const settled = deps.goals.setGoalState(goalId, "COMPLETED", "every acceptance criterion was verified", "kai");
       deps.emit?.("goal.settled", { goalId, state: "COMPLETED", criteria: criteria.length });
       return settled.ok
-        ? { skipped: false, dispatched, settled: "COMPLETED" }
-        : { skipped: false, dispatched, reason: settled.reason };
+        ? { skipped: false, dispatched, settled: "COMPLETED", notes }
+        : { skipped: false, dispatched, reason: settled.reason, notes };
+    }
+
+    // ── A criterion that needs a PERSON pauses the goal ──────────────────────
+    // Declared `human review: <question>`, it can never be auto-settled. KAI asks
+    // and waits: it does not invent evidence, does not mark it MET, and does not
+    // block forever without saying what is needed.
+    const awaitingHuman = unmet.filter((c) => classifyCriterion(c.criterion).kind === "human-review");
+    if (awaitingHuman.length > 0) {
+      const question = awaitingHuman
+        .map((c) => c.criterion.slice("human review:".length).trim())
+        .join(" | ");
+      const reason = `waiting for a human decision on ${awaitingHuman.length} criterion(s): ${question}`;
+      deps.goals.setGoalFields(goalId, {
+        blocker: reason,
+        nextAction: { action: "ASK_USER", reason, at: new Date().toISOString() },
+      });
+      const parked = deps.goals.setGoalState(goalId, "WAITING_USER", "a criterion needs a human decision", "kai");
+      deps.emit?.("goal.awaiting_user", { goalId, criteria: awaitingHuman.map((c) => c.criterion) });
+      return parked.ok
+        ? { skipped: false, dispatched, reason, notes }
+        : { skipped: false, dispatched, reason: parked.reason, notes };
     }
 
     // Terminal but unverified. A goal whose criteria were never observed is
@@ -378,8 +491,8 @@ export function createGoalExecutor(deps: GoalExecutorDeps): GoalExecutor {
     const settled = deps.goals.setGoalState(goalId, "BLOCKED", "acceptance criteria were not verified", "kai");
     deps.emit?.("goal.settled", { goalId, state: "BLOCKED", failed, unmet: unmet.map((c) => c.criterion) });
     return settled.ok
-      ? { skipped: false, dispatched, settled: "BLOCKED", reason }
-      : { skipped: false, dispatched, reason: settled.reason };
+      ? { skipped: false, dispatched, settled: "BLOCKED", reason, notes }
+      : { skipped: false, dispatched, reason: settled.reason, notes };
   }
 
   return { compile, advance, status };

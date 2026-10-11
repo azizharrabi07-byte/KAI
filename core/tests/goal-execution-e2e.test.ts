@@ -168,6 +168,9 @@ function harness(opts: { dbPath?: string; dir?: string; goalsPath?: string } = {
     runWorkItem: (id) => orch.runWorkItem(id),
     doerEnabled: () => state.doerOn,
     maxParallel: () => 4,
+    // Driven from the same stubbed filesystem the gate uses, so the workspace
+    // proof and the evidence checks agree — and no test touches the real disk.
+    fileExists: (path) => state.present.has(path) || state.files.has(path),
   });
 
   return {

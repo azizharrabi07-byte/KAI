@@ -279,9 +279,29 @@ export interface Goal {
    * version of the goal than the one that was actually critiqued.
    */
   challenge?: ChallengeReport;
+  /** Human decisions on `human review:` criteria, in the order they were made. */
+  humanDecisions: HumanDecision[];
 }
 
 /** The mutable, non-lifecycle half of a goal. `undefined` means "leave as is". */
+/**
+ * A HUMAN decision on one criterion.
+ *
+ * Some criteria genuinely need judgement ("is this report honest and complete?").
+ * Those are declared `human review: <question>` and KAI PAUSES for the answer —
+ * it does not invent evidence, it does not mark the criterion MET, and it does not
+ * block forever without saying what is needed. The decision is recorded with its
+ * author, so it stays distinct from anything KAI observed itself.
+ */
+export interface HumanDecision {
+  /** The criterion label exactly as written. */
+  criterion: string;
+  decision: "MET" | "FAILED";
+  by: string;
+  at: string;
+  note?: string;
+}
+
 export interface GoalFieldPatch {
   statement?: string;
   assumptions?: string[];
@@ -299,6 +319,8 @@ export interface GoalFieldPatch {
   workItemIds?: string[];
   /** `null` clears the stored challenge report. */
   challenge?: ChallengeReport | null;
+  /** Replaces the recorded human decisions for this goal. */
+  humanDecisions?: HumanDecision[];
 }
 
 // ── Deterministic hashing ────────────────────────────────────────────────────

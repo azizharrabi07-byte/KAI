@@ -45,12 +45,12 @@ const PLAN_JSON = JSON.stringify({
       objective: "find where the time goes",
       dependsOn: [],
       role: "coding",
-      acceptanceCriteria: ["a profile is recorded"],
+      acceptanceCriteria: ["file present: profile.txt"],
       verification: ["the profile command's output is attached"],
     },
   ],
-  acceptanceCriteria: ["a profile is recorded"],
-  requiredEvidence: ["a profile is recorded"],
+  acceptanceCriteria: ["file present: profile.txt"],
+  requiredEvidence: ["file present: profile.txt"],
   constraints: [],
   forbiddenOutcomes: [],
   authorizedWorkspace: ["."],
@@ -274,7 +274,7 @@ test("a stale approval cannot authorise a modified plan", async (t) => {
 
   // A MATERIAL edit: a new revision with a changed criterion.
   const changed = JSON.parse(PLAN_JSON) as Record<string, unknown>;
-  changed["acceptanceCriteria"] = ["a DIFFERENT thing is recorded"];
+  changed["acceptanceCriteria"] = ["file present: DIFFERENT.txt"];
   const revision = h.runtime.goals.addRevision(id, changed as never, "kai");
   assert.notEqual(revision.id, first.currentRevision.id, "a material edit is a new revision");
   assert.notEqual(revision.contentHash, h.runtime.goals.getRevision(first.currentRevision.id)?.contentHash);

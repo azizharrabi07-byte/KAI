@@ -148,6 +148,7 @@ export const ACCESS_POLICY: Readonly<Record<string, AccessPolicyEntry>> = Object
   "POST /goals/:id/reject": { access: "owner", reason: "rejects a plan — the same authority as approval, in the negative" },
   "POST /goals/:id/start": { access: "owner", reason: "compiles an approved plan into work items and dispatches them — the owner's decision to execute" },
   "GET /goals/:id/execution": { access: "read", reason: "reads a goal's execution status" },
+  "POST /goals/:id/review": { access: "owner", reason: "records a HUMAN decision on a criterion — the one place an assertion can settle one" },
 
   // ── KAI Doer: the autonomy switch ────────────────────────────────────────────
   "GET /doer": { access: "read", reason: "the Doer switch's current state" },

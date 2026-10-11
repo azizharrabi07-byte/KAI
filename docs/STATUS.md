@@ -92,6 +92,54 @@ The gap between "approved plan" and "work actually runs" is closed.
   Core state, with four separate sections for assigned tasks, worker-reported
   results, KAI-observed activity and KAI-performed verification.
 
+### Acceptance criteria are typed, and a criterion nothing can settle is REFUSED
+
+The live run exposed the root cause of a goal that could not complete: the planner
+produced *"the final report states that all tests passed"* — prose with no
+settlement path — while the worker did its job and KAI verified the bytes it could.
+
+- **One classifier, shared** (`core/src/goals/criteria.ts`): a criterion is typed by
+  HOW it settles — `file content equals: <path> = hex:4f4b`, `file present: <path>`,
+  a runnable test command (`npm test`, `node --test`, `cargo test`, `pytest`,
+  `go test`, `tsc --noEmit`), `human review: <question>`, or **unsupported**. The
+  gate and the architect import the SAME definition, so the thing that refuses a
+  criterion and the thing that settles it cannot drift.
+- **The architect refuses** a plan containing an unsupported criterion, naming it and
+  the way to rewrite it. The planner prompt now states the grammar it must use.
+- **A `human review:` criterion PARKS the goal** (`WAITING_USER`) with the question
+  and a next action. `POST /goals/:id/review` records the decision, attributed to a
+  person; a MET decision settles it and a FAILED one blocks it. KAI never invents
+  the verdict and never blocks forever without saying what is needed.
+- **Every plan-level criterion is task-owned** (the gate runs the checks an ITEM
+  requires, so an unowned criterion was unsettleable).
+
+### Verification is direct and not vacuous
+
+- **Positive test counts.** A zero exit code is not proof the intended tests ran:
+  `node --test` exits 0 with zero tests, `go test` prints "no test files". A test
+  criterion now requires a POSITIVE discovered/executed count; an explicit zero is
+  named as a vacuous pass, and an unestablished count is reported as such. Never PASS.
+- **`file present:` is checked by KAI**, not by the worker's handoff — a worker that
+  created the file correctly used to leave the criterion unmet because its handoff
+  named something else.
+- **The workspace is proved before dispatch**: the criterion's artifacts must not
+  pre-exist (a leftover file must never satisfy a new goal) and must not escape the
+  authorized root. The proof runs ONCE per revision, so a retry is not refused by the
+  artifact the run itself created.
+- **`advance` reports why a dispatched item did not move**, so a silent refusal no
+  longer looks like success.
+
+### REA is registered (development-time only)
+
+`rea-agents` **6.4.0** (MIT) is installed globally at a stable path and registered
+with OMP as one added server entry in `~/.omp/agent/mcp.json`, with a backup at
+`mcp.json.pre-rea-backup`. **Ghidra and IDA are NOT installed**, so REA's
+binary/managed/APK providers are unavailable by choice; its JavaScript/Electron,
+web-capture and evidence tools are the usable surface. **REA is not a runtime
+dependency**: KAI plans, dispatches, verifies and settles without it, and a REA
+result can never grant a capability or bypass Guard. See
+`docs/research/REA_DONOR_WORKFLOW.md`.
+
 ### Authorization posture (read this before deploying)
 
 Every one of the **141** registered routes is classified in `core/src/api/authz.ts`

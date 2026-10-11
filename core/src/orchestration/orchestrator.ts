@@ -46,6 +46,7 @@ import { buildWorkerPrompt, recordPatternOutcome, selectPattern } from "./prompt
 import type { PromptPatternStore } from "../shared/contracts.ts";
 import { buildReviewerPrompt, requestReview, runReviewLoop } from "./review.ts";
 import { autoVerdict } from "./autonomy.ts";
+import { classifyCriterion, presencePathFor, runnableCommandFor } from "../goals/criteria.ts";
 import { redactText } from "../redact/index.ts";
 import { estimateDifficulty } from "./bench.ts";
 import {
@@ -646,6 +647,57 @@ export function createOrchestrator(deps: OrchestratorDeps) {
    * returns null (recorded unsupported, never guessed).
    */
   /**
+   * Did the intended tests actually RUN?
+   *
+   * A test runner's exit code alone is NOT proof: `node --test` in a directory
+   * with no discoverable tests exits 0 and reports "tests 0 / pass 0", and
+   * `go test` prints "no test files". A live Goal Challenger found exactly this
+   * and was right, so a zero exit is now only HALF the evidence — the run must
+   * also show a POSITIVE count of discovered/executed tests.
+   *
+   *   - a positive count  -> satisfied (exit 0 + count > 0)
+   *   - an explicit zero  -> NOT satisfied, named as a vacuous run
+   *   - no count at all   -> NOT satisfied, reported as unestablished
+   *
+   * A typecheck has no test count to establish, so exit 0 remains its signal.
+   */
+  function testRunSatisfied(
+    cmd: { command: string; args: string[] },
+    exitCode: number | null,
+    output: string,
+  ): { satisfied: boolean; reason: string } {
+    const line = `${cmd.command} ${cmd.args.join(" ")}`;
+    const counts = {
+      // node --test (TAP): `# pass 12`; the summary reporter prints `ℹ pass 12`.
+      pass: /(?:^|\n)\s*(?:#|ℹ|i)?\s*pass\s+(\d+)/i.exec(output),
+      tests: /(?:^|\n)\s*(?:#|ℹ|i)?\s*tests\s+(\d+)/i.exec(output),
+      // pytest: `12 passed`; cargo: `test result: ok. 12 passed; 0 failed`.
+      passed: /(\d+)\s+passed\b/i.exec(output),
+    };
+    const zeroed = /no test files|#\s*tests\s+0\b|\btests\s+0\b|\bpass\s+0\b/i.test(output);
+    const n = (m: RegExpExecArray | null): number | null => (m?.[1] !== undefined ? Number(m[1]) : null);
+    const positive = [n(counts.pass), n(counts.tests), n(counts.passed)].filter((v): v is number => v !== null && v > 0);
+
+    if (exitCode !== 0) {
+      return { satisfied: false, reason: `${line} exited ${exitCode ?? "?"} — failing output retained.` };
+    }
+    if (positive.length > 0) {
+      const most = Math.max(...positive);
+      return { satisfied: true, reason: `${line} exited 0 and reported ${most} test(s).` };
+    }
+    if (zeroed) {
+      return {
+        satisfied: false,
+        reason: `${line} exited 0 but ran ZERO tests (a vacuous pass) — a green exit code is not proof the intended tests exist or ran.`,
+      };
+    }
+    return {
+      satisfied: false,
+      reason: `${line} exited 0 but no test count could be established from its output, so it cannot be treated as proof the intended tests ran.`,
+    };
+  }
+
+  /**
    * Parse a CONTENT requirement: `file content equals: <path> = <spec>`.
    *
    * The goal panel kept (correctly) refusing goals whose acceptance criterion was
@@ -661,6 +713,9 @@ export function createOrchestrator(deps: OrchestratorDeps) {
    * a mismatch — never as a pass — for a file that is not valid UTF-8.
    */
   function contentCheckFor(label: string): { path: string; bytes: Buffer; describe: string } | null {
+    // Same classifier the architect refuses with: if it is not `file-content`,
+    // the gate must not silently treat it as one.
+    if (classifyCriterion(label).kind !== "file-content") return null;
     const m = /^\s*file content equals:\s*(.+?)\s*=\s*(.+?)\s*$/i.exec(label);
     if (m === null || m[1] === undefined || m[2] === undefined) return null;
     const path = m[1].trim();
@@ -679,23 +734,10 @@ export function createOrchestrator(deps: OrchestratorDeps) {
   }
 
   function testCommandFor(label: string): { command: string; args: string[] } | null {
-    if (/[;&|><$`(){}\[\]!*?]/.test(label)) return null;
-    const m = /\b((?:npm|npx|node|cargo|pytest|python|go|tsc)(?:\s+[A-Za-z0-9_./:=-]+)*)/i.exec(label);
-    if (m === null || m[1] === undefined) return null;
-    const parts = m[1].trim().split(/\s+/);
-    const command = parts[0]?.toLowerCase();
-    const args = parts.slice(1);
-    if (command === undefined) return null;
-    if (command === "npm" && (args[0] === "test" || (args[0] === "run" && args[1] !== undefined))) {
-      return { command, args };
-    }
-    if (command === "npx" && args[0] === "tsc" && args.includes("--noEmit")) return { command, args };
-    if (command === "node" && args[0] === "--test") return { command, args };
-    if (command === "cargo" && args[0] === "test") return { command, args };
-    if (command === "pytest" && args.every((a) => !a.startsWith("-") || a === "-q")) return { command, args };
-    if (command === "go" && args[0] === "test") return { command, args };
-    if (command === "tsc" && args.includes("--noEmit")) return { command, args };
-    return null;
+    // ONE definition, shared with the Goal Architect (`goals/criteria.ts`): the
+    // thing that REFUSES a criterion at plan time and the thing that SETTLES it at
+    // gate time must not be able to drift apart.
+    return runnableCommandFor(label);
   }
 
   /**
@@ -785,6 +827,50 @@ export function createOrchestrator(deps: OrchestratorDeps) {
             label,
             reason: `content check threw: ${error instanceof Error ? error.message : String(error)}`.slice(0, 200),
           });
+        }
+        continue;
+      }
+      // 0b. PRESENCE checks: KAI stats the path ITSELF, so a `file present:`
+      //     criterion does not depend on the worker naming the artifact in its
+      //     handoff. `deliverable present:` still uses the handoff below, because
+      //     that criterion IS about the worker's claim.
+      const presencePath = presencePathFor(label);
+      if (presencePath !== null) {
+        if (cwd === undefined) {
+          blocked.push({
+            label,
+            reason: "no working directory on this work item: a presence check cannot be scoped to its own workspace",
+          });
+          continue;
+        }
+        const target = isAbsolute(presencePath) ? presencePath : join(cwd, presencePath);
+        try {
+          const meta = await tools.invoke("filesystem.metadata", { path: target }, invokeOpts);
+          if (!meta.ok) {
+            blocked.push({
+              label,
+              reason: `presence check refused: ${meta.error?.code ?? "unknown"} — ${meta.error?.message ?? ""}`.slice(0, 200),
+            });
+            continue;
+          }
+          const info = typeof meta.result === "object" && meta.result !== null
+            ? (meta.result as { exists?: unknown; size?: unknown })
+            : {};
+          const exists = info.exists === true;
+          observed.push({
+            id: mkId(),
+            kind: "file state",
+            source: "kai-observed",
+            method: "filesystem.metadata",
+            detail: exists
+              ? `${target} exists${typeof info.size === "number" ? ` (${info.size} bytes)` : ""} in ${cwd}.`
+              : `${target} is ABSENT in ${cwd}.`,
+            path: target,
+            supports: exists ? [label] : [],
+            at,
+          });
+        } catch (error) {
+          blocked.push({ label, reason: `presence check threw: ${error instanceof Error ? error.message : String(error)}`.slice(0, 200) });
         }
         continue;
       }
@@ -884,19 +970,21 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           const out = clipPreview(
             `${typeof value["stdout"] === "string" ? value["stdout"] : ""}\n${typeof value["stderr"] === "string" ? value["stderr"] : ""}`.trim(),
           );
-          const passed = exitCode === 0;
+          // Exit 0 is necessary, never sufficient: the run must also show that
+          // the intended tests actually executed.
+          const verdictOfRun = testRunSatisfied(cmd, exitCode, `${value["stdout"] ?? ""}\n${value["stderr"] ?? ""}`);
           observed.push({
             id: mkId(),
             kind: "test result",
             source: "kai-observed",
             method: "shell.run",
-            detail: passed
-              ? `${cmd.command} ${cmd.args.join(" ")} exited 0.`
-              : `${cmd.command} ${cmd.args.join(" ")} exited ${exitCode ?? "?"} — failing output retained.`,
+            detail: verdictOfRun.reason,
             command: `${cmd.command} ${cmd.args.join(" ")}${cwd !== undefined ? ` (cwd ${cwd})` : ""}`,
             exitCode,
             outputPreview: out,
-            supports: passed ? [label] : [],
+            // A vacuous or unestablished run records EMPTY supports: it informs,
+            // it never satisfies.
+            supports: verdictOfRun.satisfied ? [label] : [],
             at,
           });
         } catch (error) {

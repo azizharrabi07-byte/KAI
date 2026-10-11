@@ -41,6 +41,7 @@ import {
   type GoalFieldPatch,
   type GoalPlanContent,
   type GoalState,
+  type HumanDecision,
   type PlanApproval,
   type PlanRevision,
 } from "./goal.ts";
@@ -132,7 +133,8 @@ CREATE TABLE IF NOT EXISTS goals (
   lastCause          TEXT,
   lastActor          TEXT,
   challengeJson      TEXT,
-  acceptanceCriteriaJson TEXT NOT NULL DEFAULT '[]'
+  acceptanceCriteriaJson TEXT NOT NULL DEFAULT '[]',
+  humanDecisionsJson TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS idx_goals_state ON goals(state);
 
@@ -188,6 +190,22 @@ function isRow(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
 }
 
+/**
+ * A JSON array column read back as objects. A malformed column reads as EMPTY
+ * rather than throwing, so one corrupt row cannot break a goal read — and an
+ * empty list is the safe direction: it means "no decisions recorded", never
+ * "decisions that we failed to read".
+ */
+function objectArray<T>(raw: unknown): T[] {
+  if (typeof raw !== "string" || raw.trim().length === 0) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed.filter((item) => item !== null && typeof item === "object") as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 /** A `TEXT[]` column read back. A malformed column reads as empty, never as a crash. */
 function stringArray(raw: unknown): string[] {
   if (typeof raw !== "string") return [];
@@ -241,6 +259,11 @@ export function createGoalStore(opts: { path: string; now?: () => Date }): GoalS
   } catch {
     // The column already exists (or the table was just created with it).
   }
+  try {
+    db.exec(`ALTER TABLE goals ADD COLUMN humanDecisionsJson TEXT NOT NULL DEFAULT '[]'`);
+  } catch {
+    // See above.
+  }
 
   const stmts = {
     goalGet: db.prepare(`SELECT * FROM goals WHERE id = ?`),
@@ -249,8 +272,8 @@ export function createGoalStore(opts: { path: string; now?: () => Date }): GoalS
       `INSERT INTO goals
          (id, statement, state, createdAt, updatedAt, createdBy, assumptionsJson, constraintsJson,
           uncertaintiesJson, blocker, nextActionJson, missionId, taskId, workItemIdsJson, lastCause, lastActor,
-          challengeJson, acceptanceCriteriaJson)
-       VALUES (?, ?, 'DRAFT', ?, ?, ?, '[]', '[]', '[]', NULL, NULL, NULL, NULL, '[]', NULL, NULL, NULL, '[]')`,
+          challengeJson, acceptanceCriteriaJson, humanDecisionsJson)
+       VALUES (?, ?, 'DRAFT', ?, ?, ?, '[]', '[]', '[]', NULL, NULL, NULL, NULL, '[]', NULL, NULL, NULL, '[]', '[]')`,
     ),
     // The full-row write is deliberate: `setGoalFields` merges a patch in memory
     // and rewrites one row, so there is no per-column statement zoo and no
@@ -259,7 +282,8 @@ export function createGoalStore(opts: { path: string; now?: () => Date }): GoalS
       `UPDATE goals
           SET statement = ?, state = ?, updatedAt = ?, createdBy = ?, assumptionsJson = ?, constraintsJson = ?,
               uncertaintiesJson = ?, blocker = ?, nextActionJson = ?, missionId = ?, taskId = ?,
-              workItemIdsJson = ?, lastCause = ?, lastActor = ?, challengeJson = ?, acceptanceCriteriaJson = ?
+              workItemIdsJson = ?, lastCause = ?, lastActor = ?, challengeJson = ?, acceptanceCriteriaJson = ?,
+              humanDecisionsJson = ?
         WHERE id = ?`,
     ),
     revisionGet: db.prepare(`SELECT * FROM goal_plan_revisions WHERE id = ?`),
@@ -307,6 +331,7 @@ export function createGoalStore(opts: { path: string; now?: () => Date }): GoalS
       uncertainties: stringArray(row.uncertaintiesJson),
       workItemIds: stringArray(row.workItemIdsJson),
       acceptanceCriteria: stringArray(row.acceptanceCriteriaJson),
+      humanDecisions: objectArray<HumanDecision>(row.humanDecisionsJson),
     };
     optional(goal, "createdBy", row.createdBy);
     optional(goal, "blocker", row.blocker);
@@ -427,6 +452,7 @@ export function createGoalStore(opts: { path: string; now?: () => Date }): GoalS
       goal.lastActor ?? null,
       goal.challenge === undefined ? null : JSON.stringify(goal.challenge),
       JSON.stringify(goal.acceptanceCriteria ?? []),
+      JSON.stringify(goal.humanDecisions ?? []),
       goal.id,
     );
     return goal;
@@ -463,6 +489,7 @@ export function createGoalStore(opts: { path: string; now?: () => Date }): GoalS
     if (patch.constraints !== undefined) goal.constraints = patch.constraints;
     if (patch.uncertainties !== undefined) goal.uncertainties = patch.uncertainties;
     if (patch.acceptanceCriteria !== undefined) goal.acceptanceCriteria = patch.acceptanceCriteria;
+    if (patch.humanDecisions !== undefined) goal.humanDecisions = patch.humanDecisions;
     if (patch.workItemIds !== undefined) goal.workItemIds = patch.workItemIds;
     if (patch.challenge !== undefined) {
       if (patch.challenge === null) delete goal.challenge;

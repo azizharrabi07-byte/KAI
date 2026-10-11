@@ -38,7 +38,7 @@ function planReply(overrides: Record<string, unknown> = {}): string {
         objective: "Add the login route",
         dependsOn: [],
         role: "coding",
-        acceptanceCriteria: ["login succeeds with valid credentials"],
+        acceptanceCriteria: ["file present: auth.txt"],
         verification: ["run the auth test suite"],
       },
       {
@@ -47,11 +47,11 @@ function planReply(overrides: Record<string, unknown> = {}): string {
         objective: "Verify the login flow",
         dependsOn: ["t1"],
         role: "qa",
-        acceptanceCriteria: ["no regression in auth"],
+        acceptanceCriteria: ["npm test"],
         verification: ["run `npm test -- auth`"],
       },
     ],
-    acceptanceCriteria: ["the user can log in"],
+    acceptanceCriteria: ["file present: login.txt"],
     requiredEvidence: ["auth test output"],
     constraints: ["no new dependencies"],
     forbiddenOutcomes: ["storing plaintext passwords"],
@@ -85,9 +85,11 @@ test("a well-formed plan becomes GoalPlanContent with task-level criteria + meth
   assert.equal(content.tasks.length, 2);
   assert.deepEqual(content.tasks[0]!.dependsOn, []);
   assert.deepEqual(content.tasks[1]!.dependsOn, ["t1"]);
-  assert.deepEqual(content.tasks[0]!.acceptanceCriteria, ["login succeeds with valid credentials"]);
-  assert.deepEqual(content.tasks[0]!.verification, ["run the auth test suite"]);
-  assert.deepEqual(content.acceptanceCriteria, ["the user can log in"]);
+  // The plan-level criterion no task claimed is ASSIGNED to the first task, so it
+  // has an owner and a verification method rather than being unsettleable.
+  assert.deepEqual(content.tasks[0]!.acceptanceCriteria, ["file present: auth.txt", "file present: login.txt"]);
+  assert.deepEqual(content.tasks[0]!.verification, ["run the auth test suite", "file present: login.txt"]);
+  assert.deepEqual(content.acceptanceCriteria, ["file present: login.txt"]);
   assert.deepEqual(content.requiredEvidence, ["auth test output"]);
 });
 
@@ -131,7 +133,7 @@ test("a plan with an unverifiable criterion is REFUSED", async () => {
         objective: "Add the login route",
         dependsOn: [],
         role: "coding",
-        acceptanceCriteria: ["login succeeds with valid credentials"],
+        acceptanceCriteria: ["file present: auth.txt"],
         verification: [],
       },
     ],
@@ -151,7 +153,7 @@ test("a criterion whose method is blank is REFUSED", async () => {
         objective: "Add the login route",
         dependsOn: [],
         role: "coding",
-        acceptanceCriteria: ["login succeeds", "no crashes"],
+        acceptanceCriteria: ["file present: login-ok.txt", "npm test"],
         verification: ["run the suite", "   "],
       },
     ],
@@ -159,14 +161,14 @@ test("a criterion whose method is blank is REFUSED", async () => {
   const result = await architectFor(text).planGoal(BASE_INPUT);
   assert.equal(result.ok, false);
   if (result.ok) return;
-  assert.match(result.reason, /criterion "no crashes" has no verification method/);
+  assert.match(result.reason, /criterion "npm test" has no verification method/);
 });
 
 test("a dependency cycle is refused, named, and never hangs", async () => {
   const text = planReply({
     tasks: [
-      { id: "a", title: "A", objective: "do A", dependsOn: ["b"], role: "coding", acceptanceCriteria: ["a done"], verification: ["check a"] },
-      { id: "b", title: "B", objective: "do B", dependsOn: ["a"], role: "coding", acceptanceCriteria: ["b done"], verification: ["check b"] },
+      { id: "a", title: "A", objective: "do A", dependsOn: ["b"], role: "coding", acceptanceCriteria: ["file present: a.txt"], verification: ["file present: a.txt"] },
+      { id: "b", title: "B", objective: "do B", dependsOn: ["a"], role: "coding", acceptanceCriteria: ["file present: b.txt"], verification: ["file present: b.txt"] },
     ],
   });
   const result = await architectFor(text).planGoal(BASE_INPUT);
@@ -178,7 +180,7 @@ test("a dependency cycle is refused, named, and never hangs", async () => {
 test("a self-dependency is refused", async () => {
   const text = planReply({
     tasks: [
-      { id: "a", title: "A", objective: "do A", dependsOn: ["a"], role: "coding", acceptanceCriteria: ["a done"], verification: ["check a"] },
+      { id: "a", title: "A", objective: "do A", dependsOn: ["a"], role: "coding", acceptanceCriteria: ["file present: a.txt"], verification: ["file present: a.txt"] },
     ],
   });
   const result = await architectFor(text).planGoal(BASE_INPUT);
@@ -190,7 +192,7 @@ test("a self-dependency is refused", async () => {
 test("an unknown dependency id is refused", async () => {
   const text = planReply({
     tasks: [
-      { id: "a", title: "A", objective: "do A", dependsOn: ["ghost"], role: "coding", acceptanceCriteria: ["a done"], verification: ["check a"] },
+      { id: "a", title: "A", objective: "do A", dependsOn: ["ghost"], role: "coding", acceptanceCriteria: ["file present: a.txt"], verification: ["file present: a.txt"] },
     ],
   });
   const result = await architectFor(text).planGoal(BASE_INPUT);
@@ -202,8 +204,8 @@ test("an unknown dependency id is refused", async () => {
 test("the task budget is enforced against the caller's maxTasks", async () => {
   const text = planReply({
     tasks: [
-      { id: "a", title: "A", objective: "do A", dependsOn: [], role: "coding", acceptanceCriteria: ["a done"], verification: ["check a"] },
-      { id: "b", title: "B", objective: "do B", dependsOn: ["a"], role: "coding", acceptanceCriteria: ["b done"], verification: ["check b"] },
+      { id: "a", title: "A", objective: "do A", dependsOn: [], role: "coding", acceptanceCriteria: ["file present: a.txt"], verification: ["file present: a.txt"] },
+      { id: "b", title: "B", objective: "do B", dependsOn: ["a"], role: "coding", acceptanceCriteria: ["file present: b.txt"], verification: ["file present: b.txt"] },
     ],
   });
   const result = await architectFor(text).planGoal({ ...BASE_INPUT, budgets: { maxTasks: 1 } });
@@ -215,7 +217,7 @@ test("the task budget is enforced against the caller's maxTasks", async () => {
 test("a task with an empty objective is refused", async () => {
   const text = planReply({
     tasks: [
-      { id: "a", title: "A", objective: "   ", dependsOn: [], role: "coding", acceptanceCriteria: ["a done"], verification: ["check a"] },
+      { id: "a", title: "A", objective: "   ", dependsOn: [], role: "coding", acceptanceCriteria: ["file present: a.txt"], verification: ["file present: a.txt"] },
     ],
   });
   const result = await architectFor(text).planGoal(BASE_INPUT);
@@ -227,7 +229,7 @@ test("a task with an empty objective is refused", async () => {
 test("a task with no role cannot be dispatched and is refused", async () => {
   const text = planReply({
     tasks: [
-      { id: "a", title: "A", objective: "do A", dependsOn: [], role: "", acceptanceCriteria: ["a done"], verification: ["check a"] },
+      { id: "a", title: "A", objective: "do A", dependsOn: [], role: "", acceptanceCriteria: ["file present: a.txt"], verification: ["file present: a.txt"] },
     ],
   });
   const result = await architectFor(text).planGoal(BASE_INPUT);

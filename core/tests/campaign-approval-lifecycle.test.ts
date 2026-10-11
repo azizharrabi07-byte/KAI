@@ -327,7 +327,7 @@ test("3a spent approval: the real approvals store refuses a second verdict", asy
 test("3b spent approval: the same approval id cannot authorize a second orchestrator execution", async () => {
   const h = harness();
   try {
-    h.state.toolHandlers["shell.run"] = shellHandler(0, "ok", "");
+    h.state.toolHandlers["shell.run"] = shellHandler(0, "# tests 3\n# pass 3\n# fail 0", "");
     const { id, approvalId } = await parkOnGuardedCheck(h);
 
     const first = await h.orch.onApprovalDecided(approvalId, true);

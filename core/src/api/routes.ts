@@ -31,6 +31,7 @@
 
 import type { CoreRuntime } from "../runtime.ts";
 import { decideAccess } from "./authz.ts";
+import { classifyCriterion } from "../goals/criteria.ts";
 import { isGoalState, routeTo, type Goal, type GoalState } from "../goals/goal.ts";
 import { revisionIdFor } from "../goals/challenger.ts";
 import { loadIdentity } from "../identity.ts";
@@ -1551,6 +1552,52 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     if (!moved.ok) return conflict(moved.reason);
     runtime.bus.publish("goal.plan_rejected", { goalId, revisionId: current.id }, { source: "ui" });
     return ok(goalView(moved.goal));
+  }
+
+  /**
+   * Record a HUMAN decision on one criterion.
+   *
+   * Some criteria genuinely need judgement, so they are declared
+   * `human review: <question>` and the goal PARKS on them. This is where the
+   * answer is recorded: attributed to a person, durable, and kept distinct from
+   * anything KAI observed. It is the only way such a criterion can settle.
+   */
+  async function reviewGoalHandler(req: ApiRequest, params: Record<string, string>): Promise<ApiResponse> {
+    const body = asBodyObject(req.body);
+    if (body === null) return bad('"body" must be a JSON object, e.g. {"criterion": "human review: …", "decision": "MET"}');
+    const goalId = params.id ?? "";
+    const goal = runtime.goals.getGoal(goalId);
+    if (goal === null) return notFound(`no goal "${goalId}" exists`);
+    const criterion = typeof body.criterion === "string" ? body.criterion.trim() : "";
+    const decision = body.decision;
+    if (criterion.length === 0) return bad('"criterion" must be the exact criterion label');
+    if (decision !== "MET" && decision !== "FAILED") return bad('"decision" must be "MET" or "FAILED"');
+    // Only a criterion that NEEDS a person may be decided this way: a machine
+    // check must be settled by the check, never by an assertion.
+    if (classifyCriterion(criterion).kind !== "human-review") {
+      return bad(`"${criterion}" is not a human-review criterion — machine-checkable criteria are settled by their own verification`);
+    }
+    const at = new Date().toISOString();
+    const existing = goal.humanDecisions.filter((d) => d.criterion !== criterion);
+    runtime.goals.setGoalFields(goalId, {
+      humanDecisions: [
+        ...existing,
+        {
+          criterion,
+          decision,
+          by: "user",
+          at,
+          ...(typeof body.note === "string" && body.note.trim().length > 0 ? { note: body.note.trim() } : {}),
+        },
+      ],
+    });
+    // A goal parked on this decision resumes so it can settle on the answer.
+    if (runtime.goals.getGoal(goalId)?.state === "WAITING_USER") {
+      runtime.goals.setGoalState(goalId, "RUNNING", "the human decision was recorded", "user");
+    }
+    runtime.bus.publish("goal.review_decided", { goalId, criterion, decision }, { source: "ui" });
+    const stored = runtime.goals.getGoal(goalId);
+    return ok(stored === null ? null : goalView(stored));
   }
 
   /**
@@ -3370,6 +3417,9 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     // authoritative gate is the orchestration boundary, not this route.
     route("POST", "/goals/:id/start", "EXTERNAL", (req, p) => startGoalHandler(req, p), { requiresOwner: true }),
     route("GET", "/goals/:id/execution", "READ", (req, p) => Promise.resolve(goalExecutionHandler(req, p))),
+    // The human decision a `human review:` criterion is parked on. Owner-only: it
+    // is the one place an assertion can settle a criterion.
+    route("POST", "/goals/:id/review", "WRITE", (req, p) => reviewGoalHandler(req, p), { requiresOwner: true }),
     // KAI Doer: the autonomous switch (Guard stays on and is never toggled here).
     route("GET", "/doer", "READ", () => Promise.resolve(getDoer())),
     // Changes KAI's autonomy: owner-only.

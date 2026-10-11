@@ -262,7 +262,11 @@ export type KaiEventType =
   | "goal.plan_proposed"
   | "goal.plan_approved"
   | "goal.plan_rejected"
-  | "goal.state_changed";
+  | "goal.state_changed"
+  // A human decision on a `human review:` criterion, and the pause that precedes
+  // it. Both persist: who decided what, and when a goal parked on a person.
+  | "goal.awaiting_user"
+  | "goal.review_decided";
 
 export interface KaiEvent<T = unknown> {
   id: string;
@@ -333,6 +337,8 @@ export const PERSISTED_EVENT_TYPES: readonly KaiEventType[] = [
   "goal.plan_approved",
   "goal.plan_rejected",
   "goal.state_changed",
+  "goal.awaiting_user",
+  "goal.review_decided",
 ];
 
 export function shouldPersist(type: KaiEventType): boolean {

@@ -43,6 +43,7 @@
 
 import { createOutcomeContract, type OutcomeContract } from "../orchestration/outcome.ts";
 import { extractJson } from "../plans/plans.ts";
+import { unsupportedCriteria } from "./criteria.ts";
 import { isRecord } from "../shared/contracts.ts";
 import type { ChallengeMode } from "./challenger.ts";
 // The plan vocabulary is OWNED by the goal layer (`goal.ts`), because the store
@@ -157,6 +158,13 @@ export function normalizeBudgets(input?: Partial<GoalBudgets>): GoalBudgets {
  * generic criterion when none were named. Kept as a named function so the
  * mirror can be asserted in tests rather than trusted.
  */
+/**
+ * The criterion used when the plan (and the caller) named none. It mirrors
+ * `createOutcomeContract` exactly, and it is SETTLEABLE: `deliverable present: X`
+ * is routed to the artifact check the Outcome Gate already performs against the
+ * worker's CHANGED ARTIFACTS, so a derived criterion still has a settlement path
+ * rather than being prose nothing can settle.
+ */
 export function deriveAcceptanceCriteria(deliverables: string[]): string[] {
   return deliverables.length > 0
     ? deliverables.map((deliverable) => `deliverable present: ${deliverable}`)
@@ -195,6 +203,17 @@ export function buildPlanPrompt(input: PlanPromptInput): string {
     "- Every task needs: id (unique in this plan), title, objective, dependsOn, role, acceptanceCriteria, verification.",
     "- objective must be a non-empty description of what the task accomplishes.",
     "- For EVERY acceptance criterion, give its verification METHOD at the SAME index in `verification` (a command, an inspection, or an independent check). A criterion without a method is refused.",
+    // The planner is told the criterion GRAMMAR, because a criterion KAI cannot
+    // settle is refused outright — a live run proved that a planner left to write
+    // free prose ("the final report states that all tests passed") produces a goal
+    // that can never complete.
+    "- Every acceptance criterion MUST be written as one of these EXACT forms, because KAI settles criteria mechanically:",
+    "    `file content equals: <path> = hex:<hexbytes>` (KAI reads the file and compares its bytes)",
+    "    `file content equals: <path> = \"<literal>\"` (the same, for text)",
+    "    `file present: <path>` (KAI checks the path exists in the workspace)",
+    "    a runnable command: `npm test`, `node --test`, `cargo test`, `pytest`, `go test`, `tsc --noEmit` (KAI runs it and requires a POSITIVE test count)",
+    "    `human review: <question>` (a person must decide — use this ONLY when judgement is genuinely required)",
+    "- A criterion in any OTHER wording is REJECTED and the plan will not be accepted. Do not write criteria like \"the report is complete\" or \"the code is clean\".",
     "- dependsOn names task ids from THIS plan only; the dependency graph must be acyclic.",
     `- At most ${input.budgets.maxTasks} tasks.`,
     "- Plan-level acceptanceCriteria are derived from deliverables when you omit them.",
@@ -505,8 +524,13 @@ function withGoalAuthority(
   const acceptanceCriteria = [...new Set([...ctx.acceptanceCriteria, ...content.acceptanceCriteria])];
   const tasks = content.tasks.map((task) => ({ ...task, acceptanceCriteria: [...task.acceptanceCriteria] }));
   if (tasks.length > 0) {
+    // EVERY plan-level criterion must be owned by a task, not just the caller's.
+    // A criterion that only exists at plan level is never checked: the gate runs
+    // the checks an ITEM requires, so an unowned criterion is unsettleable and the
+    // goal can never complete. (Found live: the model added a plan-level criterion
+    // that no task carried, and the goal blocked on it forever.)
     const claimed = new Set(tasks.flatMap((task) => task.acceptanceCriteria));
-    const unclaimed = ctx.acceptanceCriteria.filter((c) => !claimed.has(c));
+    const unclaimed = acceptanceCriteria.filter((c) => !claimed.has(c));
     if (unclaimed.length > 0) {
       const first = tasks[0];
       if (first !== undefined) {
@@ -571,6 +595,29 @@ export function createGoalArchitect(deps: GoalArchitectDeps): GoalArchitect {
       });
       const valid = validatePlanContent(content, { maxTasks: budgets.maxTasks });
       if (!valid.ok) return { ok: false, reason: valid.reason };
+
+      // ── Every criterion must have a SETTLEMENT PATH ─────────────────────────
+      // This is the fix for the defect a live run exposed: the planner produced
+      // criteria like "the final report states that all tests passed" — prose no
+      // verifier can settle — and the goal could then never complete. A plan
+      // containing such a criterion is REFUSED here, at the door, with the exact
+      // labels and the exact way to rewrite them.
+      const allCriteria = [
+        ...content.acceptanceCriteria,
+        ...content.tasks.flatMap((task) => task.acceptanceCriteria),
+      ];
+      const unsettleable = unsupportedCriteria(allCriteria);
+      if (unsettleable.length > 0) {
+        return {
+          ok: false,
+          reason:
+            `the plan contains ${unsettleable.length} criterion(s) with no settlement path: ` +
+            unsettleable
+              .slice(0, 5)
+              .map((c) => `${JSON.stringify(c.label)} (${c.reason})`)
+              .join("; "),
+        };
+      }
 
       return { ok: true, content, prompt, plannedAt: (deps.now?.() ?? new Date()).toISOString() };
     },

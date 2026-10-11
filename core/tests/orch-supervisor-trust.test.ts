@@ -781,7 +781,7 @@ test("11 safe recovery: a parked item resumes once after restart; a settled item
 test("12 approval lifecycle: rejected never executes; a new action needs a fresh approval", async () => {
   const h = harness();
   try {
-    h.state.toolHandlers["shell.run"] = shellHandler(0, "ok", "");
+    h.state.toolHandlers["shell.run"] = shellHandler(0, "# tests 3\n# pass 3\n# fail 0", "");
     const started = h.orch.startObjective(
       { objective: OBJ, deliverable: DELIVERABLE, successCriteria: ["tests pass"], requiredEvidence: ["npm test"] },
       ["worker-1"],
