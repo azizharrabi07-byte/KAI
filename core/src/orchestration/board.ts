@@ -411,6 +411,11 @@ export function createWorkBoard(store: WorkItemStore, opts: WorkBoardOptions = {
     block(id: string, reason: string): BoardResult<WorkItem> {
       const item = load(id);
       if (item === null) return unknownId(id);
+      // The reason is RECORDED, not merely emitted. `block` takes a reason and used
+      // to discard it into an event, so a blocked item could not say why it was
+      // blocked after the process that blocked it was gone — the exact information
+      // a human needs to decide what to do next.
+      item.failures.push(reason);
       item.state = "BLOCKED";
       const saved = save(item);
       emit("worker.waiting", { id, reason, blocked: true, workerId: item.workerId });

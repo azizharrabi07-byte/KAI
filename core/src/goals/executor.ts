@@ -32,7 +32,7 @@ import { isAbsolute, resolve, sep } from "node:path";
 import type { WorkBoard } from "../orchestration/board.ts";
 import type { VerifiedEvidence, WorkItem } from "../orchestration/types.ts";
 import { artifactPathsForAll, classifyCriterion } from "./criteria.ts";
-import type { Goal, GoalPlanContent, HumanDecision, PlanRevision } from "./goal.ts";
+import { TERMINAL_GOAL_STATES, type Goal, type GoalPlanContent, type HumanDecision, type PlanRevision } from "./goal.ts";
 import type { GoalStore } from "./store.ts";
 
 /** How a criterion was settled, or why it was not. */
@@ -363,6 +363,13 @@ export function createGoalExecutor(deps: GoalExecutorDeps): GoalExecutor {
       return { skipped: true, dispatched: [], reason: "the KAI Doer is OFF", notes: [] };
     }
 
+    // A TERMINAL goal never dispatches again. Without this an already-COMPLETED
+    // goal would compile and run its tasks a second time, because the only guard
+    // was the state transition (which a terminal goal refuses silently).
+    if (TERMINAL_GOAL_STATES.includes(goal.state)) {
+      return { skipped: false, dispatched: [], reason: `the goal is ${goal.state}; a terminal goal dispatches nothing`, notes: [] };
+    }
+
     const approved = approvedContent(deps.goals, goalId);
     if (!approved.ok) {
       // Not approved (or a stale approval). Nothing may dispatch, and the goal
@@ -488,6 +495,11 @@ export function createGoalExecutor(deps: GoalExecutorDeps): GoalExecutor {
         : "";
     const reason = `${unmet.length} criterion(s) unverified: ${unmet.map((c) => `${c.criterion} (${c.detail})`).join("; ")}${blockedNote}`;
     deps.goals.setGoalFields(goalId, { blocker: reason, nextAction: { action: "ASK_USER", reason, at: new Date().toISOString() } });
+    // Already blocked with the same truth: record the reason again and STOP. Trying
+    // the transition would only produce "illegal transition BLOCKED -> BLOCKED".
+    if (deps.goals.getGoal(goalId)?.state === "BLOCKED") {
+      return { skipped: false, dispatched, settled: "BLOCKED", reason, notes };
+    }
     const settled = deps.goals.setGoalState(goalId, "BLOCKED", "acceptance criteria were not verified", "kai");
     deps.emit?.("goal.settled", { goalId, state: "BLOCKED", failed, unmet: unmet.map((c) => c.criterion) });
     return settled.ok

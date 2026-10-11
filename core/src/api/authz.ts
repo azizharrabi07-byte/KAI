@@ -138,6 +138,7 @@ export const ACCESS_POLICY: Readonly<Record<string, AccessPolicyEntry>> = Object
   "GET /activity": { access: "read", reason: "the activity feed over persisted events" },
 
   // ── Goals: a goal is what authorises KAI to act ──────────────────────────────
+  "GET /workers/preflight": { access: "read", reason: "reports what KAI can dispatch to; it enables nothing" },
   "GET /goals": { access: "read", reason: "the goal list" },
   "POST /goals": { access: "owner", reason: "an unrelated local process must not be able to create the goal that authorises KAI" },
   "GET /goals/:id": { access: "read", reason: "one goal" },

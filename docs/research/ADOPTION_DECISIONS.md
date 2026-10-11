@@ -28,6 +28,34 @@ proves the decision was implemented. A decision with no test is an intention.
 | 14 | Hermes' Python backend wholesale | `NousResearch/hermes-agent` (MIT) | **Reject** (as a whole) | Different language and process model. The *learning design* is worth studying; the code is not portable into KAI's Core |
 | 15 | A VM / hypervisor | — | **Blocked pending host authorization** | No firmware, Hyper-V, startup or service change is made without a separately approved host-change decision |
 
+| 16 | **Interrupted-run reconciliation** — a work item a dead process left in flight is BLOCKED with a durable reason, so its goal settles instead of hanging | KAI's own interrupted run (inspected: item `RUNNING`, worker process gone, goal stuck) | **Reimplement natively** | Found by inspecting the real persisted state, not by reading a donor | `core/tests/goal-criteria.test.ts` — and demonstrated on the REAL run: `RUNNING` → `BLOCKED` + reason, goal settled `BLOCKED` with an honest blocker |
+| 17 | **`board.block` records its reason** | same investigation (`block` took a reason and discarded it into an event) | **Reimplement natively** | A blocked item must be able to say why after the process that blocked it is gone | `goal-criteria.test.ts` asserts the reason is persisted |
+| 18 | **Terminal goals never dispatch** | Part A step 6 | **Reimplement natively** | An already-COMPLETED goal would compile and run its tasks again | `goal-criteria.test.ts` — a completed goal dispatches nothing and reaches no worker |
+| 19 | **Typed provider diagnostics** | the real `GoUsageLimitError`/`limitName: monthly` 429 | **Reimplement natively** | A spent allowance and transient throttling need opposite responses, and must never leak a credential | `core/tests/model-diagnostics.test.ts` — the real 429 body classifies as `quota-exhausted`, not retryable; a credential in the body is redacted |
+| 20 | **Worker preflight** | the live run (a fresh Core compiles, then refuses to dispatch) | **Reimplement natively** | Installed ≠ registered ≠ reachable; the user must be told which before a plan runs | `core/tests/worker-preflight.test.ts` — the two real gaps are named as different blockers |
+| 21 | **Hermes skill mechanisms** — compact index, applicability conditions, per-skill mutation lock outside the dir, validate-before-write, scan agent-created skills, pinned/redirect guards | `NousResearch/hermes-agent` @ `1fd182772671` (MIT) | **Implement pattern natively** | Python, and KAI owns the same responsibility in its skill registry; porting would couple languages. **KAI must turn the scan ON by default, unlike Hermes' opt-in `guard_agent_created=False`** | not yet implemented — see the ranked plan (highest-value native work) |
+| 22 | Grok Build Desktop | `Franzferdinan51/Grok-Build-Desktop-App` | **Reject** | **No root LICENSE/COPYING/NOTICE; GitHub's licence API 404.** No reuse is permitted until the owner clarifies, and an `upstream/` directory would need separate checks | n/a |
+| 23 | OpenHands SDK / Rakazo | MIT / Apache-2.0 | **Pending** | Licences are permissive, but the workspace/execution-provider contract was not read | missing: the provider interface source |
+| 24 | open·grok | `OnlyTerp/opengrok` (MIT) | **Pending** | A routing sidecar, not an executor; the provider-mapping/health ideas may or may not be relevant | missing: the provider mapping source |
+
+## Ranked adoption plan (Part D)
+
+Ranked by the criteria the brief sets, highest first:
+
+| Rank | Capability | Why it ranks here |
+|---|---|---|
+| 1 | **Hermes' skill mechanisms, reimplemented natively** | Directly improves verified completion *and* learning: a bounded index, applicability conditions, and validation/scan before a skill is activated are what stop a bad skill reaching a future prompt. No new dependency |
+| 2 | **OpenCode event consumption** (once the event schema is verified and `:4096` is up) | Improves reliability and observability of a worker KAI already supports; needs the missing evidence first |
+| 3 | **OpenHands/Rakazo workspace-provider separation** | Improves workspace isolation and recoverability, but KAI's current containment + proof already covers the security property; this is a structural improvement, not a gap |
+| 4 | **Pi as an external worker** | Adds a runtime behind the existing adapter contract; value depends on the RPC contract, which is unverified |
+| 5 | **OpenClaw loop patterns** | Lowest: KAI has a durable retry ledger, a dispatch ledger and an Outcome Gate, and will not import a second loop |
+| — | **Coucou, LobeHub, LING71671/open-grokbot** | **Study only** — no implementation path is cleared |
+
+**The boundary is unchanged:** KAI owns intent, plans, approvals, Guard, dispatch policy
+and settlement; worker runtimes own their own execution; the work board is authoritative
+for item state and evidence; donor mechanics sit behind an adapter or provider boundary;
+and no new runtime may authorize an operation or mark its own work verified.
+
 ## Pending (not yet investigated)
 
 The six donor lanes did not run (see the method note in `DONOR_LEDGER.md`). The

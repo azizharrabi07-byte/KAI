@@ -75,6 +75,8 @@ export interface MaintenanceDeps {
   // ── repairs KAI may perform on itself ──────────────────────────────────────
   runMemoryUpkeep: () => void | Promise<void>;
   recoverScheduler: () => { resumed?: number; missed?: number } | void;
+  /** Reconcile work items a dead process left in flight; returns what it blocked. */
+  recoverWorkItems: () => { abandoned: string[] };
   resumeMissions: () => Promise<{ resumed: string[]; blocked: string[] }>;
   syncViews: () => void;
   now?: () => Date;

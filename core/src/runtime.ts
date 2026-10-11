@@ -146,6 +146,7 @@ import { parseReviewVerdict, REVIEWER_SYSTEM } from "./orchestration/review.ts";
 import { createOrchestrator, type Orchestrator } from "./orchestration/orchestrator.ts";
 import { createUnavailableJevProvider, DEFAULT_JEV_BUDGET } from "./orchestration/decision.ts";
 import { readOrchestrationPrefs, type OrchestrationPrefs } from "./orchestration/prefs.ts";
+import { describeProviderFailure, diagnoseProviderFailure } from "./model/diagnostics.ts";
 import { createSettingsService, isSettingKey, type SettingsService, type ValidatedSettingsInput } from "./settings/settings.ts";
 import { isOrchestrationKey, validateOrchestrationValue, type OrchestrationKey } from "./orchestration/prefs.ts";
 import type { StepRunner } from "./missions/executor.ts";
@@ -425,6 +426,11 @@ export interface CoreRuntime {
    * instead of parking again.
    */
   runSubagent(id: string, input: string, approvalId?: string): Promise<unknown>;
+  /**
+   * Reconcile work items a dead process left in flight: they are BLOCKED with an
+   * explicit reason rather than replayed, so a goal waiting on one can settle.
+   */
+  recoverWorkItems(): { abandoned: string[] };
   /** One tracked subagent run: parked runs stay until decided or cancelled. */
   activeSubagentRuns(): SubagentRunRecord[];
   /**
@@ -746,6 +752,8 @@ export interface StateMutationToolDeps {
   createSchedule(task: unknown): Promise<unknown>;
   cancelSchedule(id: string): boolean;
   recoverScheduler(): unknown;
+  /** Reconcile work items a dead process left in flight; returns what it blocked. */
+  recoverWorkItems(): { abandoned: string[] };
   proposeLearning(event: unknown): unknown;
   createCheckpoint(input: unknown): unknown;
   restoreCheckpoint(id: string, target: string | undefined): unknown;
@@ -2603,6 +2611,7 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       const out = scheduler.recoverInterrupted();
       return { resumed: out.interrupted.length };
     },
+    recoverWorkItems: () => recoverInterruptedWorkItems(),
     resumeMissions: () => missions.recover(),
     syncViews: () => syncEmployeeViews(),
   });
@@ -3708,6 +3717,9 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       return true;
     },
     recoverScheduler: () => scheduler.recoverInterrupted(),
+    // Exposed so an operator (or a test) can reconcile an interrupted run on
+    // demand, exactly like the scheduler's own recovery.
+    recoverWorkItems: () => recoverInterruptedWorkItems(),
     proposeLearning: (event) => learning.learnFromTurn(event as Parameters<typeof learning.learnFromTurn>[0]),
     createCheckpoint: (input) =>
       checkpoints.create(input as Parameters<typeof checkpoints.create>[0]),
@@ -4089,13 +4101,23 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       ...(maxRounds !== undefined ? { maxRounds } : {}),
       runRole: async (input) => {
         if (options.goalRunners?.runRole !== undefined) return options.goalRunners.runRole(input);
-        const result = await goalBrain.respond({
-          text: buildCriticPrompt(input),
-          system: CRITIC_SYSTEM,
-          purpose: `goal:critic:${input.role}`,
-        });
+        let text: string;
+        try {
+          const result = await goalBrain.respond({
+            text: buildCriticPrompt(input),
+            system: CRITIC_SYSTEM,
+            purpose: `goal:critic:${input.role}`,
+          });
+          text = result.text;
+        } catch (error) {
+          // A provider failure is classified before it is reported, so the goal's
+          // BLOCKED reason distinguishes a spent allowance from throttling, an auth
+          // failure from an unreachable gateway — and never carries a credential.
+          const diagnostic = diagnoseProviderFailure(error);
+          throw new Error(`critic "${input.role}" could not run: ${describeProviderFailure(diagnostic)}`);
+        }
         // A malformed reply becomes a BLOCKED finding, never a PASS.
-        return parseFinding(result.text, input.role);
+        return parseFinding(text, input.role);
       },
     });
 
@@ -4123,6 +4145,41 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     emit: (type, payload) => publish(type as Parameters<typeof publish>[0], payload, { source: "core" }),
   });
 
+
+  /**
+   * Mark every work item a dead process left `RUNNING`/`CLAIMED` as BLOCKED with an
+   * explicit reason, and say so. Idempotent: a terminal item is untouched.
+   *
+   * Found by inspecting a real interrupted run: the item was `RUNNING`, the worker
+   * process was gone, and the goal stayed `RUNNING` with nothing able to move it.
+   * The rule matches the mission executor and the scheduler lease sweep — an
+   * interrupted run is NEVER blindly replayed, because it may have had side
+   * effects — so the item is blocked and the goal settles on that truth.
+   */
+  function recoverInterruptedWorkItems(): { abandoned: string[] } {
+    const abandoned: string[] = [];
+    for (const item of stores.workItems.list({})) {
+      if (item.state !== "RUNNING" && item.state !== "CLAIMED") continue;
+      const moved = workBoard.block(
+        item.id,
+        "interrupted by a Core restart: the worker run was abandoned and is never blindly replayed — re-run this item deliberately",
+      );
+      if (!moved.ok) continue;
+      abandoned.push(item.id);
+      publish("worker.failed", { workItemId: item.id, reason: "interrupted by a Core restart" }, { source: "core" });
+      try {
+        notifications.notify({
+          type: "work_item.interrupted",
+          title: "A worker run was interrupted",
+          message: `Work item ${item.id} was left running by a previous Core. It was blocked rather than replayed; re-run it deliberately if the work is still wanted.`,
+          priority: "HIGH",
+        });
+      } catch {
+        // A notification that cannot be delivered must not stop the recovery.
+      }
+    }
+    return { abandoned };
+  }
 
   return {
     stores,
@@ -4157,6 +4214,7 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       return { soul: identity.soul, version: identity.version, soulPath: identity.source.soulPath };
     },
     subagents: subagentRegistry,
+    recoverWorkItems: () => recoverInterruptedWorkItems(),
     runSubagent,
     activeSubagentRuns: listActiveSubagentRuns,
     cancelSubagentRun,
@@ -4253,6 +4311,10 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       // blind replay. (`reload()` also sweeps, but calling it explicitly at
       // startup is what the durability contract promises.)
       scheduler.recoverInterrupted();
+      // Work items an earlier process left in flight are reconciled BEFORE the
+      // scheduler can fire: an abandoned run is a recovery decision, never a
+      // silent replay, and never a goal that waits forever.
+      recoverInterruptedWorkItems();
       if (options.startScheduler !== false) scheduler.start();
 
       // Results that arrived while the Doer was OFF (or while the Core was

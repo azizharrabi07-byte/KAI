@@ -35,6 +35,7 @@ import { createGoalExecutor, type GoalExecutor } from "../src/goals/executor.ts"
 import { createGoalStore, type GoalStore } from "../src/goals/store.ts";
 import { classifyCriterion, unsupportedCriteria } from "../src/goals/criteria.ts";
 import { openSqliteStores, type Stores } from "../src/storage/sqlite.ts";
+import { createCoreRuntime } from "../src/runtime.ts";
 import type { GoalPlanContent } from "../src/goals/goal.ts";
 import type { AutonomyPolicy } from "../src/orchestration/types.ts";
 
@@ -484,4 +485,102 @@ test("a plan-level criterion no task claims is ASSIGNED to a task, so it can be 
     "and the assigned criterion gets a verification method",
   );
   t.diagnostic(`t1 now owns: ${JSON.stringify(first?.acceptanceCriteria)}`);
+});
+
+
+// ── 5. Lifecycle: terminal goals, and items a dead process left behind ──────
+
+test("a COMPLETED goal dispatches nothing, even when advance is called again", async (t) => {
+  const h = harness();
+  t.after(() => {
+    h.close();
+    rmSync(h.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  });
+
+  const content: GoalPlanContent = { ...humanPlan(["file present: out.txt"]), authorizedWorkspace: ["."] };
+  const goalId = approvedGoalWith(h, content);
+  // NOTE: the artifact is NOT pre-created. Doing so is exactly what the workspace
+  // proof refuses — a leftover file must not satisfy a new goal.
+
+  let calls = 0;
+  const executor = createGoalExecutor({
+    goals: h.goals,
+    board: createWorkBoard(h.stores.workItems),
+    // A stub worker that really settles the ITEM: the goal settles on the board's
+    // state, so a stub that only returns a string would prove nothing.
+    runWorkItem: async (id) => {
+      calls += 1;
+      const item = h.stores.workItems.get(id);
+      if (item !== null) {
+        h.stores.workItems.upsert({
+          ...item,
+          state: "COMPLETED",
+          evidence: [
+            { id: `ev_${id}_x`, kind: "check", source: "kai-observed", method: "test", detail: "observed", supports: ["file present: out.txt"], at: new Date().toISOString() },
+          ],
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      return { state: "COMPLETED" };
+    },
+    doerEnabled: () => true,
+    fileExists: (path) => h.files.has(path),
+  });
+
+  for (let i = 0; i < 4; i += 1) {
+    const r = await executor.advance(goalId);
+    const st = executor.status(goalId);
+    t.diagnostic(`pass ${i}: goal=${h.goals.getGoal(goalId)?.state} dispatched=${r.dispatched.length} reason=${String(r.reason ?? "")} notes=${JSON.stringify(r.notes)} items=${JSON.stringify(st?.items.map((x) => `${x.taskId}:${x.state}`))} criteria=${JSON.stringify(st?.criteria.map((c) => `${c.met ? "+" : "-"}${c.criterion}`))}`);
+    if (h.goals.getGoal(goalId)?.state === "COMPLETED") break;
+  }
+  assert.equal(h.goals.getGoal(goalId)?.state, "COMPLETED", "the goal completed");
+  const callsAtCompletion = calls;
+
+  // A terminal goal must not dispatch again.
+  const after = await executor.advance(goalId);
+  assert.equal(after.dispatched.length, 0, "a completed goal dispatches nothing");
+  assert.equal(calls, callsAtCompletion, "and it reaches no worker");
+  assert.match(after.reason ?? "", /terminal goal dispatches nothing/);
+  t.diagnostic(`goal=COMPLETED calls=${calls} → ${after.reason}`);
+});
+
+test("a work item a dead process left RUNNING is reconciled at startup, so its goal can settle", async (t) => {
+  // Found by inspecting a real interrupted run: the item was RUNNING, the worker
+  // process was gone, and the goal stayed RUNNING with nothing able to move it.
+  const dir = mkdtempSync(join(tmpdir(), "kai-interrupt-"));
+  const dbPath = join(dir, "kai.db");
+  t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+
+  // First process: leave an item in flight the way a crash would.
+  const first = createCoreRuntime({
+    dbPath,
+    agents: { mode: "mock" },
+    startScheduler: false,
+    subsystemPaths: { runUpkeepOnStart: false },
+  });
+  const board = createWorkBoard(first.stores.workItems);
+  const created = board.create({ objective: "the interrupted task", deliverable: "d" });
+  assert.equal(created.ok, true);
+  const id = created.ok ? created.value.id : "";
+  assert.equal(board.claim(id, "worker-1").ok, true, "claimed");
+  assert.equal(board.heartbeat(id, "step").ok, true, "running");
+  assert.equal(board.get(id)?.state, "RUNNING");
+  await first.stop();
+
+  // Second process: startup reconciles it, and says so.
+  const second = createCoreRuntime({
+    dbPath,
+    agents: { mode: "mock" },
+    startScheduler: false,
+    subsystemPaths: { runUpkeepOnStart: false },
+  });
+  const recovered = second.recoverWorkItems();
+  assert.deepEqual(recovered.abandoned, [id], "the interrupted item was reconciled");
+  const item = second.stores.workItems.get(id);
+  assert.equal(item?.state, "BLOCKED", `an abandoned run must not stay RUNNING, got ${item?.state}`);
+  assert.match((item?.failures ?? []).join(" "), /interrupted by a Core restart/, "and the reason is recorded");
+  const notices = second.notifications.list().filter((n) => n.type === "work_item.interrupted");
+  assert.ok(notices.length >= 1, "the user is told, rather than the item disappearing silently");
+  await second.stop();
+  t.diagnostic(`blocked ${id}: ${(item?.failures ?? [])[0]?.slice(0, 90)}`);
 });

@@ -32,6 +32,7 @@
 import type { CoreRuntime } from "../runtime.ts";
 import { decideAccess } from "./authz.ts";
 import { classifyCriterion } from "../goals/criteria.ts";
+import { buildWorkerPreflight } from "../workforce/preflight.ts";
 import { isGoalState, routeTo, type Goal, type GoalState } from "../goals/goal.ts";
 import { revisionIdFor } from "../goals/challenger.ts";
 import { loadIdentity } from "../identity.ts";
@@ -1290,6 +1291,35 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
   // GET serves the stored rows plus the EFFECTIVE values with their winning
   // source per key (settings > environment > credential-file > defaults), so a
   // human sees why a value is what it is. POST/POST-reset go through the
+  // ── Worker preflight ──────────────────────────────────────────────────────
+  //
+  // What KAI can ACTUALLY dispatch to, before anything is compiled. It reports;
+  // it never enables. Three facts are kept apart on purpose: a runtime being
+  // INSTALLED is not a persona being REGISTERED, and registration is not the
+  // adapter being REACHABLE.
+  async function workerPreflight(): Promise<ApiResponse> {
+    const health = await runtime.registry.healthAll();
+    const healthMap: Record<string, { ok: boolean; detail: string }> = {};
+    const capabilityMap: Record<string, readonly string[]> = {};
+    for (const adapter of runtime.registry.list()) {
+      const probe = health[adapter.id];
+      healthMap[adapter.id] = probe === undefined
+        ? { ok: false, detail: "the adapter did not report health" }
+        : { ok: probe.ok, detail: probe.ok ? "reachable" : (probe.detail ?? "unhealthy") };
+      capabilityMap[adapter.id] = adapter.capabilities();
+    }
+    const personas = runtime.subagents.list().map((persona) => persona.spec.workerId);
+    const prefs = readOrchestrationPrefs(runtime.stores.settings);
+    return ok(
+      buildWorkerPreflight({
+        personas,
+        health: healthMap,
+        capabilities: capabilityMap,
+        autonomy: { workerAuto: prefs.autonomy.workerAuto, level: prefs.autonomy.level },
+      }),
+    );
+  }
+
   // ── Goals: intake → challenge → plan → approval ──────────────────────────
   //
   // A goal is the durable contract ABOVE the orchestrator. Nothing here
@@ -3405,6 +3435,8 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     route("GET", "/activity", "READ", (req) => Promise.resolve(listActivity(req))),
     // Goals: intake, challenge, plan, approval. Reads are open; every mutation
     // is owner-only, because a goal is what authorises KAI to act.
+    // The onboarding preflight: what must be configured before a goal can run.
+    route("GET", "/workers/preflight", "READ", () => workerPreflight()),
     route("GET", "/goals", "READ", () => Promise.resolve(listGoalsHandler())),
     route("POST", "/goals", "WRITE", (req) => createGoalHandler(req), { requiresOwner: true }),
     route("GET", "/goals/:id", "READ", (req, p) => Promise.resolve(getGoalHandler(req, p))),

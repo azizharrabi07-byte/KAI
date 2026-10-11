@@ -92,6 +92,40 @@ The gap between "approved plan" and "work actually runs" is closed.
   Core state, with four separate sections for assigned tasks, worker-reported
   results, KAI-observed activity and KAI-performed verification.
 
+### An interrupted run is reconciled, not stranded
+
+Found by inspecting the REAL interrupted run (`kai-run-db-mv4231ukyi7y`): its work item
+was `RUNNING`, the worker process was gone, and the goal stayed `RUNNING` with nothing
+able to move it. Startup now reconciles it, mirroring the mission executor and the
+scheduler lease sweep — an abandoned run is **never blindly replayed**, because it may
+have had side effects:
+
+```
+BEFORE: work_mv423owu_1:RUNNING
+recoverWorkItems() -> {"abandoned":["work_mv423owu_1"]}
+AFTER:  work_mv423owu_1:BLOCKED
+  reason: "interrupted by a Core restart: the worker run was abandoned and is never
+           blindly replayed — re-run this item deliberately"
+goal: BLOCKED — "1 criterion(s) unverified: file content equals: … (no evidence recorded)"
+```
+
+`board.block` now **records** its reason (it took one and discarded it into an event), so
+a blocked item can say why after the process that blocked it is gone. A **terminal goal
+never dispatches again** — an already-COMPLETED goal used to compile and run its tasks a
+second time.
+
+### Provider failures are typed, and the preflight says what is missing
+
+- `core/src/model/diagnostics.ts` classifies a failure as `quota-exhausted`,
+  `rate-limited`, `auth`, `unreachable`, `timeout`, `bad-response`, `unconfigured` or
+  `http`, with `retryable` and an actionable recovery. The **real** live 429 body
+  (`GoUsageLimitError`, `limitName: monthly`) classifies as `quota-exhausted`, **not**
+  rate-limited, and the detail is redacted so a credential can never appear.
+- `GET /workers/preflight` reports what KAI can actually dispatch to, keeping three
+  facts apart: a runtime **installed** (an adapter probe), a worker **registered** (a
+  persona the router can select), and **reachable** (the adapter's live answer). It
+  names the blockers in the order to fix them, and it **enables nothing**.
+
 ### Acceptance criteria are typed, and a criterion nothing can settle is REFUSED
 
 The live run exposed the root cause of a goal that could not complete: the planner
