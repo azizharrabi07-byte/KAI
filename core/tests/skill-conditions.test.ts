@@ -11,7 +11,13 @@
  */
 
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+
+import { createSkillRegistry } from "../src/skills/registry.ts";
+import { createSkillStore } from "../src/skills/store.ts";
 
 import { checkApplicability, conditionsForSkill } from "../src/skills/applicability.ts";
 import { parseSkillMarkdown } from "../src/skills/validate.ts";
@@ -178,6 +184,30 @@ test("APPLICABILITY DECISIONS use the typed fields, with the same semantics as b
   assert.equal(checkApplicability(conditions, context({ environment: undefined, domain: "research" })).eligible, true);
   // A KNOWN, different one still fails closed.
   assert.equal(checkApplicability(conditions, context({ environment: "local", domain: "research" })).eligible, false);
+});
+
+test("REGRESSION: the conditions reach the METADATA surface, not just the store", (t) => {
+  // Found by inspection: `toMetadata` copied tags/tools/constraints but NOT the
+  // new conditions, so applicability worked internally while the API and UI could
+  // not show a user WHY a skill was not being offered.
+  const root = mkdtempSync(join(tmpdir(), "kai-cond-meta-"));
+  t.after(() => rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+  const store = createSkillStore({ root });
+  const registry = createSkillRegistry({ store });
+  const registered = registry.register({
+    id: "meta-conditions",
+    markdown: skillMd(["name: meta-conditions", "description: x", "platforms: linux", "environments: ci"]),
+    source: "builtin",
+  });
+  assert.equal(registered.ok, true, registered.ok ? "" : registered.error.message);
+  const listed = registry.list().find((m) => m.id === "meta-conditions");
+  assert.deepEqual(listed?.conditions, { platforms: ["linux"], environments: ["ci"] }, "the metadata carries them");
+  assert.equal(listed?.conditionsVersion, SKILL_CONDITIONS_VERSION);
+  // And they survive a reopen (the JSON index persists them).
+  const reopened = createSkillRegistry({ store: createSkillStore({ root }) });
+  const again = reopened.list().find((m) => m.id === "meta-conditions");
+  assert.deepEqual(again?.conditions, { platforms: ["linux"], environments: ["ci"] }, "durable across a reload");
+  t.diagnostic(JSON.stringify(again?.conditions));
 });
 
 test("condition values are deduplicated and case is preserved for comparison", (t) => {

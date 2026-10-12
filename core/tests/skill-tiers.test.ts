@@ -11,7 +11,13 @@
  */
 
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+
+import { createSkillRegistry } from "../src/skills/registry.ts";
+import { createSkillStore } from "../src/skills/store.ts";
 
 import {
   resolveSkillTiers,
@@ -212,4 +218,35 @@ test("resolutions are returned in a stable order", (t) => {
   ];
   const keys = resolveSkillTiers(skills).resolutions.map((r) => r.key);
   assert.deepEqual(keys, ["alpha", "mu", "zeta"]);
+});
+
+test("REGRESSION: relevant() and snapshot() AGREE about a shadowed skill", async (t) => {
+  // Found by inspection: `snapshot()` marked a shadowed skill ineligible while
+  // `relevant()` still offered it, so the loser of a name conflict could be
+  // handed to a worker even though the index said it was not selectable.
+  const root = mkdtempSync(join(tmpdir(), "kai-tier-agree-"));
+  t.after(() => rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+  const registry = createSkillRegistry({ store: createSkillStore({ root }) });
+
+  const shared = (name: string) =>
+    ["---", `name: ${name}`, "description: shared lookup helper", "---", "", "Use the shared helper."].join("\n");
+
+  // Two ids, one name, different tiers: builtin wins, learned is shadowed.
+  const builtin = registry.register({ id: "shared-builtin", markdown: shared("shared-name"), source: "builtin" });
+  const learned = registry.register({ id: "shared-learned", markdown: shared("shared-name"), source: "learned" });
+  assert.equal(builtin.ok && learned.ok, true);
+
+  const tiers = registry.resolveTiers();
+  assert.equal(tiers.shadowed.size, 1, "exactly one is shadowed");
+  const shadowedId = [...tiers.shadowed.keys()][0];
+
+  const context = { platform: process.platform, availableTools: [] };
+  const snap = registry.snapshot(context);
+  const snapEntry = snap.entries.find((e) => e.id === shadowedId);
+  assert.equal(snapEntry?.eligible, false, "the snapshot says it is not selectable");
+
+  const offered = registry.relevant("shared helper lookup", 10, context).map((m) => m.id);
+  assert.ok(!offered.includes(String(shadowedId)), `relevant() must agree: ${offered.join(",")}`);
+  assert.ok(offered.includes("shared-builtin"), "the winner is still offered");
+  t.diagnostic(`shadowed ${shadowedId}; offered ${offered.join(",")}`);
 });

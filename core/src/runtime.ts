@@ -3972,7 +3972,18 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       };
     },
     skills: {
-      relevant: (query: string, limit: number) => skills.relevant(query, limit).map((s) => ({ id: s.id })),
+      relevant: (query: string, limit: number, context?: { domain?: string }) => {
+        // Applicability is applied HERE, where the platform and the real tool set
+        // are known. Without this a Linux-only skill, or one needing a tool KAI
+        // does not have, would be handed to a worker that cannot use it.
+        const toolIds = tools.list().map((tool) => tool.id);
+        const availability = {
+          platform: process.platform,
+          availableTools: toolIds,
+          ...(context?.domain !== undefined ? { domain: context.domain } : {}),
+        };
+        return skills.relevant(query, limit, availability).map((s) => ({ id: s.id }));
+      },
       load: (id: string) => {
         const result = skills.load(id);
         if (!result.ok) return { ok: false as const, reason: result.error.message };

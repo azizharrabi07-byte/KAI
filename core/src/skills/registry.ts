@@ -123,6 +123,11 @@ export function createSkillRegistry(opts: { store: SkillStore; now?: () => Date 
     if (entry.purpose !== undefined) metadata.purpose = entry.purpose;
     if (entry.tools !== undefined) metadata.tools = [...entry.tools];
     if (entry.constraints !== undefined) metadata.constraints = [...entry.constraints];
+    // The typed applicability conditions belong on the metadata surface too: a
+    // user asking "why is this skill not being offered?" must be able to see the
+    // conditions, not just the tags they replaced.
+    if (entry.conditions !== undefined) metadata.conditions = { ...entry.conditions };
+    if (entry.conditionsVersion !== undefined) metadata.conditionsVersion = entry.conditionsVersion;
     return metadata;
   }
 
@@ -342,10 +347,16 @@ export function createSkillRegistry(opts: { store: SkillStore; now?: () => Date 
   function relevant(query: string, limit = 5, context?: ApplicabilityContext): SkillMetadata[] {
     const tokens = tokenize(query);
     if (tokens.length === 0 || limit <= 0) return [];
+    // One resolution per call, so `relevant` and `snapshot` cannot disagree.
+    const shadowedIds = new Set(resolveTiers().shadowed.keys());
     return store
       .listSkills()
       .filter((entry) => !entry.disabled)
       .filter((entry) => {
+        // A SHADOWED skill is not a candidate. `snapshot()` already marks it
+        // ineligible; offering it here would make the two surfaces disagree, and
+        // the loser of a name conflict would be handed to a worker anyway.
+        if (shadowedIds.has(entry.id)) return false;
         if (context === undefined) return true;
         // Explicit frontmatter conditions win; the tag convention is the legacy
         // fallback, so a skill that has not been migrated is not narrowed.

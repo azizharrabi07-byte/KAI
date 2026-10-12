@@ -98,7 +98,12 @@ export interface ApprovalPorts {
 }
 
 export interface SkillPorts {
-  relevant(query: string, limit: number): { id: string }[];
+  /**
+   * Skills to offer this run. The CONTEXT is what makes applicability real: a
+   * skill for another platform, or one needing a tool this run does not have, is
+   * not a candidate. Absent context means "no applicability filtering".
+   */
+  relevant(query: string, limit: number, context?: { domain?: string }): { id: string }[];
   load(id: string): { ok: boolean; name?: string; body?: string; reason?: string };
   /** Version + content hash for usage receipts (Phase 6). Optional; absent → receipts carry id only. */
   inspect?(id: string): { version?: string; hash?: string } | null;
@@ -445,7 +450,10 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     let skillIds = input.skills ?? [];
     if (skillIds.length === 0) {
       try {
-        skillIds = deps.skills.relevant(input.objective, 3).map((s) => s.id).slice(0, 3);
+        skillIds = deps.skills
+          .relevant(input.objective, 3, { domain: analysis.taskType })
+          .map((s) => s.id)
+          .slice(0, 3);
       } catch {
         skillIds = [];
       }
@@ -2645,7 +2653,9 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     // Auto-select skills for the correction prompt (same path as planned work).
     let skillIds: string[] = [];
     try {
-      skillIds = deps.skills.relevant(objective, 3).map((s) => s.id).slice(0, 3);
+      // No domain is known here, but the runtime still applies platform and
+      // tool applicability, which is what stops an inapplicable skill being offered.
+      skillIds = deps.skills.relevant(objective, 3, {}).map((s) => s.id).slice(0, 3);
     } catch {
       skillIds = [];
     }
