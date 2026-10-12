@@ -90,6 +90,10 @@ export interface SkillMetadata {
   /** Hard limits the skill declares for itself (shown, never silently waived). */
   constraints?: readonly string[];
   tags: readonly string[];
+  /** Typed applicability conditions, when the frontmatter declared any. */
+  conditions?: SkillConditions;
+  /** The contract version the conditions were read under. */
+  conditionsVersion?: number;
   /** Declared version from frontmatter, when present. */
   version?: string;
   source: SkillSource;
@@ -131,6 +135,35 @@ export interface LoadedSkill {
 }
 
 /** A parsed, validated SKILL.md. */
+/**
+ * The version of the applicability-metadata contract.
+ *
+ * It exists so a future change to the meaning of a condition can be told apart
+ * from today's: a skill carrying version 1 is interpreted by version-1 rules,
+ * and an unknown version is reported rather than guessed at.
+ */
+export const SKILL_CONDITIONS_VERSION = 1;
+
+/**
+ * Where a skill applies. Every field is OPTIONAL and an absent field is not a
+ * constraint, so a skill with no conditions applies everywhere.
+ *
+ * These are EXPLICIT frontmatter fields (`platforms:`, `environments:`,
+ * `domains:`). The older convention of encoding the same thing in `tags:`
+ * (`platform:linux`) is still read for backward compatibility, but the explicit
+ * field always wins and a disagreement between the two is reported.
+ */
+export interface SkillConditions {
+  /** Platform ids, as `process.platform` reports them (`win32`, `linux`, `darwin`). */
+  platforms?: readonly string[];
+  /** Environments (`ci`, `local`, ...). An UNKNOWN environment does not exclude. */
+  environments?: readonly string[];
+  /** Task domains (`research`, `coding`, ...). */
+  domains?: readonly string[];
+  /** Tool ids the skill needs. A missing tool makes it ineligible. */
+  tools?: readonly string[];
+}
+
 export interface ParsedSkill {
   /** The id the caller supplied, when one was validated alongside the content. */
   id?: string;
@@ -141,6 +174,10 @@ export interface ParsedSkill {
   tools?: readonly string[];
   constraints?: readonly string[];
   tags: readonly string[];
+  /** Typed applicability conditions, when the frontmatter declared any. */
+  conditions?: SkillConditions;
+  /** The contract version the conditions were read under. */
+  conditionsVersion?: number;
   frontmatter: Readonly<Record<string, string>>;
   body: string;
   /** The exact input string; hashing this is hashing the file. */

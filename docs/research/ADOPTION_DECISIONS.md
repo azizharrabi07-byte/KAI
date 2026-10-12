@@ -46,6 +46,11 @@ proves the decision was implemented. A decision with no test is an intention.
 | 30 | **OpenCode per-domain protocol + `/api/event`** | `anomalyco/opencode` @ `dev`, `packages/protocol/src/groups/` (30 files) | **Pending** | The event union lives in `groups/event.ts`, which was not read; the OpenAPI doc declares the payload as an opaque SSE string | missing: `groups/event.ts` |
 | 31 | **Coucou relay** | `Louis-CFM/coucou` `relay/src/index.ts` | **Reject as described; Study only** | The brief called it a hook relay. It is a single-file Cloudflare Worker that signs APNs pushes. The one transferable idea is the SHA-256 command fingerprint binding Allow/Deny to exact bytes — which KAI already does for skill approvals | n/a |
 
+| 32 | **Critic panel execution** — bounds, cancellation, provenance, explicit unavailable | KAI's own `challenger.ts` (roles and synthesis existed; execution did not) | **Reimplement natively** | Six lenses must be six independent calls, and a missing lens must never be a PASS | `core/tests/critic-panel.test.ts` (12) |
+| 33 | **Deterministic skill-tier precedence** | `hermes-agent` tier/shadowing (architecture reference) | **Implement pattern natively** | KAI has one registry, so a tier is provenance, not a directory; the policy is a table and the tie-break is the id | `core/tests/skill-tiers.test.ts` (16) |
+| 34 | **Typed, versioned applicability conditions** | replaces KAI's own tag encoding | **Reimplement natively** | Explicit frontmatter wins; tags are the legacy fallback; malformed metadata is refused | `core/tests/skill-conditions.test.ts` (11) |
+| 35 | **Worker usage accounting with honest provenance** | audited across KAI's own adapters | **Reimplement natively** | An unenforceable limit must be reported, not passed; unknown is never zero | `core/tests/worker-usage.test.ts` (15) |
+
 ## Ranked adoption plan (Part D)
 
 Ranked by the criteria the brief sets, highest first:

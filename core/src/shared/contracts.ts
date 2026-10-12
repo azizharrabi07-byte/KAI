@@ -271,7 +271,14 @@ export type KaiEventType =
   // spent allowance) and a reconciliation is an audit fact (budget consumed by a
   // process that died). Both outlive the process, so both persist.
   | "budget.refused"
-  | "budget.reconciled";
+  | "budget.reconciled"
+  // One critic lens, as it actually ran: the mechanism, the reviewer identity,
+  // the duration and the hash of the prompt it judged. It persists because
+  // "which lenses really ran, and on what" must be answerable after the fact.
+  | "critic.reviewed"
+  // What a worker REPORTED, and what could therefore be debited. It persists
+  // because "was this limit actually enforced?" must be answerable afterwards.
+  | "worker.usage";
 
 export interface KaiEvent<T = unknown> {
   id: string;
@@ -323,6 +330,8 @@ export const PERSISTED_EVENT_TYPES: readonly KaiEventType[] = [
   "review.decided",
   "budget.refused",
   "budget.reconciled",
+  "critic.reviewed",
+  "worker.usage",
   "delegation.routed",
   "benchmark.updated",
   // Command lifecycle persists (started/exit); stdout/stderr chunks stay live.

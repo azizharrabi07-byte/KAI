@@ -92,6 +92,53 @@ The gap between "approved plan" and "work actually runs" is closed.
   Core state, with four separate sections for assigned tasks, worker-reported
   results, KAI-observed activity and KAI-performed verification.
 
+### The six lenses actually run, with bounds and provenance
+
+`challenger.ts` already owned the roles, the rubrics and the synthesis — including
+the rule that one blocking objection outvotes any majority. What it lacked was
+execution. `core/src/goals/criticPanel.ts` adds it, and nothing else: it runs no
+tools, holds no state and gives a critic no way to act on the plan it judges.
+
+Three mechanisms, named in the provenance rather than inferred:
+
+| Mechanism | What it means |
+|---|---|
+| `subagent` | a role runs on a KAI subagent persona's own worker adapter |
+| `sequential` | the documented fallback: each role gets its OWN call with only its own input |
+| `unavailable` | no reviewer can run — reported, and the challenger turns it into BLOCKED |
+
+Each result carries the reviewer id, the round, the revision, the duration, and the
+**sha256 of the exact prompt it judged**. Every role is a separate call, so six
+lenses are six independent reviews and never one response relabelled. A non-OK
+result is thrown, and the challenger's existing catch makes it a BLOCKED finding:
+a lens that did not run is never a PASS.
+
+`RoleInput` has no `findings` field, and a runtime guard refuses a caller that
+tries to smuggle one in. A subagent reviewer is **not** enabled by default, because
+running a role on a worker adapter is an external effect and this path does not
+pass Guard — enabling it silently would let a critic reach a worker unapproved.
+
+### Skill tiers, typed conditions, and what is NOT enforced
+
+- `core/src/skills/tiers.ts` — a deterministic precedence policy
+  (`builtin > library > project > learned > imported > unknown`) over the name
+  conflicts KAI actually has. The order is a data table, the tie-break inside a
+  tier is the skill id, and the outcome is a pure function of the input set — six
+  different input orders produce the same winner. An unknown `source` resolves to
+  the lowest tier and is named; a disabled skill never wins.
+- Conditions are now **typed, validated, versioned frontmatter** (`platforms:`,
+  `environments:`, `domains:`) at contract v1. The legacy `platform:linux` TAG
+  convention is still read, so no existing skill changed behaviour; the explicit
+  field wins and a disagreement between the two is reported. Malformed metadata is
+  refused rather than discarded, and an unknown key is still a refusal.
+- **`maxToolCalls` and `maxCostUsd` are NOT enforced, and are now reported as
+  such.** No worker adapter reports tool invocations, and no provider reports cost;
+  KAI does not derive dollars from token counts. `enforceabilityOf()` names every
+  limit it cannot hold, `debitUsage()` skips an unknown amount **with a reason**
+  instead of debiting it as zero, and `worker.usage` persists what was reported.
+  Measured tokens (hermes and codex parse them; opencode reports none) are debited
+  to the durable budget under a `token` kind, idempotently per report id.
+
 ### One authoritative execution budget
 
 The retry ceiling was enforced PER WORK ITEM, from that item's own dispatch ledger.

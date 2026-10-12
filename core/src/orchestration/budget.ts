@@ -48,6 +48,8 @@ export type BudgetKind =
   | "replan"
   | "modelCall"
   | "toolCall"
+  /** Tokens, as the worker reports them. Separate from cost: they are different units. */
+  | "token"
   /** Spend in USD. Its own kind, so `maxCostUsd` is reachable by the same path. */
   | "cost"
   /** Wall-clock milliseconds. */
@@ -61,6 +63,7 @@ export const BUDGET_KINDS: readonly BudgetKind[] = [
   "replan",
   "modelCall",
   "toolCall",
+  "token",
   "cost",
   "runtime",
 ];
@@ -90,6 +93,8 @@ export interface BudgetLimits {
   maxReplans?: number;
   maxModelCalls?: number;
   maxToolCalls?: number;
+  /** Total tokens (input + output) across the scope. */
+  maxTokens?: number;
   /** Cost in USD; reservations carry fractional amounts. */
   maxCostUsd?: number;
   maxRuntimeMs?: number;
@@ -257,6 +262,8 @@ function limitFor(limits: BudgetLimits, kind: BudgetKind): number | undefined {
       return limits.maxModelCalls;
     case "toolCall":
       return limits.maxToolCalls;
+    case "token":
+      return limits.maxTokens;
     case "cost":
       return limits.maxCostUsd;
     case "runtime":

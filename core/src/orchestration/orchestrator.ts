@@ -60,6 +60,7 @@ import {
 import type { VerifiedEvidence } from "./types.ts";
 import type { GoalBudgets } from "../goals/goal.ts";
 import type { BudgetLedger, BudgetLimits } from "./budget.ts";
+import { debitUsage, usageReportFrom, type WorkerUsageCapability } from "./usage.ts";
 
 /**
  * A per-attempt nonce, so two INDEPENDENT calls for the same item take two
@@ -155,6 +156,12 @@ export interface OrchestratorDeps {
    * Used ONLY to derive the goal-wide dispatch ceiling.
    */
   goalBudgetFor?: (goalId: string, goalRevisionId: string | undefined) => GoalBudgets | undefined;
+  /**
+   * What the dispatched worker can REPORT. It decides which limits are
+   * enforceable: a worker that reports no tool calls cannot be held to
+   * `maxToolCalls`, and saying otherwise would be a claim KAI cannot keep.
+   */
+  usageCapability?: WorkerUsageCapability;
   publish(type: string, payload: unknown, opts?: { source?: string }): void;
   now?(): string;
   /** KAI's own tools for evidence collection (absent → supervision degrades honestly, never invents). */
@@ -1384,6 +1391,8 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       return { workItemId: id, state: "FAILED", handoff: emptyHandoff, verification: emptyVerification, note: rec !== null ? `${reason} — recommended: ${rec.action} (${rec.reason})` : `${reason} — ${budget}` };
     }
 
+    debitWorkerUsage(id, item, workerId, delegated);
+
     return completeFromReply(id, workerId, delegated.reply ?? "", {
       latencyMs: delegated.latencyMs ?? (Date.now() - started),
       ...(delegated.cost !== undefined ? { cost: delegated.cost } : {}),
@@ -1751,6 +1760,64 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       out.push({ workerId, kind, at: typeof record["at"] === "string" ? record["at"] : nowIso() });
     }
     return out;
+  }
+
+  /**
+   * Debit the worker's REPORTED usage against the same durable budget.
+   *
+   * An unreported amount is skipped and named — never debited as zero, which
+   * would make an unenforceable limit look satisfied. Each debit is keyed by the
+   * report id, so a redelivered result (a retried callback, a duplicate event)
+   * takes no second debit. An exhausted ceiling is reported on the item rather
+   * than thrown, so the failure is durable and explainable.
+   */
+  function debitWorkerUsage(
+    id: string,
+    item: WorkItem,
+    workerId: string,
+    delegated: DelegateResult,
+  ): void {
+    const ledger = deps.budgetLedger;
+    if (ledger === undefined) return;
+    const capability = deps.usageCapability ?? { inputTokens: false, outputTokens: false, toolCalls: false, costUsd: false };
+    const report = usageReportFrom({
+      workerId,
+      itemId: id,
+      attempt: dispatchLedger(item).length,
+      ...(delegated.cost !== undefined ? { cost: delegated.cost } : {}),
+      ...(delegated.latencyMs !== undefined ? { latencyMs: delegated.latencyMs } : {}),
+      capability,
+    });
+    const goal = item.goalId !== undefined ? deps.goalBudgetFor?.(item.goalId, item.goalRevisionId) : undefined;
+    const limits: BudgetLimits = {
+      ...(goal !== undefined ? { maxTokens: goal.maxTasks * 200_000 } : {}),
+      ...(item.budget?.maxToolCalls !== undefined ? { maxToolCalls: item.budget.maxToolCalls } : {}),
+      ...(item.budget?.maxCostUsd !== undefined ? { maxCostUsd: item.budget.maxCostUsd } : {}),
+    };
+    const scope = {
+      ...(item.goalId !== undefined ? { goalId: item.goalId } : {}),
+      ...(item.goalRevisionId !== undefined ? { planRevisionId: item.goalRevisionId } : {}),
+      chainId: deps.board.chainRootOf(id) || id,
+    };
+    const outcome = debitUsage(ledger, scope, report, limits);
+    if (outcome.debited.length > 0 || outcome.skipped.length > 0 || outcome.exhausted !== undefined) {
+      emit("worker.usage", {
+        workItemId: id,
+        workerId,
+        reportId: report.reportId,
+        inputTokens: report.inputTokens.provenance,
+        outputTokens: report.outputTokens.provenance,
+        toolCalls: report.toolCalls.provenance,
+        costUsd: report.costUsd.provenance,
+        debited: outcome.debited.map((d) => `${d.kind}:${d.amount}`),
+        notDebited: outcome.skipped.map((s) => `${s.kind}: ${s.reason}`),
+        ...(outcome.exhausted !== undefined ? { exhausted: outcome.exhausted.reason } : {}),
+      });
+    }
+    if (outcome.exhausted !== undefined) {
+      deps.board.block(id, `usage budget exhausted: ${outcome.exhausted.reason}`);
+      recordNextAction(id, "STOP", outcome.exhausted.reason, "blocked");
+    }
   }
 
   /**

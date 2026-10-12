@@ -41,11 +41,12 @@ import type {
 import {
   buildSkillIndex,
   checkApplicability,
-  conditionsFromTags,
+  conditionsForSkill,
   type ApplicabilityContext,
   type IndexableSkill,
   type SkillIndexSnapshot,
 } from "./applicability.ts";
+import { resolveSkillTiers, type TierResolution } from "./tiers.ts";
 
 export interface SkillRegistry {
   register(input: { id: string; markdown: string; source?: string }): SkillResult<SkillRecord>;
@@ -76,6 +77,11 @@ export interface SkillRegistry {
    * turn is using.
    */
   snapshot(context: ApplicabilityContext, opts?: { maxEntries?: number }): SkillIndexSnapshot;
+  /**
+   * The deterministic name-conflict resolution across tiers. Reported so a user
+   * can see which skill won a shared name and why the others were shadowed.
+   */
+  resolveTiers(): TierResolution;
 }
 
 function toRevisionView(revision: StoredSkill["revisions"][number]): SkillRevisionView {
@@ -163,6 +169,10 @@ export function createSkillRegistry(opts: { store: SkillStore; now?: () => Date 
       if (parsed.value.purpose !== undefined) entry.purpose = parsed.value.purpose;
       if (parsed.value.tools !== undefined) entry.tools = [...parsed.value.tools];
       if (parsed.value.constraints !== undefined) entry.constraints = [...parsed.value.constraints];
+      if (parsed.value.conditions !== undefined) {
+        entry.conditions = { ...parsed.value.conditions };
+        entry.conditionsVersion = parsed.value.conditionsVersion;
+      }
       store.putSkill(entry);
       return ok(toRecord(entry));
     });
@@ -289,6 +299,8 @@ export function createSkillRegistry(opts: { store: SkillStore; now?: () => Date 
       name: entry.name,
       description: entry.description,
       tags: entry.tags,
+      ...(entry.conditions !== undefined ? { conditions: entry.conditions } : {}),
+      ...(entry.conditionsVersion !== undefined ? { conditionsVersion: entry.conditionsVersion } : {}),
       ...(entry.tools !== undefined ? { tools: entry.tools } : {}),
       ...(entry.version !== undefined ? { version: entry.version } : {}),
       source: entry.source,
@@ -297,10 +309,34 @@ export function createSkillRegistry(opts: { store: SkillStore; now?: () => Date 
     };
   }
 
+  function resolveTiers(): TierResolution {
+    return resolveSkillTiers(
+      store.listSkills().map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        source: entry.source,
+        sha256: entry.currentSha,
+        disabled: entry.disabled,
+      })),
+    );
+  }
+
   function snapshot(context: ApplicabilityContext, opts: { maxEntries?: number } = {}): SkillIndexSnapshot {
-    return buildSkillIndex(store.listSkills().map(indexable), context, {
+    const index = buildSkillIndex(store.listSkills().map(indexable), context, {
       ...(opts.maxEntries !== undefined ? { maxEntries: opts.maxEntries } : {}),
     });
+    // A SHADOWED skill is not selectable, and it must not look eligible: the
+    // conflict is resolved by the tier policy, never by which entry the store
+    // happened to return first. The reason travels with the entry.
+    const { shadowed } = resolveTiers();
+    if (shadowed.size === 0) return index;
+    const entries = index.entries.map((entry) => {
+      const reason = shadowed.get(entry.id);
+      if (reason === undefined || entry.disabled) return entry;
+      return { ...entry, eligible: false, reason };
+    });
+    const eligible = entries.filter((e) => e.eligible).length;
+    return { ...index, entries, eligible, ineligible: entries.length - eligible };
   }
 
   function relevant(query: string, limit = 5, context?: ApplicabilityContext): SkillMetadata[] {
@@ -311,10 +347,9 @@ export function createSkillRegistry(opts: { store: SkillStore; now?: () => Date 
       .filter((entry) => !entry.disabled)
       .filter((entry) => {
         if (context === undefined) return true;
-        const conditions = conditionsFromTags(entry.tags);
-        const withTools =
-          entry.tools !== undefined && entry.tools.length > 0 ? { ...conditions, tools: entry.tools } : conditions;
-        return checkApplicability(withTools, context).eligible;
+        // Explicit frontmatter conditions win; the tag convention is the legacy
+        // fallback, so a skill that has not been migrated is not narrowed.
+        return checkApplicability(conditionsForSkill(entry).conditions, context).eligible;
       })
       .map((entry) => ({ entry, value: score(entry, tokens) }))
       .filter((candidate) => candidate.value > 0)
@@ -336,5 +371,6 @@ export function createSkillRegistry(opts: { store: SkillStore; now?: () => Date 
     delete: remove,
     relevant,
     snapshot,
+    resolveTiers,
   };
 }

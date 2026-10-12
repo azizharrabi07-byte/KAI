@@ -29,6 +29,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { SkillFsError, skillError } from "./errors.ts";
+import type { SkillConditions } from "./types.ts";
 import { sha256Hex } from "./hash.ts";
 import {
   assertNoReparseEscape,
@@ -58,6 +59,13 @@ export interface StoredSkill {
   tools?: string[];
   constraints?: string[];
   tags: string[];
+  /**
+   * Typed applicability conditions (contract v1). Additive: an index written
+   * before this field existed simply lacks it, and the tag convention is read
+   * instead, so no migration rewrites anyone's skills.
+   */
+  conditions?: SkillConditions;
+  conditionsVersion?: number;
   version?: string;
   source: string;
   createdAt: string;

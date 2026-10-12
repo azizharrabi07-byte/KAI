@@ -81,7 +81,8 @@ import { createGoalStore, type GoalStore } from "./goals/store.ts";
 import { createGoalExecutor, type GoalExecutor } from "./goals/executor.ts";
 import { createGoalChallenger, type ChallengeMode, type GoalChallenger } from "./goals/challenger.ts";
 import { createGoalArchitect, type GoalArchitect } from "./goals/architect.ts";
-import { buildCriticPrompt, CRITIC_SYSTEM, parseFinding, PLANNER_SYSTEM } from "./goals/runners.ts";
+import { CRITIC_SYSTEM, parseFinding, PLANNER_SYSTEM } from "./goals/runners.ts";
+import { createCriticPanel, criticPromptFor, criticRoleRunner, type CriticReviewer } from "./goals/criticPanel.ts";
 import type { ChallengeFinding, RoleInput } from "./goals/challenger.ts";
 import { createMissionExecutor } from "./missions/executor.ts";
 import { createMission } from "./missions/mission.ts";
@@ -93,6 +94,7 @@ import { createDailySummaryService, type DailySummaryService } from "./summary/d
 import { createCheckpointManager, type CheckpointManager } from "./checkpoints/checkpoint.ts";
 import { createExecutionLedger, type ExecutionLedger } from "./recovery/ledger.ts";
 import { createBudgetLedger } from "./orchestration/budget.ts";
+import type { WorkCost } from "./orchestration/types.ts";
 import { createBoundaryRunner } from "./recovery/boundary.ts";
 import { createMemoryService } from "./memory/service.ts";
 import {
@@ -324,6 +326,13 @@ export interface CoreRuntimeOptions {
    * the test, never by a live model.
    */
   goalRunners?: {
+    /**
+     * Reviewer ports for the critic panel. Absent → KAI's own model runs each
+     * lens sequentially. A `subagent` reviewer runs a role on a worker adapter,
+     * which is an EXTERNAL effect: supply one only with the policy consequence
+     * understood, because this path does not pass Guard.
+     */
+    criticReviewers?: readonly CriticReviewer[];
     runRole?: (input: RoleInput) => Promise<ChallengeFinding>;
     runPlanner?: (prompt: string) => Promise<string>;
   };
@@ -3825,6 +3834,54 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   const workBoard = createWorkBoard(stores.workItems, {
     onEvent: (type, payload) => publish(type as Parameters<typeof publish>[0], payload, { source: "core" }),
   });
+  /**
+   * ── The critic panel ──────────────────────────────────────────────────────
+   *
+   * The six lenses are interrogated through ONE bounded, provenance-recording
+   * mechanism. The default reviewer is KAI's OWN model (the documented sequential
+   * fallback): each role gets its own call and only its own input, so six roles
+   * are six independent reviews and never one shared response.
+   *
+   * A subagent reviewer can be injected through `options.goalRunners.criticReviewers`.
+   * It is NOT enabled by default on purpose: running a role on a worker adapter is
+   * an EXTERNAL effect, and this path has no policy gate, so enabling it silently
+   * would let a critic reach a worker without passing Guard.
+   */
+  const criticReviewers: CriticReviewer[] = options.goalRunners?.criticReviewers !== undefined
+    ? [...options.goalRunners.criticReviewers]
+    : [
+        {
+          id: "kai:model-critic",
+          kind: "sequential",
+          async review(input, opts) {
+            const result = await goalBrain.respond({
+              text: criticPromptFor(input),
+              system: CRITIC_SYSTEM,
+              purpose: `goal:critic:${input.role}`,
+              ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
+            });
+            return { finding: parseFinding(result.text, input.role), source: "model" as const };
+          },
+        },
+      ];
+  const criticPanel = createCriticPanel({ reviewers: criticReviewers });
+  const criticRunner = criticRoleRunner(criticPanel, {
+    onResult: (result) => {
+      publish("critic.reviewed", {
+        role: result.role,
+        status: result.status,
+        reviewer: result.provenance.reviewer,
+        mechanism: result.provenance.kind,
+        round: result.provenance.round,
+        goalRevisionId: result.provenance.goalRevisionId,
+        durationMs: result.provenance.durationMs,
+        promptSha256: result.provenance.promptSha256,
+        isolated: result.provenance.isolated,
+        ...(result.reason.length > 0 ? { reason: result.reason } : {}),
+      });
+    },
+  });
+
   const orchestrator = createOrchestrator({
     board: workBoard,
     bench: createBenchmark(stores.workerProfiles),
@@ -3894,7 +3951,25 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
           ? String((nested["result"] as Record<string, unknown>)["output"] ?? "")
           : "");
       const authored = rec !== undefined ? personaReply(rec.spec, output) : { reply: output, guarded: false };
-      return { ok: true, reply: authored.reply, latencyMs: Date.now() - started };
+      // ── Usage, when the worker actually reported it ────────────────────────
+      // The adapters parse token usage from the worker's own response (hermes and
+      // codex do; opencode reports none). It used to be DROPPED here, which is why
+      // `WorkCost` was a declared contract nothing ever filled. Nothing is
+      // invented: a field is set only when the worker sent a number.
+      const usageRecord = entity(nested !== null ? (nested["usage"] ?? record?.["usage"]) : record?.["usage"]);
+      const cost: WorkCost = {};
+      if (usageRecord !== null) {
+        const tin = usageRecord["inputTokens"] ?? usageRecord["input_tokens"] ?? usageRecord["prompt_tokens"];
+        const tout = usageRecord["outputTokens"] ?? usageRecord["output_tokens"] ?? usageRecord["completion_tokens"];
+        if (typeof tin === "number" && Number.isFinite(tin)) cost.tokensIn = tin;
+        if (typeof tout === "number" && Number.isFinite(tout)) cost.tokensOut = tout;
+      }
+      return {
+        ok: true,
+        reply: authored.reply,
+        latencyMs: Date.now() - started,
+        ...(Object.keys(cost).length > 0 ? { cost } : {}),
+      };
     },
     skills: {
       relevant: (query: string, limit: number) => skills.relevant(query, limit).map((s) => ({ id: s.id })),
@@ -3970,6 +4045,12 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     // this refuses again — one authoritative check at the orchestration
     // boundary, so no caller can route around it.
     budgetLedger,
+    // What KAI's real workers can report. The adapters parse token usage from the
+    // worker's own response (hermes and codex do; opencode reports none), and NO
+    // adapter reports tool calls or cost — so those limits are reported
+    // unenforceable rather than pretended. A run that reports no tokens is
+    // recorded as `unavailable` and debits nothing.
+    usageCapability: { inputTokens: true, outputTokens: true, toolCalls: false, costUsd: false },
     goalBudgetFor: (goalId, goalRevisionId) => {
       // The budgets in force are the APPROVED revision's, so a plan cannot widen
       // its own allowance after approval.
@@ -4124,23 +4205,10 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       ...(maxRounds !== undefined ? { maxRounds } : {}),
       runRole: async (input) => {
         if (options.goalRunners?.runRole !== undefined) return options.goalRunners.runRole(input);
-        let text: string;
-        try {
-          const result = await goalBrain.respond({
-            text: buildCriticPrompt(input),
-            system: CRITIC_SYSTEM,
-            purpose: `goal:critic:${input.role}`,
-          });
-          text = result.text;
-        } catch (error) {
-          // A provider failure is classified before it is reported, so the goal's
-          // BLOCKED reason distinguishes a spent allowance from throttling, an auth
-          // failure from an unreachable gateway — and never carries a credential.
-          const diagnostic = diagnoseProviderFailure(error);
-          throw new Error(`critic "${input.role}" could not run: ${describeProviderFailure(diagnostic)}`);
-        }
-        // A malformed reply becomes a BLOCKED finding, never a PASS.
-        return parseFinding(text, input.role);
+        // Bounded, serialised, provenance-recorded. A non-OK result throws, and
+        // the challenger turns it into a BLOCKED finding — a lens that did not run
+        // is never a PASS.
+        return criticRunner(input);
       },
     });
 

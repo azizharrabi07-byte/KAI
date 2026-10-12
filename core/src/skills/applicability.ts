@@ -35,6 +35,11 @@
  */
 
 import { sha256Hex } from "./hash.ts";
+import type { SkillConditions } from "./types.ts";
+
+// The typed contract lives in `types.ts` (the shared contract module) and is
+// re-exported here so existing importers keep working.
+export type { SkillConditions };
 
 /** A tag prefix that carries a condition. Anything else is an ordinary tag. */
 const CONDITION_PREFIXES: Record<string, "platforms" | "environments" | "domains"> = {
@@ -42,17 +47,6 @@ const CONDITION_PREFIXES: Record<string, "platforms" | "environments" | "domains
   env: "environments",
   domain: "domains",
 };
-
-export interface SkillConditions {
-  /** Platform ids this skill applies to (`linux`, `win32`, `darwin`). */
-  platforms?: readonly string[];
-  /** Environments (`ci`, `local`, ...). */
-  environments?: readonly string[];
-  /** Task domains (`research`, `coding`, ...). */
-  domains?: readonly string[];
-  /** Tool ids the skill needs. A missing tool makes it ineligible. */
-  tools?: readonly string[];
-}
 
 export interface ApplicabilityContext {
   /** The runtime platform: `process.platform` by convention. */
@@ -91,6 +85,77 @@ export function conditionsFromTags(tags: readonly string[]): SkillConditions {
   if (conditions.environments.length > 0) out.environments = conditions.environments;
   if (conditions.domains.length > 0) out.domains = conditions.domains;
   return out;
+}
+
+/**
+ * Which conditions apply to a skill, and WHERE they came from.
+ *
+ * The typed frontmatter fields (`platforms:`) are the carrier; the older
+ * `platform:` TAG convention is still read so existing skills keep working. The
+ * explicit field WINS, and a disagreement between the two is reported rather
+ * than resolved silently — a skill that says `platforms: [linux]` in frontmatter
+ * and `platform:win32` in its tags is contradictory, and the reader should be
+ * able to see that.
+ */
+export interface ResolvedConditions {
+  conditions: SkillConditions;
+  /** Where the conditions came from. `none` means the skill applies everywhere. */
+  carrier: "frontmatter" | "tags" | "mixed" | "none";
+  /** Set when the two carriers disagree. The frontmatter still wins. */
+  conflict?: string;
+}
+
+function sameSet(a: readonly string[] | undefined, b: readonly string[] | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  if (a.length !== b.length) return false;
+  const left = [...a].sort();
+  const right = [...b].sort();
+  return left.every((value, index) => value === right[index]);
+}
+
+export function conditionsForSkill(skill: {
+  conditions?: SkillConditions;
+  tags?: readonly string[];
+  tools?: readonly string[];
+}): ResolvedConditions {
+  const legacy = conditionsFromTags(skill.tags ?? []);
+  const declared = skill.conditions ?? {};
+  const hasFrontmatter =
+    declared.platforms !== undefined || declared.environments !== undefined || declared.domains !== undefined;
+  const hasTags =
+    legacy.platforms !== undefined || legacy.environments !== undefined || legacy.domains !== undefined;
+
+  // The frontmatter wins for each dimension it declares; a dimension it does not
+  // declare falls back to the tag, so a partially migrated skill is not narrowed.
+  const merged: {
+    platforms?: readonly string[];
+    environments?: readonly string[];
+    domains?: readonly string[];
+  } = {
+    ...(declared.platforms ?? legacy.platforms ? { platforms: declared.platforms ?? legacy.platforms } : {}),
+    ...(declared.environments ?? legacy.environments ? { environments: declared.environments ?? legacy.environments } : {}),
+    ...(declared.domains ?? legacy.domains ? { domains: declared.domains ?? legacy.domains } : {}),
+  };
+
+  const conflicts: string[] = [];
+  for (const key of ["platforms", "environments", "domains"] as const) {
+    if (declared[key] !== undefined && legacy[key] !== undefined && !sameSet(declared[key], legacy[key])) {
+      conflicts.push(`${key}: frontmatter [${declared[key]!.join(", ")}] vs tag [${legacy[key]!.join(", ")}]`);
+    }
+  }
+
+  const tools = skill.tools !== undefined && skill.tools.length > 0 ? { tools: skill.tools } : {};
+  const conditions: SkillConditions = { ...merged, ...tools };
+  const carrier: ResolvedConditions["carrier"] =
+    hasFrontmatter && hasTags ? "mixed" : hasFrontmatter ? "frontmatter" : hasTags ? "tags" : "none";
+
+  return {
+    conditions,
+    carrier,
+    ...(conflicts.length > 0
+      ? { conflict: `${conflicts.join("; ")} — the frontmatter wins` }
+      : {}),
+  };
 }
 
 /**

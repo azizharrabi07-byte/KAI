@@ -37,7 +37,8 @@
 import { Buffer } from "node:buffer";
 import { fail, ok, skillError } from "./errors.ts";
 import { parseFrontmatter } from "./frontmatter.ts";
-import type { ParsedSkill, SkillIssue, SkillIssueCode, SkillResult } from "./types.ts";
+import { SKILL_CONDITIONS_VERSION } from "./types.ts";
+import type { ParsedSkill, SkillConditions, SkillIssue, SkillIssueCode, SkillResult } from "./types.ts";
 
 export const SKILL_LIMITS = {
   /** Whole SKILL.md, bytes. */
@@ -52,6 +53,10 @@ export const SKILL_LIMITS = {
   constraintLength: 256,
   tags: 16,
   tagLength: 32,
+  /** At most this many entries per condition field (platforms/environments/domains). */
+  conditions: 8,
+  /** At most this many characters per condition value. */
+  conditionLength: 32,
 } as const;
 
 /** The frontmatter keys KAI understands. An unknown key is a refusal. */
@@ -64,12 +69,21 @@ export const ALLOWED_FRONTMATTER_KEYS: readonly string[] = [
   "version",
   "license",
   "tags",
+  // Explicit applicability conditions (contract v1). The `platform:`-style TAG
+  // convention is still read for backward compatibility, but these are the
+  // typed carrier and they win.
+  "platforms",
+  "environments",
+  "domains",
   "author",
   "homepage",
 ];
 
 /** A tool id a skill may name: dotted KAI ids (`filesystem.search`) and plain names. */
 const SKILL_TOOL_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+/** A condition value: a short, case-insensitive token such as `linux` or `ci`. */
+const SKILL_CONDITION_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
 
 const SKILL_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const RESERVED_WINDOWS_NAMES = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
@@ -308,6 +322,7 @@ export function parseSkillMarkdown(markdown: unknown, opts: { id?: string } = {}
   let version: string | undefined;
   let purpose: string | undefined;
   let tools: string[] = [];
+  let conditions: SkillConditions | undefined;
   let constraints: string[] = [];
   let tags: string[] = [];
 
@@ -401,6 +416,27 @@ export function parseSkillMarkdown(markdown: unknown, opts: { id?: string } = {}
       }
     }
 
+    // ── Applicability conditions (contract v1) ─────────────────────────────
+    // Parsed and VALIDATED, never guessed: a malformed entry is a refusal, so
+    // metadata is never silently discarded.
+    const conditionFields: { field: string; key: "platforms" | "environments" | "domains" }[] = [
+      { field: "platforms", key: "platforms" },
+      { field: "environments", key: "environments" },
+      { field: "domains", key: "domains" },
+    ];
+    const declared: { platforms?: readonly string[]; environments?: readonly string[]; domains?: readonly string[] } = {};
+    for (const { field, key } of conditionFields) {
+      const parsedList = parseStringList(fm.raw[field], {
+        max: SKILL_LIMITS.conditions,
+        maxItem: SKILL_LIMITS.conditionLength,
+        label: field,
+        itemRe: SKILL_CONDITION_RE,
+      });
+      issues.push(...parsedList.issues);
+      if (parsedList.items.length > 0) declared[key] = parsedList.items;
+    }
+    if (Object.keys(declared).length > 0) conditions = { ...declared };
+
     if (fm.closed && fm.body.trim().length === 0) {
       issues.push(issue("EMPTY_BODY", "skill body must not be empty"));
     }
@@ -427,5 +463,9 @@ export function parseSkillMarkdown(markdown: unknown, opts: { id?: string } = {}
   if (purpose !== undefined) parsed.purpose = purpose;
   if (tools.length > 0) parsed.tools = tools;
   if (constraints.length > 0) parsed.constraints = constraints;
+  if (conditions !== undefined) {
+    parsed.conditions = conditions;
+    parsed.conditionsVersion = SKILL_CONDITIONS_VERSION;
+  }
   return ok(parsed);
 }
