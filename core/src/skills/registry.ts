@@ -38,6 +38,14 @@ import type {
   SkillResult,
   SkillRevisionView,
 } from "./types.ts";
+import {
+  buildSkillIndex,
+  checkApplicability,
+  conditionsFromTags,
+  type ApplicabilityContext,
+  type IndexableSkill,
+  type SkillIndexSnapshot,
+} from "./applicability.ts";
 
 export interface SkillRegistry {
   register(input: { id: string; markdown: string; source?: string }): SkillResult<SkillRecord>;
@@ -56,7 +64,18 @@ export interface SkillRegistry {
    * Rank skills against a natural-language query from METADATA only and return
    * at most `limit` of them, best first. An empty query matches nothing.
    */
-  relevant(query: string, limit?: number): SkillMetadata[];
+  /**
+   * The best matches for a query. When a CONTEXT is given, a skill that is not
+   * applicable here is excluded — an ineligible skill is not a candidate, so it
+   * must not take a slot from one the run can actually use.
+   */
+  relevant(query: string, limit?: number, context?: ApplicabilityContext): SkillMetadata[];
+  /**
+   * A deterministic index snapshot for one execution context. Built once per
+   * turn, so a skill created or edited mid-turn cannot change which skills that
+   * turn is using.
+   */
+  snapshot(context: ApplicabilityContext, opts?: { maxEntries?: number }): SkillIndexSnapshot;
 }
 
 function toRevisionView(revision: StoredSkill["revisions"][number]): SkillRevisionView {
@@ -263,12 +282,40 @@ export function createSkillRegistry(opts: { store: SkillStore; now?: () => Date 
     return total;
   }
 
-  function relevant(query: string, limit = 5): SkillMetadata[] {
+  /** A stored skill, as the index sees it. One mapping, so both callers agree. */
+  function indexable(entry: StoredSkill): IndexableSkill {
+    return {
+      id: entry.id,
+      name: entry.name,
+      description: entry.description,
+      tags: entry.tags,
+      ...(entry.tools !== undefined ? { tools: entry.tools } : {}),
+      ...(entry.version !== undefined ? { version: entry.version } : {}),
+      source: entry.source,
+      sha256: entry.currentSha,
+      disabled: entry.disabled,
+    };
+  }
+
+  function snapshot(context: ApplicabilityContext, opts: { maxEntries?: number } = {}): SkillIndexSnapshot {
+    return buildSkillIndex(store.listSkills().map(indexable), context, {
+      ...(opts.maxEntries !== undefined ? { maxEntries: opts.maxEntries } : {}),
+    });
+  }
+
+  function relevant(query: string, limit = 5, context?: ApplicabilityContext): SkillMetadata[] {
     const tokens = tokenize(query);
     if (tokens.length === 0 || limit <= 0) return [];
     return store
       .listSkills()
       .filter((entry) => !entry.disabled)
+      .filter((entry) => {
+        if (context === undefined) return true;
+        const conditions = conditionsFromTags(entry.tags);
+        const withTools =
+          entry.tools !== undefined && entry.tools.length > 0 ? { ...conditions, tools: entry.tools } : conditions;
+        return checkApplicability(withTools, context).eligible;
+      })
       .map((entry) => ({ entry, value: score(entry, tokens) }))
       .filter((candidate) => candidate.value > 0)
       .sort((a, b) => (b.value - a.value) || (a.entry.name < b.entry.name ? -1 : a.entry.name > b.entry.name ? 1 : 0))
@@ -288,5 +335,6 @@ export function createSkillRegistry(opts: { store: SkillStore; now?: () => Date 
     enable,
     delete: remove,
     relevant,
+    snapshot,
   };
 }

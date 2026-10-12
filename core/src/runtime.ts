@@ -92,6 +92,7 @@ import { stripScheduleExtensions } from "./scheduler/schedule.ts";
 import { createDailySummaryService, type DailySummaryService } from "./summary/daily.ts";
 import { createCheckpointManager, type CheckpointManager } from "./checkpoints/checkpoint.ts";
 import { createExecutionLedger, type ExecutionLedger } from "./recovery/ledger.ts";
+import { createBudgetLedger } from "./orchestration/budget.ts";
 import { createBoundaryRunner } from "./recovery/boundary.ts";
 import { createMemoryService } from "./memory/service.ts";
 import {
@@ -340,6 +341,8 @@ export interface CoreRuntimeOptions {
     leasePath?: string;
     /** Recovery acceptance ledger (its own file). Default `<dbDir>/recovery-ledger.db`. */
     ledgerPath?: string;
+    /** Execution budget ledger (its own file). Default `<dbDir>/budget-ledger.db`. */
+    budgetPath?: string;
     /** KAI conversation sessions (their own file). Default `<dbDir>/kai-sessions.db`. */
     sessionsPath?: string;
     /** Plugin catalogue root (plugins.json + one dir per plugin). Default `<dbDir>/plugins`. */
@@ -1476,6 +1479,7 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   const skillsRoot = subsystemPaths.skillsRoot ?? underData("skills");
   const leasePath = subsystemPaths.leasePath ?? (dataDir !== undefined ? join(dataDir, "scheduler-leases.db") : ":memory:");
   const ledgerPath = subsystemPaths.ledgerPath ?? (dataDir !== undefined ? join(dataDir, "recovery-ledger.db") : ":memory:");
+  const budgetPath = subsystemPaths.budgetPath ?? (dataDir !== undefined ? join(dataDir, "budget-ledger.db") : ":memory:");
   const sessionsPath = subsystemPaths.sessionsPath ?? (dataDir !== undefined ? join(dataDir, "kai-sessions.db") : ":memory:");
   const subagentsPath = subsystemPaths.subagentsPath ?? (dataDir !== undefined ? join(dataDir, "kai-subagents.json") : undefined);
   // Governed subagent-memory shares persist beside the personas they concern, so a
@@ -2238,6 +2242,15 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   // runner; `createBoundaryRunner` implements the executor's StepRunner seam, so
   // executor.ts is untouched.
   const recovery = createExecutionLedger({ path: ledgerPath });
+  /**
+   * The AUTHORITATIVE execution budget. Its own file, like the recovery ledger,
+   * and its own owner id so a restart can tell which reservations died with the
+   * previous process. A reservation left behind by a dead owner is marked
+   * ABANDONED and STAYS debited: the operation may have had side effects, and
+   * restoring its budget would authorise a second one.
+   */
+  const budgetOwnerId = `core_${process.pid}_${Date.now().toString(36)}`;
+  const budgetLedger = createBudgetLedger({ path: budgetPath, ownerId: budgetOwnerId });
   /**
    * KAI's own conversation sessions (Phase F). Durable, per-user, and the
    * producer of the id the `session` memory scope binds to — which is why the
@@ -3956,6 +3969,16 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     // its content hash. A material edit to the plan makes the approval stale and
     // this refuses again — one authoritative check at the orchestration
     // boundary, so no caller can route around it.
+    budgetLedger,
+    goalBudgetFor: (goalId, goalRevisionId) => {
+      // The budgets in force are the APPROVED revision's, so a plan cannot widen
+      // its own allowance after approval.
+      const approval = goals.isApproved(goalId);
+      if (!approval.approved) return undefined;
+      const revision =
+        goalRevisionId !== undefined ? goals.getRevision(goalRevisionId) : approval.revision;
+      return revision?.content.budgets;
+    },
     goalGate: (goalId, goalRevisionId) => {
       const goal = goals.getGoal(goalId);
       if (goal === null) return { ok: false, reason: `no goal "${goalId}" exists` };
@@ -4315,6 +4338,17 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       // scheduler can fire: an abandoned run is a recovery decision, never a
       // silent replay, and never a goal that waits forever.
       recoverInterruptedWorkItems();
+      // Budget reservations a previous process left RESERVED are abandoned, and
+      // stay debited. Releasing them would restore consumed budget and authorise
+      // a second side effect for work that may already have run.
+      const abandoned = budgetLedger.reconcileOpen([budgetOwnerId]);
+      if (abandoned.length > 0) {
+        publish("budget.reconciled", {
+          abandoned: abandoned.length,
+          kinds: [...new Set(abandoned.map((r) => r.kind))],
+          note: "reservations left by a process that is no longer running stay debited",
+        });
+      }
       if (options.startScheduler !== false) scheduler.start();
 
       // Results that arrived while the Doer was OFF (or while the Core was
@@ -4378,6 +4412,11 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       }
       try {
         recovery.close();
+      } catch {
+        /* see above */
+      }
+      try {
+        budgetLedger.close();
       } catch {
         /* see above */
       }

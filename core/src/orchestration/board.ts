@@ -114,6 +114,16 @@ export interface WorkBoard {
   children(parentId: string): WorkItem[];
   /** Depth of an item: roots are 0. Unknown ids (or cycles) yield -1. */
   depthOf(id: string): number;
+  /**
+   * The ROOT of this item's corrective tree — the chain identity.
+   *
+   * Budget is scoped to the chain, not the item: `createChild` gives every child
+   * a fresh per-item allowance, so without a shared chain identity a parent could
+   * multiply its allowance by spawning siblings (they are all depth 1, so
+   * `maxDepth` never trips). Returns the item's own id when it has no parent, and
+   * "" for an unknown id.
+   */
+  chainRootOf(id: string): string;
   claim(id: string, workerId: string, workerVersion?: string): BoardResult<WorkItem>;
   heartbeat(id: string, step?: string, note?: string): BoardResult<WorkItem>;
   progress(id: string, label: string): BoardResult<WorkItem>;
@@ -303,6 +313,21 @@ export function createWorkBoard(store: WorkItemStore, opts: WorkBoardOptions = {
         current = parent;
       }
       return depth;
+    },
+
+    chainRootOf(id: string): string {
+      const seen = new Set<string>();
+      let current = load(id);
+      if (current === null) return "";
+      while (current.parentId !== undefined) {
+        if (seen.has(current.id)) return current.id;
+        seen.add(current.id);
+        if (seen.size > 1000) return current.id;
+        const parent = load(current.parentId);
+        if (parent === null) return current.id;
+        current = parent;
+      }
+      return current.id;
     },
 
     claim(id: string, workerId: string, workerVersion?: string): BoardResult<WorkItem> {

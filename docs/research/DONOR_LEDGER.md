@@ -1,157 +1,183 @@
 # Donor Ledger
 
-Every candidate KAI has investigated, with the evidence behind each row.
+Every candidate investigated, with the evidence behind each row.
 
-**Method note (honest, unchanged):** the plan called for six independent lanes. **The
-subagent mechanism is unavailable** — every spawned lane dies on the retired
-`nvidia/z-ai/glm-5.2` child model (HTTP 410), and the session-only override that fixes
-it needs the user's approval, which was not granted. So the six lenses below are ONE
-reviewer's findings, labelled as such, not six independent opinions. Where a lens
-needed evidence I could not obtain, it says so.
+**Method note (honest).** The plan called for six independent lanes. **The subagent
+mechanism is unavailable** — every spawned lane dies on the retired child model, and
+the session-only override needs the user's approval, which was not granted. So this is
+ONE reviewer's sequential source review, labelled as such. It is not six opinions, and
+no independent critic's verdict is invented.
 
-**REA's contribution:** REA was installed, pinned (6.4.0, MIT), registered with OMP and
-verified working. It contributed **nothing to these reviews**, and that is the correct
-outcome: every candidate here is an open-source repository whose complete source is
-available, and the REA skill itself says to read the source first. REA's providers for
-native/managed/APK work (Ghidra, IDA) are deliberately NOT installed. See
-`REA_DONOR_WORKFLOW.md`.
+**REA's contribution: nothing, correctly.** REA is installed, pinned (6.4.0, MIT),
+registered with OMP and verified working. It was not used for these reviews because
+every candidate is an open-source repository whose source is available, and the REA
+skill itself says to read the source first. REA's native providers are deliberately
+NOT installed. See `REA_DONOR_WORKFLOW.md`.
+
+**Licences were fetched from each repository, not taken from its README.**
 
 ---
 
-## Priority A — Hermes Agent (`NousResearch/hermes-agent`)
+## Priority A — Hermes Agent (`NousResearch/hermes-agent`) — IMPLEMENTED
 
-- **Identity:** `main` @ **`1fd182772671`** (2026-10-11T20:31:55Z), verified via the
-  GitHub commits API.
-- **Licence:** **MIT**, "Copyright (c) 2025 Nous Research" (fetched from `LICENSE`).
-- **Files inspected:** `agent/prompt_builder.py` (1883 lines),
-  `tools/skill_manager_tool.py` (925), `tools/skills_tool.py` (726). All three exist
-  on `main` (HTTP 200) — the brief's paths are current.
+- **Inspected commit:** `main` @ **`1fd182772671`** (2026-10-11T20:31:55Z).
+- **Licence:** MIT, "Copyright (c) 2025 Nous Research".
+- **Files read:** `agent/prompt_builder.py` (1883 lines), `agent/skill_utils.py` (866),
+  `tools/skill_manager_tool.py` (925), `tools/skills_tool.py` (726).
+  (`website/docs/.../skills.md` was rate-limited by GitHub and is NOT relied on.)
 
-### The mechanisms, from the source
+### Mechanisms, from the source
 
-1. **A compact skills INDEX, not bodies.** `prompt_builder.py:1265`
-   `_build_snapshot_entry(skill_file, skills_dir, frontmatter, description)` returns
-   `{name, description, platforms[], conditions}`. The prompt carries this index; a body
-   is loaded on demand. That is progressive disclosure as a data structure.
-2. **Applicability conditions.** `agent/skill_utils.py` provides
-   `extract_skill_conditions`, `skill_matches_platform`, `skill_matches_apps`,
-   `skill_matches_environment`, and `session_platforms` handling
-   (`prompt_builder.py:1297-1302`). A skill is indexed only when it matches the current
-   platform/app/environment and the available tools/toolsets — so an inapplicable skill
-   is never even offered.
-3. **Per-skill mutation locks.** `skill_manager_tool.py:84`
-   `_skill_lock_path(name)` puts the lock at `.usage.json.lock` **outside** the skill
-   directory, documented as "never inside the skill dir so delete/recreate cannot unlink
-   it under a lock". `_skill_mutation_lock` / `_skill_mutation_locks` serialise
-   mutations per skill.
-4. **Validation on write.** `_validate_name`, `_validate_category`,
-   `_validate_frontmatter(content, *, new_skill)` (name + description + non-empty body;
-   `new_skill` enforces index-truncation limits while edit/patch skip it so an
-   existing over-limit skill stays maintainable), `_validate_content_size`.
-5. **Security scanning of agent-created skills.** `_security_scan_skill(skill_dir)` runs
-   `scan_skill(skill_dir, source="agent-created")` and blocks a skill with dangerous
-   findings. Gated by `skills.guard_agent_created` (default **False** — opt-in).
-6. **Guards around destructive operations:** `_pinned_guard` (a pinned skill cannot be
-   deleted or overwritten), `_is_path_redirect` (symlink/redirect protection),
-   `_validate_delete_target`, `_background_review_read_before_write_guard` (read before
-   write), and curator/background-review delete guards.
-7. **Memory vs skill, kept distinct.** `build_memory_guidance(memory_enabled,
-   profile_enabled, skill_manage_available)` — the source comment states the intent:
-   "Keep the every-session memory scope even when task knowledge cannot be saved as a
-   skill."
-
-### Six lenses (one reviewer)
-
-| Lens | Finding |
+| Mechanism | Exact evidence |
 |---|---|
-| Technical fit | Closes KAI gap #6. KAI has a skills registry (`core/src/skills/registry.ts`) with metadata/body split and relevance scoring, but **no applicability conditions, no index snapshot, no per-skill lock, no scan of agent-created skills, and no pinned/redirect guards** |
-| Backend architecture | KAI's existing owner is the skill registry + `orchestration/learn.ts`. Hermes' mechanisms are *policy around* a registry, not a competing registry — they map onto KAI's existing boundary |
-| Reliability | Locks are the strongest evidence here: the lock file is deliberately OUTSIDE the skill dir so delete/recreate cannot unlink it. Validation happens before write |
-| Security | `scan_skill(source="agent-created")` + pinned/redirect guards. **Caveat: `skills.guard_agent_created` defaults to False**, so the scan is opt-in upstream — KAI must NOT copy that default |
-| Cost/operations | No new dependency: the mechanisms are pure TypeScript-sized ideas (a lock file, a frontmatter validator, an index entry) |
-| Licensing/maintainability | MIT; notices required if code is copied. The implementation is Python, so KAI **reimplements natively** rather than porting |
+| **Platform normalization** | `skill_utils.py:21` `PLATFORM_MAP = {"macos": "darwin", "linux": "linux", "windows": "win32"}`; `skill_matches_platform_list()` maps then prefix-matches `sys.platform`. Absent = all |
+| **Environment gate is OFFER-ONLY** | `skill_matches_environment()` — its own comment: "a *relevance* gate for offer surfaces (index, autocomplete, slash commands), not a compatibility gate: an explicit load (`skill_view`, `--skills`) always succeeds". Detection cached per process (`_ENV_DETECT_CACHE`) |
+| **App requirements fail CLOSED** | `skill_matches_apps()` — `requires_apps:` resolves through `declaration.lookup` + `availability(decl).offerable`; "An unknown name hides the skill (fail closed)" |
+| **Tier precedence + shadowing** | `TIER_PROJECT, TIER_LOCAL, TIER_CREATE_DIR, TIER_EXTERNAL = range(4)`; "Cross-directory precedence, lowest tier wins: trusted project > local profile > skills.create_dir > external". `get_skill_search_roots()` returns `(tier, dir)` in "the ONE ordering". A name owned by a higher tier is marked `shadowed`, `load_name=None`, warned once |
+| **Support dirs excluded** | `EXCLUDED_SKILL_DIRS`; `SKILL_SUPPORT_DIRS = ("references", "templates", "assets", "scripts")`; `is_excluded_skill_path()` / `is_skill_support_path()` |
+| **Config cache invalidation** | `_RAW_CONFIG_CACHE` keyed by a `(path, mtime, size, ino, …)` tuple from `_config_cache_key()` |
+| **Compact index** | `prompt_builder.py:1265` `_build_snapshot_entry()` → `{name, description, platforms[], conditions}`; the body is loaded on demand |
+| **Per-skill lock OUTSIDE the dir** | `skill_manager_tool.py:84` `_skill_lock_path()` → `.usage.json.lock`, "never inside the skill dir so delete/recreate cannot unlink it under a lock" |
+| **Validate before write** | `_validate_name`, `_validate_category`, `_validate_frontmatter(content, *, new_skill)`, `_validate_content_size` |
+| **Scan of agent-created skills** | `_security_scan_skill()` → `scan_skill(dir, source="agent-created")`; gated by `skills.guard_agent_created`, **default False (opt-in)** |
+| **Destructive-op guards** | `_pinned_guard`, `_is_path_redirect`, `_validate_delete_target`, `_background_review_read_before_write_guard` |
 
-**Verdict: Implement pattern natively** (index + applicability + per-skill lock +
-validation-before-write + scan-before-activate + pinned/redirect guards), with the
-scan ON by default rather than Hermes' opt-in default.
+### What KAI implemented, and where it deliberately differs
+
+**Implemented natively** (KAI's skills are a different subsystem; the implementation is
+TypeScript, not a port):
+
+| KAI file | Mechanism |
+|---|---|
+| `core/src/skills/scan.ts` | The security scan, **default ON with no off switch**. `CLEAN`/`WARNING`/`BLOCKED`/`ERROR`; the verdict is bound to the candidate's sha256. **`ERROR` is never `CLEAN`** — Hermes' `guard_agent_created=False` default and its fail-open exception path are both deliberately NOT copied |
+| `core/src/skills/lock.ts` | Per-skill lock in a sibling `.locks/` dir, named by a hash of the **canonical id** so `writing/summary` and `research/summary` cannot collide; stale/dead-pid locks are stolen and reported; a stolen lock is never deleted by its former owner |
+| `core/src/skills/applicability.ts` | Platform / environment / domain / tool conditions + a **deterministic index snapshot** (`snapshotId` = hash of `[id, sha256, eligible]`), bounded by `maxEntries` |
+
+**Deliberate differences, stated:**
+- **Conditions come from TAGS** (`platform:linux`, `env:ci`, `domain:research`), not new
+  frontmatter keys. First-class `platforms:` would need the parser allow-list,
+  `SkillMetadata`, the store schema and a migration to change together; the tag
+  convention delivers the behaviour today without touching stored data. **This is the
+  one place a Hermes mechanism is reproduced with a different carrier.**
+- **An unknown environment FAILS OPEN** (a known mismatch fails closed). Hermes reaches
+  the same conclusion from the other side. Failing closed on an unknown environment
+  would make every `env:ci` skill invisible in the ordinary case — a real bug caught
+  while writing this.
+- **The scan runs at BOTH stage and activation**, and activation re-verifies that the
+  recorded verdict is for the exact bytes being installed.
+
+**Not implemented (ranked, honest):** tier precedence and cross-tier shadowing. KAI's
+store has a single root, so tiers are a structural change rather than a mechanism to
+copy; recorded as the next adoption item.
+
+**Verdict: Native implementation inspired by the behaviour.** No Hermes code is copied;
+no notice obligation arises. Its Python runtime is not embedded.
 
 ---
 
-## Priority B — OpenCode (`anomalyco/opencode`)
+## Priority B — OpenCode (`anomalyco/opencode`) — PENDING (partial evidence)
 
-- **Identity:** branch `dev`; `LICENSE` fetched → **MIT**, "Copyright (c) 2025 opencode".
-- **KAI's actual adapter:** `core/src/agents/adapters/opencodeAdapter.ts` + client
-  `core/src/agents/opencode.ts`. It implements health/status/message/run_task/cancel_task
-  and **does not consume the SSE `GET /event` stream**.
-- **Source evidence:** **PENDING.** The event-payload shapes were not verified against
-  the source in this pass.
-- **Runtime evidence:** the CLI is installed (v1.18.35) but the service is **not
-  listening on `:4096`**; live tests skip with that named reason. Per the brief, the
-  integration is **not** marked verified while the service is unavailable.
-- **Six lenses:** technical fit is real (event-driven progress and result reconciliation);
-  the other five are **PENDING** on the same missing source/event evidence.
-- **Verdict: Pending** — missing evidence: the `GET /event` payload schema on the
-  current `dev` branch, and a running `:4096` service for a live reconciliation test.
-
----
-
-## Priority C — Coucou (`Louis-CFM/coucou`)
-
-- **Licence:** `LICENSE` → **MIT**, "Copyright (c) 2026 Louis Raillé".
-  `LICENSE-ASSETS.md` → "**All rights reserved**, except as stated below" for the name,
-  character and artwork.
-- **Source evidence:** **PENDING** — the relay/pipe implementation was not read in this
-  pass.
-- **Binding constraint regardless of findings:** **no asset, name, character, sound or
-  icon may be copied.** Mechanisms only.
-- **Verdict: Study only** for now. KAI's `KaiEventType` union and
-  `shared/runtime-events.ts` already define a canonical vocabulary, so the burden is on
-  Coucou to show a mechanism KAI lacks.
+- **Inspected:** `dev`, licence **MIT**, TypeScript, 212913 stars, pushed 2026-10-12.
+- **Verified from source:** the protocol is a real per-domain contract —
+  `packages/protocol/src/groups/` contains **30 group files**, including `event.ts`,
+  `session.ts`, `permission.ts`, `message.ts`, `skill.ts`, `rpc.ts`, `mcp.ts`, `agent.ts`,
+  `worktree.ts`, `shell.ts`, `fs.ts`. `packages/protocol/openapi.json` is generated
+  (118 paths, 282 schemas) and exposes **`/api/event`**.
+- **Why it is still PENDING:** `Event.SeqEncoded` and `V2EventEncoded` are declared as
+  `{"type": "string"}` — the event payloads are SSE-encoded strings, so the OpenAPI
+  document does **not** enumerate the event names or their fields. The event union lives
+  in `groups/event.ts`, which was not read in this pass.
+- **KAI's gap it could close:** `core/src/agents/opencode.ts` implements
+  health/status/message/run_task/cancel_task and does **not** consume `/api/event`, so
+  progress and terminal status are polled rather than streamed.
+- **Verdict: Pending.** Missing evidence: `packages/protocol/src/groups/event.ts` (the
+  event union and payload shapes), plus a live `:4096` service for a reconciliation test.
 
 ---
 
-## Priority D — Pi (`badlogic/pi-mono`)
-- **Licence:** **MIT**, "Copyright (c) 2025 Mario Zechner".
-- **Verdict: Pending** — the runtime/RPC contract was not verified; do not assume Pi
-  supplies subagents, plan approval or a permission architecture because it is extensible.
+## Priority C — Coucou (`Louis-CFM/coucou`) — CORRECTED
 
-## Priority E — OpenClaw (`openclaw/openclaw`)
-- **Licence:** **MIT**, "Copyright (c) 2026 OpenClaw Foundation".
-- **Verdict: Pending** on the loop's specific failure-handling patterns. KAI will not
-  import a second agent loop.
+- **Inspected:** `main`, licence **MIT** ("Copyright (c) 2026 Louis Raillé"), Swift, 4953
+  stars, pushed 2026-10-12. `LICENSE-ASSETS.md` reserves the name, character and artwork.
+- **The brief's premise is wrong, and this is the finding.** The brief asks to study
+  "hook relay, named-pipe/socket protocol, event normalization and session lifecycle".
+  `relay/` is **not a hook relay**: `relay/src/index.ts` is a single-file **Cloudflare
+  Worker** that signs Apple Push Notification requests, because the APNs key cannot ship
+  inside the Mac app. Its README states it forwards only the push token, the agent's
+  name/state/`"working · 3/7"` counts, and — while a command waits for approval — a
+  **SHA-256 fingerprint of that command**. "Never a project name, a command, a path or a
+  message. It stores nothing and logs nothing."
+- **The genuinely transferable mechanism** is that fingerprint: the Lock Screen's Allow
+  and Deny "answer that exact command", bound by hash. That is the same shape as KAI's
+  approval bound to a staged skill's sha256 — independent corroboration, not a new idea.
+- The hook / IPC mechanism, if any, is in the platform app directories
+  (`windows/`, `linux/`, `NotchBuddy/`, `android/`), which were not read.
+- **Verdict: Study only.** No asset, name, character, sound or icon may be copied.
 
-## Priority F — OpenHands SDK + Rakazo
-- **OpenHands SDK:** **MIT**, "Copyright (c) 2026 OpenHands contributors" (fetched).
-- **Rakazo (`vnavani/Grokbot`):** **Apache-2.0** (fetched) — permissive, with NOTICE
-  obligations if code is copied.
-- **Verdict: Pending** — the workspace/execution-provider separation and the
-  computer-runtime contract were not read. The reported warning that shared team folders
-  are not a security boundary matches KAI's own conclusion and must be quoted from source
-  before it is relied on.
+---
+
+## Priority D — Pi (`badlogic/pi-mono`) — MOVED
+
+- **Finding:** the repository has **moved** — `badlogic/pi-mono` returns HTTP 301 to
+  **`earendil-works/pi`** (MIT, TypeScript, 114572 stars, `main`). Any prior note that
+  cited the old path is stale.
+- **Verdict: Pending** at the new location. The RPC/SDK contract and event hooks were not
+  read; nothing about Pi may be assumed from its extensibility.
+
+---
+
+## Priority E — OpenClaw (`openclaw/openclaw`) — PENDING
+
+- **Inspected:** `main`, licence **MIT**, TypeScript, 391777 stars, pushed 2026-10-12.
+- **Verified:** the repository carries `THIRD_PARTY_NOTICES.md` and `SECURITY.md`
+  alongside `LICENSE` — licence hygiene worth copying as a practice. The tree includes
+  `.openclaw/`, `CHANGELOG` (no extension) and `Dockerfile`.
+- **Not read:** the tool-loop recovery, steering, batch admission and failure semantics
+  the brief names. **Verdict: Pending** on the loop's specific patterns. KAI will not
+  import a second agent loop regardless.
+
+---
+
+## Priority F — OpenHands SDK (`OpenHands/software-agent-sdk`) + Rakazo
+
+- **OpenHands SDK:** `main`, licence **MIT**, Python, 1244 stars, pushed 2026-10-12.
+  **Verified from source:** the repository is split into real packages —
+  `openhands-sdk/`, `openhands-tools/`, `openhands-workspace/`,
+  `openhands-agent-server/`, plus `clients/`, `examples/`, `tests/`. That separation is
+  the structure the brief asks about, and it is confirmed to exist rather than assumed.
+  The interfaces themselves were not read.
+- **Rakazo (`vnavani/Grokbot`):** `main`, licence **Apache-2.0** (permissive, with NOTICE
+  obligations). **Verified:** it is a real pnpm monorepo (`apps/`, `packages/`, `docs/`,
+  `infra/`, `AGENTS.md`, `SECURITY.md`) but has **0 stars and no detected language**, and
+  its last push was 2026-08-16. Treat it as an unvetted source, not an established one.
+- **Verdict: Pending** for both. Missing evidence: the workspace/provider interfaces.
+
+---
 
 ## Priority G — Grok-related projects
-| Repo | Licence (fetched) | Note |
-|---|---|---|
-| `Franzferdinan51/Grok-Build-Desktop-App` | **NONE — no LICENSE/COPYING/NOTICE at the root**; GitHub's licence API returns **404** | There is an `upstream/` directory, so vendored components would need separate checks. **No reuse permitted** until the owner clarifies |
-| `OnlyTerp/opengrok` | **MIT**, "Copyright (c) 2026 OnlyTerp" | A model-routing sidecar, not a coding-agent executor |
-| `LING71671/open-grokbot` | **GPL-3.0** (confirmed in the file) | Code reuse incompatible with distributing KAI as-is |
-| `ishandutta2007/open-grokbot` | not fetched | previously flagged for secrets/CORS/Docker defaults — unresolved |
 
-- **Verdict:** Grok Build Desktop **Reject** (no licence). open·grok **Pending**.
-  `LING71671/open-grokbot` **Study only**. `ishandutta2007/open-grokbot` **Pending** and
-  must not be a production donor without a separate security audit.
+| Repo | Branch | Licence (fetched) | Verdict |
+|---|---|---|---|
+| `Franzferdinan51/Grok-Build-Desktop-App` | — | **NONE** — no LICENSE/COPYING/NOTICE at the root; GitHub's licence API 404; an `upstream/` dir exists | **Reject** — no reuse permitted until the owner clarifies |
+| `OnlyTerp/opengrok` | main | **MIT**, JS, 477 stars, pushed 2026-09-22 | **Pending** — a model-routing sidecar, not an executor |
+| `LING71671/open-grokbot` | main | **GPL-3.0**, TS, 18 stars | **Study only** — GPL code cannot enter KAI without an explicit licensing decision |
+| `ishandutta2007/open-grokbot` | main | **MIT**, Python, 8 stars, pushed 2026-08-13 | **Pending** — permissive licence, but previously flagged for secrets/CORS/Docker defaults and not security-audited |
 
-## Priority H — LobeHub (`lobehub/lobehub`)
-- **Licence:** `canary/LICENSE` → "**LobeHub Community License** ... All rights reserved."
-  (fetched).
-- **Verdict: Study only.** Architecture study and code reuse are separate decisions, and
-  this licence has not been resolved for distribution.
+The three are **distinct projects** and are not conflated.
 
 ---
 
-## What would close the PENDING rows
+## Priority H — LobeHub (`lobehub/lobehub`)
 
-Each row names its missing evidence above. The cheapest next step is a **new OMP session**
-(the registered REA tools load there) plus a working `smol` role, which would let the six
-lanes run as designed — but the source reading is what produces the findings, and it needs
-no subagents.
+- **Licence:** "**LobeHub Community License** … All rights reserved." — **not** MIT.
+- **Verdict: Study only.** Architecture study and code reuse are separate decisions, and
+  this licence is unresolved for distribution.
+
+---
+
+## What remains, and what would close it
+
+Every PENDING row names its missing evidence above. The cheapest next step is to read the
+specific files named (`groups/event.ts`, Coucou's platform dirs, OpenClaw's loop,
+OpenHands' interfaces) — none of which needs a subagent. A new OMP session with a working
+child model would additionally let the six lanes run as designed.

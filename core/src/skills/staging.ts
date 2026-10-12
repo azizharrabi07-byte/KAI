@@ -39,6 +39,7 @@ import { fail, guard, ok, skillError } from "./errors.ts";
 import { sha256Hex } from "./hash.ts";
 import type { SkillStore, StagedMeta, StoredSkill } from "./store.ts";
 import { isSafeSkillId, parseSkillMarkdown, validateSkillId } from "./validate.ts";
+import { scanAllowsActivation, scanSkill } from "./scan.ts";
 import type {
   InstallReceipt,
   SkillResult,
@@ -155,6 +156,23 @@ export function createSkillStaging(opts: {
       const parsed = parseSkillMarkdown(input.markdown, { id: input.id });
       if (!parsed.ok) return parsed;
 
+      // ── The security scan, default ON ──────────────────────────────────────
+      // It runs on the EXACT candidate bytes, and its verdict is persisted with
+      // them. A BLOCKED or ERROR candidate is refused here so it never even
+      // becomes stageable; activation re-checks the recorded verdict, so the
+      // scan is not the only thing standing between a skill and the prompt.
+      const verdict = scanSkill({ id: input.id, markdown: input.markdown }, { now });
+      if (!scanAllowsActivation(verdict, { allowWarning: true })) {
+        return fail(
+          skillError(
+            "POLICY_DENIED",
+            `skill "${input.id}" refused by the security scan: ${verdict.reason}`,
+            now,
+            "SCAN_REFUSED",
+          ),
+        );
+      }
+
       const sha256 = sha256Hex(input.markdown);
       const stagedId = idFactory();
       if (!isSafeSkillId(stagedId)) {
@@ -172,6 +190,20 @@ export function createSkillStaging(opts: {
         name: parsed.value.name,
         description: parsed.value.description,
         tags: [...parsed.value.tags],
+        scan: {
+          outcome: verdict.outcome,
+          sha256: verdict.sha256,
+          reason: verdict.reason,
+          scannedAt: verdict.scannedAt,
+          findings: verdict.findings.map((f) => ({
+            code: f.code,
+            severity: f.severity,
+            message: f.message,
+            evidence: f.evidence,
+            ...(f.line !== undefined ? { line: f.line } : {}),
+          })),
+          ...(verdict.error !== undefined ? { error: verdict.error } : {}),
+        },
       };
       store.stageWrite(meta, input.markdown);
       return ok({ stagedId, sha256, skillId: input.id });
@@ -278,6 +310,45 @@ export function createSkillStaging(opts: {
               `refusing to install bytes the human did not approve`,
             now,
             "HASH_MISMATCH",
+          ),
+        );
+      }
+
+      // ── The scan verdict, re-checked AT ACTIVATION ────────────────────────
+      // The stage-time refusal is a courtesy; THIS is the gate. The verdict must
+      // exist, must have been taken on these exact bytes, and must permit
+      // activation. A WARNING is permitted because activation already requires an
+      // approval bound to this sha256 — the human decision IS the review, and the
+      // warning is recorded and shown with the request. BLOCKED and ERROR are not
+      // permitted, and an ERROR is never read as clean.
+      const recorded = meta.scan;
+      if (recorded === undefined) {
+        return fail(
+          skillError(
+            "POLICY_DENIED",
+            `staged skill "${input.stagedId}" carries no security verdict; re-stage it so the exact bytes can be scanned`,
+            now,
+            "SCAN_MISSING",
+          ),
+        );
+      }
+      if (recorded.sha256 !== actual) {
+        return fail(
+          skillError(
+            "POLICY_DENIED",
+            `the recorded security verdict for "${input.stagedId}" is for different bytes than the candidate; re-stage it`,
+            now,
+            "SCAN_MISMATCH",
+          ),
+        );
+      }
+      if (!scanAllowsActivation(recorded, { allowWarning: true })) {
+        return fail(
+          skillError(
+            "POLICY_DENIED",
+            `the security scan does not permit activating "${meta.skillId}": ${recorded.reason}`,
+            now,
+            "SCAN_REFUSED",
           ),
         );
       }

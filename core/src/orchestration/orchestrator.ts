@@ -58,6 +58,19 @@ import {
   type OutcomeContract,
 } from "./outcome.ts";
 import type { VerifiedEvidence } from "./types.ts";
+import type { GoalBudgets } from "../goals/goal.ts";
+import type { BudgetLedger, BudgetLimits } from "./budget.ts";
+
+/**
+ * A per-attempt nonce, so two INDEPENDENT calls for the same item take two
+ * debits. A duplicate DELIVERY is identified by its event id instead, and reuses
+ * that key — the distinction is what makes redelivery free and a re-run paid.
+ */
+let budgetAttempts = 0;
+function budgetNonce(): string {
+  budgetAttempts += 1;
+  return `${budgetAttempts.toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
 import { decideAction, type DecisionProvider, type JevBudget } from "./decision.ts";
 
 /** The corrective actions a provider may rank (all legal by construction). */
@@ -131,6 +144,17 @@ export interface OrchestratorDeps {
    * runtime has no goal layer and goal-linked items are not gated.
    */
   goalGate?: (goalId: string, goalRevisionId: string | undefined) => { ok: boolean; reason: string };
+  /**
+   * The AUTHORITATIVE execution budget. Absent → the per-item retry ledger still
+   * binds, but the goal-wide rollup does not, so a caller that creates a new item
+   * for the same goal revision is not capped here.
+   */
+  budgetLedger?: BudgetLedger;
+  /**
+   * The budgets of the approved plan revision, when the goal layer is present.
+   * Used ONLY to derive the goal-wide dispatch ceiling.
+   */
+  goalBudgetFor?: (goalId: string, goalRevisionId: string | undefined) => GoalBudgets | undefined;
   publish(type: string, payload: unknown, opts?: { source?: string }): void;
   now?(): string;
   /** KAI's own tools for evidence collection (absent → supervision degrades honestly, never invents). */
@@ -1259,8 +1283,31 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       return { workItemId: id, state: "BLOCKED", note: refusal };
     }
 
+    // ── EXECUTION BUDGET, ENFORCED AT THE SAME BOUNDARY (per GOAL REVISION) ──
+    // The item ledger above bounds ONE item. This bounds the revision: every
+    // item of the approved plan draws on one allowance, so a corrective child or
+    // a caller that creates a NEW item cannot mint a fresh one. Reserved BEFORE
+    // the claim, so an interrupted dispatch is never replayed for free.
+    let reservedId = "";
+    if (!resumingParkedDispatch) {
+      const reserved = reserveDispatch(id, item, dedupeKey);
+      if (!reserved.ok) {
+        emit("budget.refused", { workItemId: id, workerId, reason: reserved.reason });
+        deps.board.block(id, reserved.reason);
+        recordNextAction(id, "STOP", reserved.reason, "blocked");
+        return { workItemId: id, state: "BLOCKED", note: reserved.reason };
+      }
+      reservedId = reserved.reservationId;
+    }
+
     const claimed = deps.board.claim(id, workerId);
-    if (!claimed.ok) return { workItemId: id, state: item.state, note: claimed.reason };
+    if (!claimed.ok) {
+      // Nothing was dispatched, so the reservation is REWOUND rather than
+      // burned. Only a reservation whose operation provably never ran may be
+      // released; a refusal to claim is exactly that.
+      if (reservedId !== "") deps.budgetLedger?.release(reservedId, "the item could not be claimed, so nothing was dispatched");
+      return { workItemId: id, state: item.state, note: claimed.reason };
+    }
     if (!resumingParkedDispatch) appendDispatch(id, workerId);
     deps.trace.record(ref(claimed.value), "worker", `${workerId} working`);
     emit("worker.started", { workItemId: id, workerId });
@@ -1270,12 +1317,15 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     // policy-governed delegate port.
     const gate = await deps.policyCheck({ toolId: "agents.run_task", action: `run ${workerId} on objective`, risk: "EXTERNAL" });
     if (gate.outcome === "deny") {
+      // The worker never ran, so the dispatch budget is rewound.
+      if (reservedId !== "") deps.budgetLedger?.release(reservedId, "policy denied the delegation before the worker ran");
       deps.board.block(id, `policy denied delegation: ${gate.reason}`);
       deps.trace.record(ref(claimed.value), "error", `Blocked: ${gate.reason}`);
       return { workItemId: id, state: "BLOCKED", note: `Policy denied delegation: ${gate.reason}` };
     }
     const verdict = autoVerdict(policy, "delegate", "EXTERNAL");
     if (verdict === "OFF") {
+      if (reservedId !== "") deps.budgetLedger?.release(reservedId, "delegation is disabled by autonomy policy");
       deps.board.block(id, "delegation disabled by autonomy policy");
       return { workItemId: id, state: "BLOCKED", note: "Delegation is OFF." };
     }
@@ -1701,6 +1751,63 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       out.push({ workerId, kind, at: typeof record["at"] === "string" ? record["at"] : nowIso() });
     }
     return out;
+  }
+
+  /**
+   * RESERVE the goal-wide dispatch allowance, before anything is claimed.
+   *
+   * This is the boundary the per-item retry ledger could not be: that ledger is
+   * scoped to ONE item, so a corrective child — or any caller that created a NEW
+   * item for the same goal revision — arrived with a fresh allowance. `maxDepth`
+   * does not close it either: siblings of one parent are all depth 1.
+   *
+   * The reservation is taken BEFORE the claim, so a crash mid-dispatch cannot
+   * replay the work for free. A genuine duplicate delivery (a resume/approval
+   * event id) reuses its idempotency key and takes NO second debit; a fresh call
+   * with no event id is a new attempt and DOES debit.
+   */
+  function reserveDispatch(
+    id: string,
+    item: WorkItem,
+    dedupeKey: string | undefined,
+  ): { ok: true; reservationId: string } | { ok: false; reason: string } {
+    const ledger = deps.budgetLedger;
+    if (ledger === undefined) return { ok: true, reservationId: "" };
+
+    const goal =
+      item.goalId !== undefined ? deps.goalBudgetFor?.(item.goalId, item.goalRevisionId) : undefined;
+    const limits: BudgetLimits = {};
+    if (goal !== undefined) {
+      // The approved revision's allowance, rolled up across EVERY item of the
+      // revision: each task may spend its initial attempt plus its retries, and
+      // that total is the ceiling no caller can raise by adding items.
+      limits.maxDispatches = Math.max(1, goal.maxTasks * (1 + goal.maxRetries));
+      limits.maxCorrections = Math.max(0, goal.maxTasks * goal.maxRetries);
+      limits.maxReplans = Math.max(0, goal.maxDepth);
+    }
+
+    const scope = {
+      ...(item.goalId !== undefined ? { goalId: item.goalId } : {}),
+      ...(item.goalRevisionId !== undefined ? { planRevisionId: item.goalRevisionId } : {}),
+      chainId: deps.board.chainRootOf(id) || id,
+    };
+    const attempt = dispatchLedger(item).length + 1;
+    const idempotencyKey =
+      dedupeKey !== undefined
+        ? `budget:${id}:${dedupeKey}`
+        : `budget:${id}:attempt:${attempt}:${budgetNonce()}`;
+
+    const reserved = ledger.reserve({
+      scope,
+      kind: "dispatch",
+      limits,
+      idempotencyKey,
+      itemId: id,
+      detail: `dispatch attempt ${attempt} for ${id}`,
+    });
+    if (reserved.ok) return { ok: true, reservationId: reserved.reservation.id };
+    deps.trace.record(ref(item), "error", reserved.reason);
+    return { ok: false, reason: reserved.reason };
   }
 
   /** The item's effective ceilings, and what its ledger has already consumed. */

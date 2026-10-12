@@ -92,6 +92,42 @@ The gap between "approved plan" and "work actually runs" is closed.
   Core state, with four separate sections for assigned tasks, worker-reported
   results, KAI-observed activity and KAI-performed verification.
 
+### One authoritative execution budget
+
+The retry ceiling was enforced PER WORK ITEM, from that item's own dispatch ledger.
+That is necessary and it was not enough: a corrective child — or any caller that created
+a NEW item for the same goal revision — arrived with a fresh allowance, so one goal could
+spend unbounded attempts while every individual item stayed inside its own limit.
+`maxDepth` did not close it either: ten children of one parent are all depth 1.
+
+`core/src/orchestration/budget.ts` is the missing authority. It is durable (its own
+SQLite file), scoped to `(goalId, planRevisionId, chainId)` with the allowance rolled up
+to the REVISION, reserved **before** the claim, idempotent per event id, and it never
+restores what was spent: `release` rewinds only a reservation whose operation provably
+never ran, and a reservation abandoned by a dead process is marked `ABANDONED` and stays
+debited. `runWorkItem` consults it at the same boundary the goal gate uses, so no caller
+can bypass it by entering through a new door.
+
+Proven by `core/tests/execution-budget.test.ts` (13) and
+`core/tests/execution-budget-boundary.test.ts` (6): six new items in one revision share
+ONE allowance; a redelivered event takes no second debit; an approved REPLAN is the only
+way to get more; a policy denial before any effect gives its budget back.
+
+### Skills: scanned, locked, applicable, and snapshotted
+
+- `core/src/skills/scan.ts` — the security scan, **default ON**. `CLEAN`, `WARNING`,
+  `BLOCKED`, `ERROR`, with the verdict bound to the candidate's sha256. `ERROR` is never
+  `CLEAN`: a scanner that fails means "do not activate". The first version of this
+  scanner blocked KAI's own `connector-workflow` built-in, which says *"Never … skip …
+  policy, approval"* — a prohibition read as an instruction. Negation awareness was added,
+  and EVERY match is evaluated, so a `never` elsewhere cannot hide a real instruction.
+- `core/src/skills/lock.ts` — per-skill locks in a sibling `.locks/` dir, named by a hash
+  of the canonical id, so `writing/summary` and `research/summary` cannot collide and a
+  skill's own delete/recreate cannot free its lock.
+- `core/src/skills/applicability.ts` — platform / environment / domain / tool conditions
+  plus a deterministic index snapshot (`snapshotId` = hash of `[id, sha256, eligible]`),
+  so a turn holds one index and a mid-turn edit cannot change which skills it is using.
+
 ### An interrupted run is reconciled, not stranded
 
 Found by inspecting the REAL interrupted run (`kai-run-db-mv4231ukyi7y`): its work item

@@ -78,6 +78,19 @@ export interface StagedMeta {
   name: string;
   description: string;
   tags: string[];
+  /**
+   * The security verdict for THESE bytes, recorded at stage time and re-checked
+   * at activation. `sha256` inside it is the hash of the scanned candidate, so a
+   * verdict can never be carried over to different bytes.
+   */
+  scan?: {
+    outcome: "CLEAN" | "WARNING" | "BLOCKED" | "ERROR";
+    sha256: string;
+    reason: string;
+    scannedAt: string;
+    findings: { code: string; severity: "warning" | "blocked"; message: string; evidence: string; line?: number }[];
+    error?: string;
+  };
 }
 
 /** Test/observability seams. Production passes neither. */

@@ -266,7 +266,12 @@ export type KaiEventType =
   // A human decision on a `human review:` criterion, and the pause that precedes
   // it. Both persist: who decided what, and when a goal parked on a person.
   | "goal.awaiting_user"
-  | "goal.review_decided";
+  | "goal.review_decided"
+  // The execution budget: a refusal is an operational fact (a goal stopped on a
+  // spent allowance) and a reconciliation is an audit fact (budget consumed by a
+  // process that died). Both outlive the process, so both persist.
+  | "budget.refused"
+  | "budget.reconciled";
 
 export interface KaiEvent<T = unknown> {
   id: string;
@@ -316,6 +321,8 @@ export const PERSISTED_EVENT_TYPES: readonly KaiEventType[] = [
   "worker.cancelled",
   "review.requested",
   "review.decided",
+  "budget.refused",
+  "budget.reconciled",
   "delegation.routed",
   "benchmark.updated",
   // Command lifecycle persists (started/exit); stdout/stderr chunks stay live.
