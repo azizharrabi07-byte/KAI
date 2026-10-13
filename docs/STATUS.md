@@ -176,6 +176,28 @@ pass Guard — enabling it silently would let a critic reach a worker unapproved
   Measured tokens (hermes and codex parse them; opencode reports none) are debited
   to the durable budget under a `token` kind, idempotently per report id.
 
+### The authoritative backend state lives in one report
+
+`docs/reports/KAI_BACKEND_STATE.md` is the single, audited answer to "what is KAI
+actually, right now". It was written by inspecting the source and running the checks,
+not by repeating earlier reports — those disagreed about commit state and mixed
+implemented features with mock-only tests.
+
+It covers, with evidence for each: repository and version truth; the traced goal
+lifecycle and the authoritative owner of every state transition; an 18-row
+implementation matrix (runtime-verified / integration-tested / mock-only / partial /
+missing / externally blocked); security findings including the 125-route
+authorization surface; honest resource-limit accounting; a per-adapter integration
+matrix; the learning system's real capability; and the actual test results with
+every skip reason.
+
+**Two corrections it makes to earlier reporting.** The OpenCode event-stream gap is
+narrower than reported: the *client* exposes `async *events()` and **no caller uses
+it**, and the adapter's `prompt()` is synchronous — so the gap is a missing consumer,
+not a missing capability. And the learning loop is **not automatic**:
+`recordSkillUsage` fires on every outcome, but `proposeFromTask` is reached only from
+the `/refine` command.
+
 ### One authoritative execution budget
 
 The retry ceiling was enforced PER WORK ITEM, from that item's own dispatch ledger.
