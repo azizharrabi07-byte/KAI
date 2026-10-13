@@ -168,15 +168,18 @@ test("LIVE HTTP: POST parks without approval, executes with one, GET reports sou
 
   const decided = await post(`/approvals/${parked.body.approvalId}/decide`, { approved: true });
   assert.equal(decided.status, 200);
-  const applied = await post("/settings", { "model.name": "approved-model", approvalId: parked.body.approvalId });
+  // The SAME change the human approved. An approval binds to the exact input now,
+  // so re-issuing with a different value is refused — the human approved
+  // "parked-model", and "parked-model" is what runs.
+  const applied = await post("/settings", { "model.name": "parked-model", approvalId: parked.body.approvalId });
   assert.equal(applied.status, 200);
 
   const got = (await (await fetch(`${base}/settings`)).json()) as {
     stored: Array<{ key: string; value: string }>;
     effective: { values: { name: string }; sources: { name: string } };
   };
-  assert.ok(got.stored.some((row) => row.key === "model.name" && row.value === "approved-model"));
-  assert.equal(got.effective.values.name, "approved-model");
+  assert.ok(got.stored.some((row) => row.key === "model.name" && row.value === "parked-model"));
+  assert.equal(got.effective.values.name, "parked-model");
   assert.equal(got.effective.sources.name, "settings");
 });
 

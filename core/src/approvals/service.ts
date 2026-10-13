@@ -70,6 +70,8 @@ export interface ApprovalRequestInput {
   missionId?: string;
   stepId?: string;
   ttlMs?: number;
+  /** A stable hash of the exact input the human is being asked about. */
+  inputHash?: string;
 }
 
 export interface ApprovalService {
@@ -218,6 +220,7 @@ export function createApprovalService(opts: {
     };
     if (input.missionId !== undefined) approval.missionId = input.missionId;
     if (input.stepId !== undefined) approval.stepId = input.stepId;
+    if (input.inputHash !== undefined) approval.inputHash = input.inputHash;
 
     store.createApproval(approval);
     emit("approval.requested", approval);

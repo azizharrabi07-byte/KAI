@@ -128,6 +128,52 @@ function isAdapterFailure(value: unknown): value is AdapterFailure {
   );
 }
 
+
+/** How many event ids one run remembers for dedupe. Bounded on purpose. */
+const MAX_SEEN_EVENTS = 512;
+
+/**
+ * The session an event belongs to, when it names one.
+ *
+ * OpenCode nests the interesting fields under `properties`, and the key has been
+ * spelled more than one way across versions, so every spelling is accepted. A
+ * `null` means "the event did not say" — which is NOT the same as "another
+ * session", and those events are still surfaced.
+ */
+function sessionOfEvent(event: Record<string, unknown>): string | null {
+  const props = asRecord(event["properties"]);
+  for (const key of ["sessionID", "sessionId", "session_id"]) {
+    const direct = asString(event[key]);
+    if (direct !== null) return direct;
+    const nested = asString(props[key]);
+    if (nested !== null) return nested;
+  }
+  return null;
+}
+
+/** A short, non-secret summary of an event, for the KAI bus. */
+function summarizeEvent(event: Record<string, unknown>): Record<string, unknown> {
+  const props = asRecord(event["properties"]);
+  const out: Record<string, unknown> = {};
+  const status = asRecord(props["status"]);
+  const kind = asString(status["type"]) ?? asString(props["status"]) ?? asString(event["status"]);
+  if (kind !== null) out.status = kind;
+  const name = asString(props["name"]) ?? asString(props["tool"]) ?? asString(event["name"]);
+  if (name !== null) out.name = name;
+  const messageId = asString(props["messageID"]) ?? asString(props["messageId"]);
+  if (messageId !== null) out.messageId = messageId;
+  return out;
+}
+
+/** A stable dedupe key for an event: its id when it has one, else its shape. */
+function dedupeKeyOf(event: Record<string, unknown>): string {
+  const props = asRecord(event["properties"]);
+  const id = asString(event["id"]) ?? asString(props["id"]);
+  if (id !== null) return id;
+  const type = asString(event["type"]) ?? "?";
+  return `${type}:${sessionOfEvent(event) ?? "-"}:${JSON.stringify(summarizeEvent(event))}`;
+}
+
 export function createOpenCodeAdapter(options: OpenCodeAdapterOptions = {}): AgentAdapter {
   const baseUrl = (options.baseUrl ?? "http://127.0.0.1:4096").replace(/\/+$/, "");
   const timeoutMs = options.timeoutMs ?? 10_000;
@@ -156,6 +202,45 @@ export function createOpenCodeAdapter(options: OpenCodeAdapterOptions = {}): Age
       /* an event sink must never break an agent call */
     }
   };
+
+  /**
+   * Consume the session's LIVE event stream for the life of one run.
+   *
+   * The client has always exposed `events()`; nothing called it, so KAI learned
+   * only "working" and then "idle". This pump closes that: progress events reach
+   * the KAI bus while the turn is still running.
+   *
+   * Four rules, all of them about not making things worse:
+   *   - it is ADVISORY. A stream that dies mid-run must not fail a turn that
+   *     otherwise completed, so every failure is swallowed here.
+   *   - it is BOUNDED. Dedupe memory is capped; past the cap events are still
+   *     forwarded and simply stop being deduped, rather than growing forever.
+   *   - it is SCOPED. Events naming another session are dropped; events naming no
+   *     session are kept (an unnamed event is not evidence of another session).
+   *   - it is CLEANED UP. The caller aborts it in `finally`, so a finished run
+   *     leaves no generator holding the connection open.
+   */
+  function startEventPump(sessionId: string, controller: AbortController): void {
+    void (async () => {
+      const seen = new Set<string>();
+      try {
+        for await (const raw of client.events(controller.signal)) {
+          const event = asRecord(raw);
+          const type = asString(event["type"]);
+          if (type === null) continue;
+          const owner = sessionOfEvent(event);
+          if (owner !== null && owner !== sessionId) continue;
+          const key = dedupeKeyOf(event);
+          if (seen.has(key)) continue;
+          if (seen.size < MAX_SEEN_EVENTS) seen.add(key);
+          emit("agent.progress", { id: "opencode", sessionId, type, ...summarizeEvent(event) });
+        }
+      } catch {
+        // Advisory only: a broken or closed stream is not a failed run.
+      }
+    })();
+  }
+
 
   function resultState(
     taskId: string,
@@ -292,6 +377,10 @@ export function createOpenCodeAdapter(options: OpenCodeAdapterOptions = {}): Age
       }
 
       activeRuns.set(session.id, { startedAt, input: task.input });
+      // Progress is advisory and outlives nothing: the pump is scoped to this
+      // session and aborted in the `finally` below.
+      const eventStream = new AbortController();
+      startEventPump(session.id, eventStream);
       emit("agent.status_changed", { id: "opencode", state: "working", sessionId: session.id });
       try {
         // prompt() is synchronous: it resolves once the turn is done.
@@ -339,6 +428,7 @@ export function createOpenCodeAdapter(options: OpenCodeAdapterOptions = {}): Age
         }
         return resultState(task.id, "failed", startedAt, { error });
       } finally {
+        eventStream.abort();
         activeRuns.delete(session.id);
         emit("agent.status_changed", { id: "opencode", state: "idle", sessionId: session.id });
       }

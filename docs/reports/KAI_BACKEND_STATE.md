@@ -507,3 +507,163 @@ than showing a number. What it still cannot do: **consume a worker's live events
 stream exists and has no caller), **count tool calls** (so `maxToolCalls` is unenforceable),
 **measure its critics against a real model**, **enforce a wall-clock limit preemptively**, and
 **propose a skill without being asked** — `recordSkillUsage` is automatic, `/refine` is not.
+
+---
+
+# Campaign report — backend completion pass
+
+Second audit pass, same branch, after implementing against this report.
+
+## 1. Commit and branch state
+
+| Fact | Value |
+|---|---|
+| Branch | `feat/goal-executive` |
+| HEAD before this pass | `dd1e8cc11fa65d7e83b642958d96e36b91fe3799` |
+| Push | **BLOCKED** — no valid GitHub credential on this machine (env token 401; `~/.env` holds the same dead token; no cached GCM entry; no SSH key; `gh` unauthenticated) |
+| `main` / `review/supervisor-trust` / `a1-wiring` stash | untouched |
+
+## 2. Changed files in this pass
+
+**Security**
+- `src/shared/contracts.ts` — `Approval.inputHash`
+- `src/storage/schema.ts` — **migration v6**: `ALTER TABLE approvals ADD COLUMN inputHash`
+- `src/storage/sqlite.ts` — persist/read `inputHash`
+- `src/approvals/service.ts` — accept + store it
+- `src/tools/registry.ts` — `stableHash()`; pass it when parking; **refuse a mismatch at consumption**
+- `tests/security-invariants.test.ts` (new, 7 tests)
+
+**OpenCode events**
+- `src/agents/adapters/opencodeAdapter.ts` — the event pump (bounded, deduped, session-scoped, aborted in `finally`)
+- `src/lib/sse.ts` — **an abort now releases a parked read**
+- `tests/opencode-events.test.ts` (new, 7 tests)
+
+**Test isolation**
+- `scripts/test.mjs` — isolation attempted, measured, reverted; the measurement is recorded in the file
+
+## 3. Status of every campaign criterion
+
+| # | Criterion | Status |
+|---|---|---|
+| A.1 | Every protected action has an authorization/policy boundary | **Done** — 125 routes / 145 authz entries; `tools.invoke` policy-checks centrally (`registry.ts` line 610) |
+| A.2 | No alternate internal path silently bypasses Guard | **Done + tested** — routes, commands and MCP all go through `tools.invoke`; the drift guard proves the ids resolve |
+| A.3 | Tests for forged/stale approvals, replayed events, internal bypass | **Done** — 7 new tests; **found and fixed a real gap** |
+| A.4 | Dev mode cannot disable Guard/policy/budget/approvals | **Done + pinned** — by inspection `devMode` appears only in `authz.ts`/`routes.ts`/`server.ts`; a test proves a DESTRUCTIVE route still parks under dev mode |
+| A.5 | Validate the shipped Rust→Core credential | **Not done** — the code path was read; the installed credential was not exercised (no packaged runtime to test against) |
+| A.6 | Doer OFF halts autonomous dispatch, Guard stays ON | **Already true, unchanged** — `doerEnabled()` is read live; `/doer` parks for approval |
+| B | Real OpenCode events | **Done** — pump implemented + 7 deterministic fake-SSE tests. **Live OpenCode not available**, so no live evidence |
+| C | `maxToolCalls` / `maxCostUsd` / `maxRuntimeMs` enforced | **Not done this pass** — see §7 |
+| D | Autonomous learning loop | **Not done this pass** — see §8 |
+| E | Real-model critic path | **Not done this pass** |
+| F | `KAI_HOME` test isolation | **Attempted, measured, reverted** — see §6 |
+| G | Goal-execution + unwired-items audit | **Audited** (first pass); no new wiring |
+| H | Adapter honest reporting | **Done** (first pass) — matrix in §F above |
+| I | Workstation/CUA readiness | **Not done** — `cua-driver` absent; live tests opt-in |
+
+## 4. Security — the gap this pass FOUND and FIXED
+
+**Before:** an approval bound to a **tool id and nothing else**. A real "yes" to
+*restore checkpoint A into dir X* could be spent on *restore checkpoint B into dir Y* — the
+human approved one action and a different one ran. The skill-install path already bound to a
+sha256; the tool path did not.
+
+**After:** the approval records `inputHash`, a stable recursive-key-sorted hash of the exact
+input the human was shown, and the registry **refuses a mismatch** with
+`POLICY_DENIED: approval "…" was granted for a DIFFERENT input to "…"`. Nullable, so a
+pre-migration row still reads back and falls back to tool-level binding rather than refusing
+every legacy approval.
+
+**Two mistakes made and corrected while landing it**, both caught by the suite:
+
+1. The approval id was included in the hash. A caller re-issuing the approved call
+   naturally carries the id in the same body, so every legitimate retry hashed
+   differently. The id is an invocation OPTION, not part of the action, and is now
+   excluded — everything else is still bound.
+2. Three existing tests were asserting the OLD bypass. `mcp-manager` re-issued an
+   approved write with different arguments while its own comment said "the SAME
+   request is re-issued"; the share helper carried the approval id inside the
+   hashed payload; and `settings` parked `"parked-model"` then wrote
+   `"approved-model"` after approval. All three now run what the human actually
+   approved. **A test that passes only because an approval is spendable on a
+   different action was testing the vulnerability, not the contract.**
+
+**Remaining bypass, named exactly:** `KAI_DEV_MODE=1` disables the owner-credential gate for
+owner routes. It does **not** reach Guard, policy, the budget or approvals (verified by
+inspection and pinned by test). It is explicit, documented, visible in `GET /identity`, and
+off by default — but it is a real bypass when set, and a packaged runtime that activated it
+accidentally would be open to any local process.
+
+## 5. Deterministic tests vs live evidence
+
+| Suite | Kind | Result |
+|---|---|---|
+| `security-invariants` (7) | deterministic, real runtime | pass |
+| `opencode-events` (7) | deterministic, fake SSE | pass |
+| `api-authz` / `api-enforcement` / `mutation-drift-guard` / `policy*` | deterministic | pass |
+| `adapters-live` | **live** | **skips** — `RUNTIME_ABSENT` |
+| `workstation*` | **live** | **skips** — `cua-driver` not installed |
+
+**No live worker, live model or VM evidence was obtained in this pass.**
+
+## 6. Test isolation — measured, not assumed
+
+Isolating `KAI_HOME` to a throwaway directory was **implemented and measured**. It is the
+correct end state and it cannot land yet: **16 suites silently depend on the developer's real
+home** because it holds a working model credential. With an isolated home they fail with
+
+```
+ModelError: the "kai-model" model provider has no API key configured
+```
+
+instead of skipping. The affected suites are those that boot a real Core and then make a
+model call: `settings` (live effect), `mcp/manager` (approved retry), `skills-builtin` (a real
+turn), `subagent-memory-isolation` (5), and the chat/campaign task suites (7).
+
+The fix is a shared *"no model configured → skip with a named reason"* helper applied to those
+suites. Until it lands, isolating would trade a real coupling for sixteen red tests. The
+measurement is recorded in `scripts/test.mjs` so the finding is not lost.
+
+## 7. Budgets — enforced, estimated, unenforceable
+
+| Limit | State | When |
+|---|---|---|
+| `maxRetries`, `maxReassignments`, `maxDispatches`, `maxDepth` | **Enforced** | before dispatch |
+| `maxTokens` | **Enforced when reported** (hermes, codex) | after the run |
+| `maxToolCalls` | **Unenforceable** — no adapter reports tool invocations | — |
+| `maxCostUsd` | **Unenforceable** — no provider reports cost; KAI will not derive dollars from tokens | — |
+| `maxRuntimeMs` | **Measured, not preemptive** — a synchronous delegation has no cancellation point | after the run |
+
+## 8. Learning behaviour — the exact boundary
+
+| Stage | Automatic? | Where |
+|---|---|---|
+| Skill **scoring** (`recordSkillUsage`) | **YES** — on every outcome | `orchestrator.ts:1645` (failure), `:2421` (success + verified) |
+| **Candidate generation** (`proposeFromTask`) | **NO** — `/refine` only | `commands/commands.ts:593` |
+| Evaluation against reproducible tasks | **MISSING** | — |
+| Approval | yes, bound to the candidate's sha256 | `skills/staging.ts` |
+| Promotion (install) | via the approval gate | `installApproved` |
+| Rollback | implemented | `staging.rollback` |
+
+**KAI scores skills automatically and proposes them only when asked.**
+
+## 9. Workers tested live vs fake
+
+| Worker | Adapter | Contract tests | Live |
+|---|---|---|---|
+| Hermes | yes | yes | **skips** |
+| OpenCode | yes | yes | **skips** |
+| Codex | yes | yes | **skips** |
+
+## 10. External blockers
+
+| Blocker | Prevents | Unblock |
+|---|---|---|
+| **No GitHub credential** | the push | `gh auth login`, or a `repo`-scoped PAT in `GITHUB_TOKEN` |
+| **No live worker runtime** | live adapter evidence, a real OpenCode event stream | run Hermes on `:8642` / OpenCode on `:4096` |
+| **`cua-driver` not installed** | workstation/CUA verification | install the driver; live tests stay opt-in by design |
+| **No model credential under an isolated home** | the 16 coupled suites, hence F | add the skip helper described in §6 |
+
+## 11. Push
+
+**Not pushed.** No valid credential exists on this machine. The branch is intact and every
+commit is retained locally.

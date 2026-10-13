@@ -176,6 +176,35 @@ pass Guard — enabling it silently would let a critic reach a worker unapproved
   Measured tokens (hermes and codex parse them; opencode reports none) are debited
   to the durable budget under a `token` kind, idempotently per report id.
 
+### Approvals bind to the ACTION, not just the tool
+
+An approval used to name a tool id and nothing else, so a real "yes" to one action
+could be spent on a **different** action of the same tool: approving *restore
+checkpoint A into dir X* authorised *restore checkpoint B into dir Y*. The
+skill-install path already bound to a sha256; the tool path did not.
+
+An approval now records `inputHash` — a stable, key-sorted hash of the exact input
+the human was shown (migration v6, nullable so a pre-migration row still reads
+back) — and the tool registry **refuses a mismatch** with a precise
+`POLICY_DENIED`. `tests/security-invariants.test.ts` pins it, along with the rule
+that `KAI_DEV_MODE=1` cannot reach Guard, policy, the budget or approvals.
+
+### OpenCode's event stream is consumed, and an abort now releases an idle stream
+
+`OpenCodeClient.events()` existed with no caller, so KAI learned "working" and
+then "idle" and nothing between. The adapter now runs a pump for the life of a
+run: bounded dedupe, scoped to the run's session, aborted in `finally`, and
+strictly advisory — a stream that dies mid-run must not fail a turn that
+completed.
+
+Fixing it exposed a real parser bug: `parseSse` checked the abort signal only
+BETWEEN reads, so a live stream — which is idle most of the time — stayed parked
+on `read()` forever after an abort. The signal is now wired to `reader.cancel()`,
+so cancellation actually cancels. `tests/opencode-events.test.ts` (7) covers
+three event types, zero events, a dying stream, duplicates, another session,
+an idle-stream cancel, and that a worker's own `session.idle` is never a
+completion claim.
+
 ### The authoritative backend state lives in one report
 
 `docs/reports/KAI_BACKEND_STATE.md` is the single, audited answer to "what is KAI

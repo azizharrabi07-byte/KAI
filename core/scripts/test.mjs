@@ -89,6 +89,27 @@ console.log("");
 // rules call `decideAccess` directly with explicit inputs, so they are unaffected.
 process.env.KAI_DEV_MODE = "1";
 
+// ── KAI_HOME is NOT isolated here, and that is a MEASURED decision ───────────
+//
+// Isolating `KAI_HOME` to a throwaway directory was implemented and measured. It
+// is the correct end state, and it cannot land yet: 16 suites silently depend on
+// the developer's real home because it holds a working model credential. With an
+// isolated home they fail with
+//
+//     ModelError: the "kai-model" model provider has no API key configured
+//
+// instead of skipping. The affected suites are the ones that boot a real Core and
+// then make a model call: `settings` (live effect), `mcp/manager` (approved
+// retry), `skills-builtin` (a real turn), `subagent-memory-isolation` (5), and
+// the chat/campaign task suites (7).
+//
+// The fix is a shared "no model is configured -> skip with a named reason" helper
+// applied to those suites, so an unavailable credential reads as SKIPPED rather
+// than FAILED. Until that lands, isolating here would trade a real coupling for
+// sixteen red tests, which is worse than naming the coupling.
+//
+// Everything else about this runner is unchanged.
+
 const result = spawnSync(process.execPath, ["--test", ...files], {
   stdio: "inherit",
   cwd: CORE,

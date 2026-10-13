@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 KAI contributors. MIT licensed (see repository LICENSE).
 
@@ -292,6 +293,34 @@ function assertWellFormed(tool: ToolDefinition): void {
  * which artifact. The per-tool switch that fills it lives in ./provenance.ts.
  */
 export type ActionArtifactIds = ToolArtifactIds;
+
+
+/**
+ * A stable hash of a tool input.
+ *
+ * Keys are sorted recursively, so two structurally identical inputs hash the
+ * same regardless of property order — but any change to a VALUE changes the
+ * hash. This is what binds an approval to the action the human was asked about
+ * rather than to the tool in general.
+ */
+function stableHash(value: unknown): string {
+  const canonical = (v: unknown): string => {
+    if (v === null || typeof v !== "object") return JSON.stringify(v) ?? "null";
+    if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
+    const entries = Object.entries(v as Record<string, unknown>)
+      .filter(([, val]) => val !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([k, val]) => `${JSON.stringify(k)}:${canonical(val)}`).join(",")}}`;
+  };
+  // The approval id is an INVOCATION OPTION, not part of the action: a caller
+  // that re-issues the approved call naturally carries the id in the same body,
+  // and hashing it would make every legitimate retry look like a different
+  // action. Everything else is bound.
+  const action = value !== null && typeof value === "object" && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([k]) => k !== "approvalId"))
+    : value;
+  return createHash("sha256").update(canonical(action), "utf8").digest("hex");
+}
 
 export function createToolRegistry(opts: {
   policy?: PolicyGate;
@@ -648,6 +677,7 @@ export function createToolRegistry(opts: {
           action: tool.name,
           reason: decision.reason,
           risk: tool.risk,
+          inputHash: stableHash(value),
           ...(invokeOpts?.missionId !== undefined ? { missionId: invokeOpts.missionId } : {}),
           ...(invokeOpts?.stepId !== undefined ? { stepId: invokeOpts.stepId } : {}),
         });
@@ -716,6 +746,25 @@ export function createToolRegistry(opts: {
             now,
           ),
           detail: `approval was granted for tool "${approval.toolId}"`,
+        });
+      }
+      // An approval binds to the ACTION, not just the tool. A verdict given for
+      // one input must not authorise a different one — approving "restore
+      // checkpoint A into dir X" cannot be spent on "restore checkpoint B into
+      // dir Y". Absent on a pre-migration row, in which case the tool-level check
+      // above is all there is and that is stated in the refusal below.
+      if (approval.inputHash !== undefined && approval.inputHash !== stableHash(value)) {
+        return settle(meta, {
+          status: "DENIED",
+          decision,
+          approvalId,
+          approval: { required: true, approvalId, status: approval.status },
+          error: toolError(
+            "POLICY_DENIED",
+            `approval "${approvalId}" was granted for a DIFFERENT input to "${id}" and does not authorise this action`,
+            now,
+          ),
+          detail: "approval was granted for different input",
         });
       }
       if (approval.status === "REJECTED") {

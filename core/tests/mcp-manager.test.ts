@@ -258,18 +258,21 @@ test("manager: a READ MCP tool executes through the registry; a WRITE one parks,
   assert.equal(existsSync(noteFile), false, "a parked MCP write must not reach the server");
 
   // A human approves, and the SAME request is re-issued with the approval.
+  // "SAME" is load-bearing: an approval now binds to the exact input the human
+  // was shown, so re-issuing with DIFFERENT arguments is refused — which is the
+  // point. The approval was granted for THIS note, and this note is what runs.
   const approvalId = parked.error.detail;
   assert.equal(typeof approvalId, "string");
   assert.equal(approvals.decide(approvalId as string, true).ok, true);
   const approved = await manager.invokeTool({
     server: "fixture",
     tool: "write_note",
-    arguments: { note: "landed after approval" },
+    arguments: { note: "must not land yet" },
     approvalId,
   });
   assert.equal(approved.ok, true, JSON.stringify(approved));
   assert.equal(existsSync(noteFile), true, "an approved MCP write must actually run");
-  assert.match(readFileSync(noteFile, "utf8"), /landed after approval/);
+  assert.match(readFileSync(noteFile, "utf8"), /must not land yet/);
 });
 
 test("manager: provenance records every attempt — toolId, executionId, caller, arguments, status, duration, approval", async (t) => {

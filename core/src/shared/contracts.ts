@@ -454,6 +454,16 @@ export interface Approval {
   decidedAt?: string;
   missionId?: string;
   stepId?: string;
+  /**
+   * A stable hash of the EXACT input the human was asked about.
+   *
+   * Without it an approval binds to a tool and nothing else, so a real "yes" to
+   * one action can be spent on a DIFFERENT action of the same tool — approving
+   * "restore checkpoint A into dir X" would authorise "restore checkpoint B into
+   * dir Y". Optional so a row written before this field existed still reads back;
+   * a registry refuses a mismatch whenever the field IS present.
+   */
+  inputHash?: string;
 }
 
 // ── Memory ────────────────────────────────────────────────────────────────────

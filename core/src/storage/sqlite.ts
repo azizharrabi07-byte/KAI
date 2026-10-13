@@ -263,8 +263,8 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
 
     insertApproval: db.prepare(
       `INSERT OR REPLACE INTO approvals
-         (id, toolId, action, reason, risk, createdAt, status, expiresAt, decidedAt, missionId, stepId)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, toolId, action, reason, risk, createdAt, status, expiresAt, decidedAt, missionId, stepId, inputHash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ),
     getApproval: db.prepare(`SELECT * FROM approvals WHERE id = ?`),
     listApprovals: db.prepare(
@@ -716,6 +716,7 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
     optional(approval, "decidedAt", row.decidedAt);
     optional(approval, "missionId", row.missionId);
     optional(approval, "stepId", row.stepId);
+    optional(approval, "inputHash", row.inputHash);
     return approval;
   }
 
@@ -733,6 +734,7 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
         a.decidedAt ?? null,
         a.missionId ?? null,
         a.stepId ?? null,
+        a.inputHash ?? null,
       );
     },
 

@@ -40,6 +40,18 @@ export async function* parseSse(
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  // An abort must RELEASE a read that is already parked, not merely be noticed
+  // between reads. A live SSE stream is idle most of the time — the server sends
+  // nothing until something happens — so a signal checked only at the top of the
+  // loop leaves the consumer blocked on `read()` forever after an abort. Wiring
+  // the signal to `reader.cancel()` is what makes cancellation actually cancel.
+  const onAbort = (): void => {
+    void reader.cancel().catch(() => undefined);
+  };
+  if (signal !== undefined) {
+    if (signal.aborted) onAbort();
+    else signal.addEventListener("abort", onAbort, { once: true });
+  }
   try {
     for (;;) {
       if (signal?.aborted) break;
@@ -59,6 +71,7 @@ export async function* parseSse(
     const tail = parseBlock(buffer);
     if (tail) yield tail;
   } finally {
+    signal?.removeEventListener("abort", onAbort);
     try {
       await reader.cancel();
     } catch {

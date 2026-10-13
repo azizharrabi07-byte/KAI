@@ -21,7 +21,7 @@
  */
 
 /** Target schema version. Bump by appending to MIGRATIONS, never by editing. */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export interface Migration {
   readonly version: number;
@@ -354,6 +354,18 @@ export const MIGRATIONS: readonly Migration[] = [
       // of a goal", which is exactly the old behaviour.
       `ALTER TABLE work_items ADD COLUMN goalId TEXT`,
       `ALTER TABLE work_items ADD COLUMN goalRevisionId TEXT`,
+    ],
+  },
+  {
+    version: 6,
+    statements: [
+      // ── approvals: bind the verdict to the INPUT, not just the tool ────────
+      // An approval used to name a tool and nothing else, so an approved
+      // `checkpoint.restore` authorised ANY restore — a real "yes" to one action
+      // spendable on a different one. The column is nullable: a pre-migration row
+      // reads back as absent, and the registry then falls back to tool-level
+      // binding rather than refusing every legacy approval.
+      `ALTER TABLE approvals ADD COLUMN inputHash TEXT`,
     ],
   },
 ];
