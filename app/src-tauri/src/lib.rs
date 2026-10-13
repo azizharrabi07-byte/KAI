@@ -595,6 +595,23 @@ pub fn run() {
             // KAI Core is KAI's own control plane, so KAI starts it: adopt the one
             // already listening, or spawn one that cannot outlive this process.
             core_process::start(handle.clone());
+
+            // A MANUAL launch must produce a window the owner can use.
+            //
+            // The declared `main` window is `visible: false`, and `island` — the only
+            // window shown at startup — is a 240x6 fully transparent, always-on-top,
+            // taskbar-skipping sliver. So a cold start used to leave the owner with no
+            // visible application and no taskbar entry: launching KAI appeared to do
+            // nothing, and `main_window::show` was reachable only by launching a
+            // SECOND time (the single-instance handler). That is the reported "I
+            // cannot open KAI" defect.
+            //
+            // Autostart deliberately keeps the quiet companion behaviour: KAI starts
+            // with the OS, and a full window on every login would be intrusive. So the
+            // window is shown only when this launch was the owner's own.
+            if !loaded.autostart {
+                main_window::show(&handle);
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

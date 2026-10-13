@@ -190,6 +190,9 @@ pub fn show(app: &AppHandle) {
                 );
                 crate::log::line("main window: WS_VISIBLE was clear — shown directly");
             }
+            // The window is visible at this point; make it the FRONT window too.
+            // Visibility alone leaves it behind whatever the owner was using.
+            force_foreground(hwnd);
         }
     }
     crate::log::line("main window shown");
@@ -197,6 +200,54 @@ pub fn show(app: &AppHandle) {
     // after the show so `is_visible()` reports the truth rather than the pre-show
     // state. (owner §36)
     crate::island::refresh_workspace_presence(app);
+}
+
+/// Bring a window to the foreground even when this process does NOT already own
+/// the foreground.
+///
+/// Windows refuses `SetForegroundWindow` from a process that is not itself in the
+/// foreground — which is exactly KAI's case whenever the owner launches it from a
+/// terminal, a script, the Start menu, or an installer while another application
+/// has focus. The window then exists and is genuinely visible, but it sits BEHIND
+/// the app the owner was already using, so launching KAI looks like it did
+/// nothing. That is a reported defect, not a cosmetic one: it is why a correctly
+/// built application appeared not to open.
+///
+/// `AttachThreadInput` joins this thread's input queue to the foreground thread's
+/// for the duration of the call, which lifts the restriction; the attachment is
+/// dropped immediately after so no input state is shared beyond this function.
+unsafe fn force_foreground(hwnd: windows::Win32::Foundation::HWND) {
+    use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow,
+        ShowWindow, SW_RESTORE,
+    };
+
+    let this_thread = GetCurrentThreadId();
+    let target_thread = GetWindowThreadProcessId(hwnd, None);
+    let fg = GetForegroundWindow();
+    let fg_thread = if fg.is_invalid() { 0 } else { GetWindowThreadProcessId(fg, None) };
+
+    let mut attached_fg = false;
+    let mut attached_target = false;
+    if fg_thread != 0 && fg_thread != this_thread {
+        attached_fg = AttachThreadInput(this_thread, fg_thread, true).as_bool();
+    }
+    if target_thread != 0 && target_thread != this_thread && target_thread != fg_thread {
+        attached_target = AttachThreadInput(this_thread, target_thread, true).as_bool();
+    }
+
+    // Restore before raising: a minimised window ignores the raise.
+    let _ = ShowWindow(hwnd, SW_RESTORE);
+    let _ = BringWindowToTop(hwnd);
+    let _ = SetForegroundWindow(hwnd);
+
+    if attached_target {
+        let _ = AttachThreadInput(this_thread, target_thread, false);
+    }
+    if attached_fg {
+        let _ = AttachThreadInput(this_thread, fg_thread, false);
+    }
 }
 
 /// Hides the main window without destroying it. Used nowhere yet, but kept
