@@ -1,0 +1,42 @@
+/* SPDX-License-Identifier: MIT
+   Copyright (c) 2026 Louis Raillé — MIT (see repository LICENSE). */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Design tokens.
+   The palette is deliberately disciplined: one accent carries focus and active
+   execution, and colour appears ONLY where it means something (success, warning,
+   failure, and the evidence source). No glow, no gradients on text, no invented
+   decoration. System fonts only — a prototype must not need the network.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* surfaces */
+  --bg: #080d14;
+  --surface: #101824;
+  --surface-2: #16202e;
+  --surface-3: #1c2836;
+  --line: #1e2b3b;
+  --line-2: #2a3a4d;
+
+  /* ink */
+  --text: #e6eef8;
+  --text-2: #8193a8;
+  --text-3: #5b6b7e;
+
+  /* accents */
+  --accent: #42b8f5;
+  --accent-2: #648cff;
+  --accent-dim: #1d5f80;
+  --amber: #d9a441;
+  --red: #d9695f;
+  --green: #57a97b;
+
+  /* type */
+  --mono: "Cascadia Mono", "JetBrains Mono", Consolas, ui-monospace, monospace;
+  --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* geometry — small radii; this is a workstation, not a phone */
+  --r: 3px;
+  --r-2: 6px;
+  --pad: 12px;
+}

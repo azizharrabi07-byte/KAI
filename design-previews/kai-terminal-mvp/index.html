@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KAI // Executive Node — terminal MVP (demo)</title>
+<link rel="stylesheet" href="./src/tokens.css" />
+<link rel="stylesheet" href="./src/app.css" />
+</head>
+<body>
+  <!-- The DEMO badge is not decoration: it is the difference between a prototype
+       and a lie about a live system. -->
+  <div id="demobanner">DEMO PROTOTYPE — no Core, no network, invented fixtures</div>
+
+  <div id="shell">
+    <header id="head">
+      <div class="ident">
+        <span class="mark">KAI <span class="dim">//</span> EXECUTIVE NODE</span>
+        <span class="ver">terminal-mvp · demo</span>
+      </div>
+      <div id="status" class="status"></div>
+    </header>
+
+    <main id="main">
+      <section id="arch" class="panel">
+        <div class="panelhead">
+          <h2>Goal architecture</h2>
+          <span class="hint" id="archhint"></span>
+        </div>
+        <div id="graph" class="graph"></div>
+        <div id="criteria" class="criteria"></div>
+        <div id="super" class="super"></div>
+      </section>
+
+      <section id="side">
+        <div class="panel">
+          <div class="panelhead"><h2>Workers</h2><span class="hint">click to inspect</span></div>
+          <div id="workers" class="workers"></div>
+        </div>
+        <div class="panel grow">
+          <div class="panelhead"><h2>Activity</h2><span class="hint">source is shown per event</span></div>
+          <div id="events" class="events"></div>
+        </div>
+      </section>
+    </main>
+
+    <section id="termwrap" class="panel">
+      <div class="panelhead">
+        <h2>Terminal</h2>
+        <span class="hint"><kbd>⌘K</kbd> / <kbd>Ctrl</kbd>+<kbd>K</kbd> to focus · <kbd>↑</kbd><kbd>↓</kbd> history · <kbd>Tab</kbd> complete</span>
+      </div>
+      <div id="transcript" class="transcript" aria-live="polite"></div>
+      <div id="suggest" class="suggest" hidden></div>
+      <form id="promptform" autocomplete="off">
+        <label for="prompt" class="caret">kai&gt;</label>
+        <input id="prompt" name="prompt" type="text" spellcheck="false"
+               placeholder="/help · /goal list · /tasks · /doer off · /guard  …" aria-label="KAI command" />
+        <button type="submit" class="run">RUN</button>
+      </form>
+    </section>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

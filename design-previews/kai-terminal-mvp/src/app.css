@@ -1,0 +1,248 @@
+/* SPDX-License-Identifier: MIT
+   Copyright (c) 2026 Louis Raillé — MIT (see repository LICENSE). */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+kbd {
+  font-family: var(--mono); font-size: 10px; background: var(--surface-3);
+  border: 1px solid var(--line-2); border-radius: var(--r); padding: 0 4px; color: var(--text-2);
+}
+.dim { color: var(--text-3); }
+
+/* ── the demo banner ─────────────────────────────────────────────────────── */
+#demobanner {
+  background: var(--amber);
+  color: #1a1206;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-align: center;
+  padding: 3px 0;
+}
+
+/* ── shell ───────────────────────────────────────────────────────────────── */
+#shell {
+  height: calc(100% - 21px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) minmax(210px, 33vh);
+  gap: 10px;
+  padding: 10px;
+}
+
+/* ── header ──────────────────────────────────────────────────────────────── */
+#head {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-2);
+  padding: 9px 13px;
+}
+.ident { display: flex; align-items: baseline; gap: 10px; }
+.mark { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: .14em; color: var(--text); }
+.ver { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
+
+.status { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px;
+  border: 1px solid var(--line-2); border-radius: var(--r); background: var(--surface-2);
+  font-family: var(--mono); font-size: 10.5px; color: var(--text-2); white-space: nowrap;
+}
+.pill .k { color: var(--text-3); letter-spacing: .08em; }
+.pill .v { color: var(--text); }
+.pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); }
+.pill.on .dot { background: var(--green); }
+.pill.off .dot { background: var(--amber); }
+.pill.bad .dot { background: var(--red); }
+.pill.accent { border-color: var(--accent-dim); background: rgba(66, 184, 245, .09); }
+.pill.accent .v { color: var(--accent); }
+.pill.guard { border-color: #3a5a72; }
+
+/* ── main grid ───────────────────────────────────────────────────────────── */
+#main { display: grid; grid-template-columns: minmax(0, 1fr) 322px; gap: 10px; min-height: 0; }
+/* The side column must never force the row taller than the viewport, so both of
+   its panels scroll internally instead of growing. */
+#side { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; min-height: 0; overflow: hidden; }
+
+.panel { border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-2); display: flex; flex-direction: column; min-height: 0; }
+.panel.grow { min-height: 0; }
+.panelhead {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 8px 12px; border-bottom: 1px solid var(--line);
+}
+.panelhead h2 { font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--text-2); }
+.hint { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
+
+/* ── the architecture graph ──────────────────────────────────────────────── */
+.graph { padding: 12px 13px 4px; overflow: auto; flex: 1 1 auto; }
+.flow { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; }
+.stage {
+  border: 1px solid var(--line-2); border-radius: var(--r); background: var(--surface-2);
+  padding: 8px 10px; min-width: 118px;
+}
+.stage .lbl { font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; color: var(--text-3); text-transform: uppercase; }
+.stage .val { font-size: 12.5px; color: var(--text); margin-top: 2px; }
+.stage .sub { font-family: var(--mono); font-size: 10.5px; color: var(--text-2); margin-top: 3px; }
+.stage.done { border-color: #2f5a46; }
+.stage.done .val { color: var(--green); }
+.stage.active { border-color: var(--accent-dim); background: rgba(66, 184, 245, .07); }
+.stage.active .val { color: var(--accent); }
+.stage.blocked { border-color: #5c3a34; }
+.stage.blocked .val { color: var(--red); }
+.arrow { align-self: center; color: var(--text-3); font-family: var(--mono); }
+
+/* The goal's own statement, so the panel leads with intent rather than only state. */
+.objective { margin-top: 10px; font-size: 12.5px; color: var(--text-2); }
+.objective .ok { font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--text-3); margin-right: 9px; }
+
+.tasks { margin-top: 8px; display: grid; gap: 5px; }
+.task {
+  display: grid; grid-template-columns: 44px 116px minmax(0,1fr) auto; gap: 9px; align-items: center;
+  border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2);
+  padding: 6px 9px; font-family: var(--mono); font-size: 11px; cursor: pointer;
+}
+.task:hover { border-color: var(--line-2); background: var(--surface-3); }
+.task .tid { color: var(--text-3); }
+.task .ttitle { color: var(--text); font-family: var(--sans); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task .tworker { color: var(--text-2); }
+.task .deps { color: var(--text-3); font-size: 10.5px; }
+.state { font-family: var(--mono); font-size: 10px; letter-spacing: .06em; padding: 1px 6px; border-radius: var(--r); border: 1px solid var(--line-2); color: var(--text-2); white-space: nowrap; text-align: center; }
+.state.COMPLETED { color: var(--green); border-color: #2f5a46; }
+.state.RUNNING { color: var(--accent); border-color: var(--accent-dim); }
+.state.BLOCKED { color: var(--red); border-color: #5c3a34; }
+.state.CHANGES_REQUESTED { color: var(--amber); border-color: #5c4a2a; }
+.tasktask { background: var(--accent); }
+
+/* The supervisor's own position, stated in one place: what it is waiting for, and
+   the exact command that moves it. Empty space in this panel would be a design
+   failure — a supervisor that shows no position is not supervising. */
+.super { flex: 0 0 auto; margin: 10px 13px 12px; border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 7px; }
+.superrow { display: grid; grid-template-columns: 84px minmax(0,1fr); gap: 10px; align-items: baseline; }
+.superrow .sk { font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em; color: var(--text-3); text-transform: uppercase; }
+.superrow .sv { font-size: 12.5px; color: var(--text); }
+.superrow .sv code { font-family: var(--mono); font-size: 11.5px; color: var(--accent); background: var(--surface-3); border: 1px solid var(--line-2); border-radius: var(--r); padding: 1px 6px; }
+.superrow.wait .sv { color: var(--amber); }
+.superrow.ready .sv { color: var(--accent); }
+.superrow.settled .sv { color: var(--green); }
+
+.criteria { flex: 0 0 auto; padding: 0 13px 12px; font-family: var(--mono); font-size: 11px; color: var(--text-2); }
+.criteria b { color: var(--text); font-weight: 500; }
+
+/* ── workers ─────────────────────────────────────────────────────────────── */
+.workers { padding: 8px; display: grid; gap: 6px; overflow: auto; max-height: 264px; }
+.worker {
+  border: 1px solid var(--line-2); border-radius: var(--r); background: var(--surface-2);
+  padding: 7px 9px; cursor: pointer;
+}
+.worker:hover { background: var(--surface-3); }
+.worker.sel { border-color: var(--accent-dim); background: rgba(66, 184, 245, .08); }
+.worker .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.worker .name { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--text); }
+.worker .rt { font-family: var(--mono); font-size: 10px; color: var(--text-3); }
+.worker .meta { font-family: var(--mono); font-size: 10.5px; color: var(--text-2); margin-top: 3px; }
+.worker .lim { font-size: 11px; color: var(--text-3); margin-top: 4px; line-height: 1.4; }
+.wstate { font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; padding: 1px 5px; border-radius: var(--r); border: 1px solid var(--line-2); }
+.wstate.BUSY, .wstate.AVAILABLE { color: var(--accent); border-color: var(--accent-dim); }
+.wstate.UNREACHABLE { color: var(--red); border-color: #5c3a34; }
+.wstate.NOT_INSTALLED { color: var(--text-3); }
+
+/* ── events ──────────────────────────────────────────────────────────────── */
+.events { flex: 1 1 auto; min-height: 0; padding: 6px 8px; overflow: auto; font-family: var(--mono); font-size: 11px; }
+.ev { display: grid; grid-template-columns: 76px 82px minmax(0, 1fr); gap: 7px; padding: 3px 0; border-bottom: 1px solid rgba(30, 43, 59, .5); }
+.ev .at { color: var(--text-3); }
+.ev .kind { font-size: 9.5px; letter-spacing: .07em; color: var(--text-2); }
+.ev .txt { color: var(--text); overflow-wrap: anywhere; }
+.ev .src { grid-column: 2 / -1; font-size: 9.5px; color: var(--text-3); }
+.kind.BLOCKER { color: var(--red); }
+.kind.SETTLEMENT, .kind.VERIFICATION { color: var(--green); }
+.kind.DISPATCH, .kind.WORKER, .kind.TOOL { color: var(--accent); }
+.kind.APPROVAL, .kind.RETRY { color: var(--amber); }
+
+/* ── terminal ────────────────────────────────────────────────────────────── */
+#termwrap { min-height: 0; }
+.transcript {
+  flex: 1; overflow: auto; padding: 10px 13px;
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.5;
+}
+.echo { color: var(--accent); margin-bottom: 6px; }
+.echo .pr { color: var(--text-3); }
+.block { margin: 0 0 9px; }
+.block.text { color: var(--text); white-space: pre-wrap; }
+.block.title { color: var(--text-2); font-family: var(--sans); font-size: 12px; }
+.block table { border-collapse: collapse; width: 100%; font-size: 11px; }
+.block table th { text-align: left; color: var(--text-3); font-weight: 400; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 8px 3px 0; border-bottom: 1px solid var(--line-2); }
+.block table td { padding: 3px 8px 3px 0; border-bottom: 1px solid rgba(30, 43, 59, .5); color: var(--text); vertical-align: top; }
+.block .kvrow { display: flex; gap: 10px; padding: 2px 0; }
+.block .kvrow .k { color: var(--text-3); min-width: 132px; }
+.block .kvrow .v { color: var(--text); overflow-wrap: anywhere; }
+.block.note { border-left: 2px solid var(--accent); background: var(--surface-2); padding: 6px 10px; border-radius: 0 var(--r) var(--r) 0; }
+.block.note.warn { border-left-color: var(--amber); }
+.block.note.error { border-left-color: var(--red); }
+.block.note.ok { border-left-color: var(--green); }
+.block.note .nt { font-family: var(--sans); font-size: 11.5px; color: var(--text-2); }
+.block.note .nb { font-family: var(--sans); font-size: 12px; color: var(--text); margin-top: 2px; }
+.block.error { border-left: 2px solid var(--red); background: rgba(217, 105, 95, .08); padding: 6px 10px; border-radius: 0 var(--r) var(--r) 0; }
+.block.error .em { color: var(--red); font-family: var(--sans); font-size: 12.5px; }
+.block.error .eh { color: var(--text-3); font-size: 11px; margin-top: 2px; }
+.section-h { font-family: var(--sans); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); margin: 8px 0 4px; }
+
+/* ── suggestions + prompt ────────────────────────────────────────────────── */
+.suggest { border-top: 1px solid var(--line); background: var(--surface-2); max-height: 168px; overflow: auto; }
+.sug { display: grid; grid-template-columns: 190px 92px minmax(0,1fr); gap: 10px; padding: 4px 13px; font-family: var(--mono); font-size: 11px; cursor: pointer; }
+.sug.sel { background: rgba(66, 184, 245, .1); }
+.sug .sn { color: var(--accent); }
+.sug .sf { color: var(--text-3); font-size: 10px; }
+.sug .sd { color: var(--text-2); font-family: var(--sans); }
+
+#promptform { display: flex; align-items: center; gap: 9px; padding: 9px 13px; border-top: 1px solid var(--line); }
+.caret { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 700; }
+#prompt {
+  flex: 1; background: transparent; border: 0; outline: 0; color: var(--text);
+  font-family: var(--mono); font-size: 13px;
+}
+#prompt::placeholder { color: var(--text-3); }
+.run {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: .1em;
+  background: var(--accent-dim); color: #06121a; border: 0; border-radius: var(--r); padding: 5px 13px; cursor: pointer;
+}
+.run:hover { background: var(--accent); }
+
+/* ── narrower desktops ───────────────────────────────────────────────────────
+   Below the two-column breakpoint the panels STACK, which makes the column taller
+   than the viewport. The fix is to let the page scroll, never to let the rows be
+   compressed: a squashed grid clips the goal architecture and the task board down
+   to their borders, which is worse than a scrollbar. ──────────────────────── */
+@media (max-width: 1180px) {
+  /* `body { height: 100% }` makes BODY the scroll container, so the window cannot
+     be scrolled and focusing an input drags a panel off-screen. Drop the fixed
+     height and let the document scroll normally. */
+  html, body { height: auto; overflow-x: hidden; }
+  #shell { height: auto; min-height: 0; grid-template-rows: auto auto auto; }
+  #main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; }
+  #side { grid-template-columns: 1fr 1fr; grid-template-rows: auto; overflow: visible; }
+  #arch, .panel { min-height: 0; }
+  #termwrap { min-height: 320px; max-height: 62vh; }
+  .workers { max-height: 320px; }
+  .events { max-height: 320px; }
+}
+@media (max-width: 900px) {
+  #side { grid-template-columns: 1fr; }
+  .stage { min-width: 96px; padding: 6px 8px; }
+  .task { grid-template-columns: 40px 118px minmax(0, 1fr); }
+  .task .tworker { display: none; }
+  .task .deps { display: none; }
+}
+@media (max-height: 820px) {
+  .graph { padding-top: 8px; }
+  .workers { max-height: 200px; }
+}

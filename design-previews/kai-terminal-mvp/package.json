@@ -1,0 +1,13 @@
+{
+  "name": "kai-terminal-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated, runnable terminal-first UI prototype for KAI. DEMO DATA ONLY — not connected to a Core, and safe to delete without affecting the production app.",
+  "license": "MIT",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "dev": "node scripts/serve.mjs",
+    "test": "node --test \"tests/*.test.js\""
+  }
+}
