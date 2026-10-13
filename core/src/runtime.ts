@@ -50,6 +50,7 @@ import {
   type SubagentRegistry,
   type KaiSubagentSpec,
 } from "./workforce/subagent.ts";
+import { seedLibraryPersonas } from "./workforce/personas.ts";
 import { createCapabilityRegistry } from "./capabilities/registry.ts";
 import { createCapabilityManager } from "./capabilities/manager.ts";
 import { loadIdentity, PROTOCOL_VERSION } from "./identity.ts";
@@ -3412,6 +3413,26 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   const subagentRegistry: SubagentRegistry = createSubagentRegistry(
     subagentsPath !== undefined ? { path: subagentsPath } : {},
   );
+  /**
+   * KAI's curated persona library — seeded only when the operator asks for it.
+   *
+   * WHY OPT-IN. Measured, not guessed: every persona is a workforce EMPLOYEE, so
+   * registering one publishes `workforce.registered` and the boot monitor then
+   * publishes an observation. The Doer records those durably, so seeding the 16
+   * mined personas produced **32 extra Doer results on every boot** (16 x 2 + the
+   * test's own 3 = the 35 that broke the Doer suite). That is real noise for a
+   * user who never asked for it, and it changes the boot state every exact-count
+   * assertion in the suite depends on.
+   *
+   * So the library ships, is validated, and is seeded on request:
+   *     KAI_PERSONA_LIBRARY=1
+   * The alternative — seeding silently and relaxing every count assertion — would
+   * have hidden a real behavioural change behind edited tests.
+   */
+  const personaSeed =
+    process.env.KAI_PERSONA_LIBRARY === "1"
+      ? seedLibraryPersonas(subagentRegistry)
+      : { seeded: [], existing: [], failed: [] };
 
   /**
    * The governed-share registry: the ONLY path by which one persona's private

@@ -55,3 +55,70 @@ winners (prompt-injection, exfiltration, destructive commands): 3 hits, all
 benign in context (scoped git config, ticket clarity, honoring declared
 preferences). Skill bodies are served to the model as DATA, never
 instructions (see `prompts/compose.ts`).
+
+## Mined pack — ECC (affaan-m/ECC)
+
+Curated 2026-10-12 by `core/scripts/mine-skills.mjs`. **These files are NOT
+byte-identical to upstream**, and that is deliberate: the byte-identical rule
+requires the upstream to pass KAI's own `parseSkillMarkdown` unchanged, and over
+all 311 ECC skills only **20 do**. 242 are refused for one reason — a nested
+`metadata:` block (`origin: ECC`) that KAI's flat frontmatter parser rejects.
+
+So the miner normalises the FRONTMATTER ONLY and copies the BODY byte-for-byte.
+What it changes, and why, is stated here rather than left implicit:
+
+- `metadata: { origin }` is dropped, because KAI's frontmatter contract has no
+  such key. The value is **not lost**: it becomes a provenance banner at the top
+  of each body, an `author:` field, and the row below.
+- Quoted scalars are unquoted (`version: "1.0.0"` → `version: 1.0.0`).
+- Claude tool names are MAPPED to KAI ids (`Read` → `filesystem.read`,
+  `Bash` → `shell.run`, `Grep` → `filesystem.search`, `Glob` → `filesystem.list`,
+  `Task` → `agents.run_task`). A name with no KAI counterpart is **recorded in the
+  banner**, never silently dropped — copying `WebSearch` verbatim would have made
+  the skill permanently ineligible, because KAI has no web tool.
+- Every result must still pass KAI's `parseSkillMarkdown` AND the default-ON
+  security scan. A skill that fails either is REFUSED, not shipped.
+
+Three of the 27 carry a **reference-only WARNING** (`gateguard`, `safety-guard`,
+`verification-loop`): their findings are patterns NAMED for detection — a
+security skill must list what it blocks — so the scanner downgrades them from
+refusal to a visible warning, and curation accepted them on that basis.
+
+| Source | URL | Licence | Commit | Used |
+|---|---|---|---|---|
+| affaan-m/ECC | https://github.com/affaan-m/ECC | MIT | `b92f181b` | 27 |
+
+**Selection rule:** only the objects matching KAI's OWN job — being an agent
+harness, auditing agents, holding an approval gate, bounding a loop, and mining
+skills. The 40-odd language reviewers (`go-reviewer`, `vue-reviewer`, …) are
+deliberately excluded: that is work KAI DELEGATES, not work KAI does.
+
+| Skill | Why it is here |
+|---|---|
+| gateguard | the approval gate KAI owns |
+| safety-guard | the boundary KAI must not cross |
+| operator-approval-loop | parking on a human, and resuming exactly once |
+| agent-harness-construction | building the harness KAI IS |
+| agent-architecture-audit | auditing an agent setup |
+| agent-introspection-debugging | debugging an agent that misbehaves |
+| agent-self-evaluation | honest self-assessment |
+| agent-eval | measuring agents instead of guessing |
+| agent-security-hardening | hardening an agent boundary |
+| eval-harness | an evaluation harness |
+| verification-loop | verify, then act |
+| production-audit | what is actually running |
+| test-collaboration | working with tests, not around them |
+| autonomous-loops | running a loop without losing control |
+| loop-design-check | checking a loop before trusting it |
+| context-budget | bounded context |
+| token-budget-advisor | bounded spend |
+| cost-tracking | tracking cost honestly |
+| unified-memory | one memory, not several |
+| iterative-retrieval | retrieval that converges |
+| plan-orchestrate | planning and orchestration |
+| team-agent-orchestration | coordinating several agents |
+| prompt-optimizer | better prompts, measurably |
+| skill-stocktake | taking stock of a skill library |
+| skill-scout | finding skills worth having |
+| skill-host-compat | whether a skill fits this host |
+| skill-comply | whether a skill follows the rules |

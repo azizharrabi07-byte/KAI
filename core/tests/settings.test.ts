@@ -17,7 +17,7 @@ import type { AddressInfo } from "node:net";
 import { createCoreRuntime } from "../src/runtime.ts";
 import { createKaiServer } from "../src/server.ts";
 import { loadConfig } from "../src/config.ts";
-import { MODEL_DEFAULTS } from "../src/model/config.ts";
+import { MODEL_DEFAULTS, resolveModelSettings } from "../src/model/config.ts";
 
 function freshDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -112,7 +112,21 @@ test("reset: clearing reveals the layer below", async (t) => {
   const one = rt.settings.reset(["model.name"]);
   assert.equal(one.ok, true);
   assert.deepEqual(one.value.cleared, ["model.name"]);
-  assert.equal(one.value.effective.values.name, MODEL_DEFAULTS.NAME);
+  // "Clearing reveals the layer below" — and the layer below a SETTING is the
+  // resolved provider config (an explicit model, the environment, KAI's own
+  // credential file), and only then the built-in default. Asserting
+  // MODEL_DEFAULTS.NAME made this test depend on the MACHINE having no
+  // credential file, which is not a property of the code under test.
+  const fallback = resolveModelSettings();
+  assert.equal(
+    one.value.effective.values.name,
+    fallback.name,
+    `the setting cleared to the resolved provider name (${fallback.name})`,
+  );
+  assert.ok(
+    one.value.effective.values.name !== "temp",
+    "and the cleared setting is really gone",
+  );
   assert.equal(one.value.effective.values.timeoutMs, 45000);
   const all = rt.settings.reset([]);
   assert.deepEqual(all.value.cleared, ["model.timeoutMs"]);

@@ -38,6 +38,13 @@ export interface ScanFinding {
   /** The matched text, truncated. Evidence, never the whole body. */
   evidence: string;
   line?: number;
+  /**
+   * True when the match NAMES a pattern for detection rather than instructing
+   * anyone to do it. A reference is a warning, never a refusal on its own, and
+   * the flag is a field rather than a phrase in `message` so a caller can decide
+   * on it without matching prose.
+   */
+  reference?: boolean;
 }
 
 export interface ScanVerdict {
@@ -183,6 +190,63 @@ function isNegated(text: string, index: number): boolean {
   return NEGATION_CUE.test(clause);
 }
 
+/**
+ * Is the match being PRESENTED FOR DETECTION rather than as an instruction?
+ *
+ * The cue list is deliberately NARROW. It holds only words that are about
+ * *finding* a pattern — trigger, detect, scan, grep, match, pattern, list of.
+ * Words like `guard`, `gate`, `block` and `deny` were removed after the tests
+ * caught them weakening the scan: an ATTACK says "disable the guard checks" and
+ * "skip the approval gate", so those words are evidence of an attack, not of a
+ * reference.
+ *
+ * A security skill has to name the patterns it protects against — `gateguard`
+ * says "Triggers on: `rm -rf`, `git reset --hard`", and `verification-loop` runs
+ * `grep -rn "api_key"` to FIND secrets. Both are the opposite of an attack, and
+ * a scanner that cannot tell them apart either blocks every security skill or
+ * gets weakened until it blocks nothing.
+ *
+ * The cue must be on the SAME LINE as the match, so a hostile skill cannot
+ * launder an instruction by putting the word "detect" in a different paragraph.
+ * A reference is still REPORTED — it is downgraded to a warning, never dropped —
+ * so the text is visible for review rather than silently trusted.
+ */
+const REFERENCE_CUE =
+  /\b(trigger|triggers|detect|detects|detected|scan|scans|scanning|grep|rg|search for|look for|matches|match|pattern|patterns|denylist|blocklist|allowlist|list of|recognis|recognizes|recognised|recognized|unaffected|such as)\b/i;
+
+function isReference(text: string, index: number): boolean {
+  const lineStart = Math.max(0, text.lastIndexOf("\n", index) + 1);
+  const lineEnd = text.indexOf("\n", index);
+  if (REFERENCE_CUE.test(text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd))) return true;
+
+  // A detection LIST puts its cue on the first line and the patterns on the
+  // lines after it ("Triggers on: ..." then "- git reset --hard"). So look back
+  // to the start of the enclosing BLOCK — stopping at a blank line, and at eight
+  // lines regardless — which keeps the window tight enough that a hostile skill
+  // would have to write its instruction inside the same paragraph as the word
+  // "detect". A match found this way is still reported, as a warning.
+  // A markdown LIST belongs to the paragraph or heading above it, and that is
+  // where the cue lives: gateguard's "Triggers on:" and its "when either
+  // matches:" list are separated from their cue by one blank line. So exactly
+  // ONE blank line may be crossed, and a second one ends the search.
+  let cursor = lineStart;
+  let blanks = 0;
+  for (let seen = 0; seen < 14 && cursor > 0; seen += 1) {
+    const prevEnd = cursor - 1;
+    const prevStart = Math.max(0, text.lastIndexOf("\n", prevEnd - 1) + 1);
+    const prev = text.slice(prevStart, prevEnd);
+    if (prev.trim().length === 0) {
+      blanks += 1;
+      if (blanks > 1) break;
+    } else {
+      if (REFERENCE_CUE.test(prev)) return true;
+      if (blanks === 1) break; // a paragraph after a blank line ends the block
+    }
+    cursor = prevStart;
+  }
+  return false;
+}
+
 function lineOf(text: string, index: number): number {
   let line = 1;
   for (let i = 0; i < index && i < text.length; i += 1) {
@@ -229,12 +293,18 @@ export function scanSkill(
         // Every match is evaluated. A prohibition is not an attack, and a
         // "never" elsewhere cannot hide the occurrence that IS an instruction.
         if (isNegated(input.markdown, index)) continue;
+        // A pattern NAMED for detection is reported as a warning: visible, and
+        // reviewable, but not a refusal on its own.
+        const reference = isReference(input.markdown, index);
         findings.push({
           code: pattern.code,
-          severity: pattern.severity,
-          message: pattern.message,
+          severity: reference ? "warning" : pattern.severity,
+          message: reference
+            ? `${pattern.message} — presented as a pattern to detect, not an instruction`
+            : pattern.message,
           evidence: evidenceAt(input.markdown, index, match[0].length),
           line: lineOf(input.markdown, index),
+          ...(reference ? { reference: true } : {}),
         });
       }
     }
@@ -271,6 +341,15 @@ export function scanSkill(
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+/**
+ * Is this warning ONLY about named patterns? A security skill has to list what it
+ * detects, so this is the one shape of warning that curation may accept — and the
+ * caller must still record it.
+ */
+export function isReferenceOnly(verdict: ScanVerdict): boolean {
+  return verdict.findings.length > 0 && verdict.findings.every((f) => f.reference === true);
 }
 
 /** May a candidate with this verdict become ACTIVE? */

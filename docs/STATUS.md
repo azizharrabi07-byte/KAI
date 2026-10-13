@@ -92,6 +92,43 @@ The gap between "approved plan" and "work actually runs" is closed.
   Core state, with four separate sections for assigned tasks, worker-reported
   results, KAI-observed activity and KAI-performed verification.
 
+### Skill and agent mining from affaan-m/ECC
+
+`core/scripts/mine-skills.mjs` and `core/scripts/mine-agents.mjs` mine an external
+Claude-skill repository into KAI's own format. The corpus is `affaan-m/ECC` (MIT,
+`b92f181b`) — 71 agents, 311 skills.
+
+**Why a converter exists at all.** KAI's library rule is "byte-identical copies
+that already pass `parseSkillMarkdown`". Measured over all 311 skills, only **20
+pass unchanged**: 242 are refused for a nested `metadata: origin: ECC` block that
+KAI's flat frontmatter parser rejects. So the miner rewrites the FRONTMATTER ONLY,
+copies the body byte-for-byte, and must still pass BOTH `parseSkillMarkdown` and
+the default-ON scan. **27 skills** mined (255 → 282).
+
+**The tool-name trap.** ECC declares `tools: Read, Write, Bash` — Claude's names.
+Copying them verbatim would have made every mined skill permanently INELIGIBLE,
+because a skill requiring a tool KAI lacks is not offered. The miner maps what maps
+and RECORDS what does not.
+
+**The scanner learned reference from instruction.** Mining exposed a real
+limitation: a security skill must NAME the patterns it detects. `gateguard` says
+"Triggers on: `rm -rf`, `git reset --hard`" — a detection list, refused as an
+instruction. A match presented for detection is now downgraded to a WARNING
+(reported, never dropped), with `reference` as a field. The cue list is
+deliberately narrow: the tests caught `guard`, `gate`, `block`, `deny` and
+`example` all weakening the scan.
+
+### Personas: shipped, validated, and OPT-IN
+
+`core/src/workforce/personas.ts` seeds 16 mined personas from `core/agents-library/`.
+It runs only when **`KAI_PERSONA_LIBRARY=1`**, and that is a MEASURED decision, not
+caution: every persona is a workforce EMPLOYEE, so registering one publishes
+`workforce.registered` and the boot monitor then publishes an observation. The
+Doer records those durably, so seeding 16 personas produced **32 extra Doer results
+on every boot** — noise a user never asked for, and a change to boot state every
+exact-count assertion depends on. The alternative, seeding silently and relaxing
+those assertions, would have hidden a real behavioural change behind edited tests.
+
 ### The six lenses actually run, with bounds and provenance
 
 `challenger.ts` already owned the roles, the rubrics and the synthesis — including
