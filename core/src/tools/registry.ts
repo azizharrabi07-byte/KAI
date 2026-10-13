@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { BudgetLimits, BudgetScope } from "../orchestration/budget.ts";
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 KAI contributors. MIT licensed (see repository LICENSE).
 
@@ -120,6 +121,19 @@ export interface ToolInvokeOptions {
   sessionId?: string;
   /** The agent that CAUSED this call, when one did. */
   agentId?: string;
+  /**
+   * The goal and plan revision this call belongs to, when it belongs to one.
+   * The tool-call allowance is the REVISION'S, exactly as the dispatch allowance
+   * is — so a goal cannot multiply its tool budget by spawning work items.
+   */
+  goalId?: string;
+  goalRevisionId?: string;
+  /**
+   * The item's declared tool-call ceiling, when it has one. Absent means the
+   * scope is unbounded and the ledger enforces nothing — which is stated in
+   * `enforceabilityOf` rather than assumed to be satisfied.
+   */
+  maxToolCalls?: number;
   /** Who caused it: "core" (default), "scheduler", "route", a test label. */
   source?: string;
   /**
@@ -303,6 +317,13 @@ export type ActionArtifactIds = ToolArtifactIds;
  * hash. This is what binds an approval to the action the human was asked about
  * rather than to the tool in general.
  */
+/** A per-call nonce, so two independent invocations are two charges. */
+let invocationSeq = 0;
+function invocationNonce(): string {
+  invocationSeq += 1;
+  return `${invocationSeq.toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function stableHash(value: unknown): string {
   const canonical = (v: unknown): string => {
     if (v === null || typeof v !== "object") return JSON.stringify(v) ?? "null";
@@ -322,8 +343,34 @@ function stableHash(value: unknown): string {
   return createHash("sha256").update(canonical(action), "utf8").digest("hex");
 }
 
+/**
+ * The tool-call allowance, injected.
+ *
+ * The registry owns ONE moment here: a policy-checked call is about to run. It
+ * does not own the ledger — `orchestration/budget.ts` does — and this port is how
+ * the registry reaches it WITHOUT a second budget store.
+ */
+export interface ToolBudgetPort {
+  /** The scope and ceilings for this invocation, or null when it is not budgeted. */
+  scopeFor(opts: ToolInvokeOptions | undefined): { scope: BudgetScope; limits: BudgetLimits } | null;
+  /**
+   * Reserve ONE tool call BEFORE the tool runs.
+   *
+   * `idempotencyKey` names the logical invocation: a redelivered approval resume
+   * is charged once, while two independent calls are charged once each.
+   */
+  reserve(input: {
+    toolId: string;
+    scope: BudgetScope;
+    limits: BudgetLimits;
+    idempotencyKey: string;
+  }): { ok: true } | { ok: false; reason: string };
+}
+
 export function createToolRegistry(opts: {
   policy?: PolicyGate;
+  /** The tool-call allowance. Absent means tool calls are not budgeted here. */
+  toolBudget?: ToolBudgetPort;
   approvals?: ApprovalService;
   publish?: Publish;
   /** Stamped on every action record, so a trace names the build that produced it. */
@@ -805,6 +852,37 @@ export function createToolRegistry(opts: {
       // APPROVED and bound to this tool: fall through to execute. The approval
       // that AUTHORISED the run rides on the invocation and the record.
       meta.approval = { required: true, approvalId, status: approval.status };
+    }
+
+    // ── 3b. the tool-call allowance ──────────────────────────────────────────
+    // A policy-checked call is about to run, so its cost is charged NOW — before
+    // the effect, exactly like the dispatch allowance. Refusing here means the
+    // tool never ran, which is the only honest place to stop a loop.
+    const toolBudget = opts.toolBudget;
+    if (toolBudget !== undefined) {
+      const budgeted = toolBudget.scopeFor(invokeOpts);
+      if (budgeted !== null) {
+        const reserved = toolBudget.reserve({
+          toolId: id,
+          scope: budgeted.scope,
+          limits: budgeted.limits,
+          // A resume carries the approval id, so a REDELIVERED resume reuses its
+          // key and is charged once. An ordinary call has no such identity, and
+          // each call is its own invocation.
+          idempotencyKey:
+            invokeOpts?.approvalId !== undefined
+              ? `tool:${id}:${invokeOpts.approvalId}`
+              : `tool:${id}:${invocationNonce()}`,
+        });
+        if (!reserved.ok) {
+          return settle(meta, {
+            status: "DENIED",
+            decision,
+            error: toolError("POLICY_DENIED", reserved.reason, now),
+            detail: "tool-call budget exhausted",
+          });
+        }
+      }
     }
 
     // ── 4. execute ───────────────────────────────────────────────────────────

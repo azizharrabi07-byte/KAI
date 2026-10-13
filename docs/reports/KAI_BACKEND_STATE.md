@@ -667,3 +667,75 @@ measurement is recorded in `scripts/test.mjs` so the finding is not lost.
 
 **Not pushed.** No valid credential exists on this machine. The branch is intact and every
 commit is retained locally.
+
+---
+
+# Third pass — Priority 1 and Priority 2 completed
+
+## Priority 2 — test isolation. DONE.
+
+**Implemented, and this time it lands.** The first attempt was reverted because
+**nine** suites (down from sixteen — the approval work fixed seven) silently relied on the
+developer's real `KAI_HOME` holding a model credential, and failed with
+`ModelError: no API key configured` instead of skipping.
+
+The unblocking change is `core/tests/live-model.ts`:
+
+```ts
+export function liveModelSkipReason(): string | undefined   // inspects CONFIGURATION ONLY
+```
+
+It does not attempt a call and catches nothing, so **a real failure — a bad response, an
+auth rejection, a bug — can never be misreported as a missing credential.** Applied to the
+nine suites: `settings` (live effect), `skills-builtin` (a real turn), and the seven
+`task-completion` A–F cases.
+
+`scripts/test.mjs` now creates a unique throwaway `KAI_HOME` per run (`mkdtempSync`), so
+concurrent runs cannot collide over a directory, a database or a port, with cleanup on
+`exit` **and** `SIGINT`. A suite that sets `KAI_HOME` itself still wins — the five real-path
+suites are unaffected.
+
+**Evidence:** `[kai-test] KAI_HOME isolated to …\Temp\kai-test-home-…` and
+**1702 tests · 1669 pass · 0 fail · 33 skipped**, where each of the nine new skips prints:
+
+```
+# no model credential is configured for this KAI_HOME (…kai-test-home-…):
+  set KAI_MODEL_API_KEY, or write KAI_HOME/model/credentials.json.
+  This suite needs a live model and is skipped rather than failed.
+```
+
+## Priority 1 — tool-call budgets. DONE.
+
+`maxToolCalls` was declared in `WorkBudget` and enforced nowhere. It is now charged at the
+**one boundary every policy-checked call passes** — the tool registry — before the tool
+runs, into the **same ledger** the dispatch allowance uses (no second budget store).
+
+- `registry.ts` gains `ToolBudgetPort` and charges `kind: "toolCall"` immediately before
+  `execute`. A refusal returns `POLICY_DENIED` naming the kind, the ceiling and the scope,
+  and the tool never runs.
+- Scope is the **plan revision**, so a goal cannot multiply its tool budget by adding work
+  items — the same rule the dispatch allowance already follows.
+- The ceiling is the item's **existing** `WorkBudget.maxToolCalls`, threaded through
+  `ToolInvokeOptions`; no number is invented.
+- Idempotency: a resume carries its `approvalId`, so a **redelivered resume is charged
+  once**; an ordinary call has no such identity and each call is its own invocation.
+- A **parked** call is not charged: the budget is for calls that RUN, and Guard still comes
+  first — pinned by a test using a `DESTRUCTIVE` policy.
+- `enforceabilityOf(limits, capability, { kaiOwnedToolCalls: true })` now reports
+  `maxToolCalls: "enforced"` for **KAI's own** calls and `"unenforceable"` for a **worker's
+  internal** ones, naming which — it never claims to bound what it cannot observe.
+
+**Evidence:** `tests/tool-budget.test.ts` (8) — ceiling, the exact refusal text, redelivered
+resume charged once, five concurrent calls charged exactly five, an unscoped call charged
+nothing, a parked tool still parking, an unbounded scope still counted, and the
+KAI-owned/worker-internal distinction.
+
+## Still open after this pass
+
+| Priority | State |
+|---|---|
+| 3 — real-model critic evaluation | **Not started.** Needs a fixture corpus + an eval script; a model IS configured for the real home |
+| 4 — autonomous learning | **Not started.** `recordSkillUsage` is automatic; `proposeFromTask` is still `/refine`-only |
+| 5 — cost + runtime limits | **Not started.** `maxCostUsd` needs provider-reported cost or an explicit price table; `maxRuntimeMs` needs adapter cancellation |
+| 6 — `KAI_DEV_MODE` boundary | **Not started.** The bypass is scoped and documented; making a packaged runtime refuse it is the remaining work |
+| adapter / G-wiring / H-live / I | **Not started this pass** |

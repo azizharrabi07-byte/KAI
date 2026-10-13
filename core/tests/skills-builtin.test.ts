@@ -20,6 +20,10 @@ import { loadConfig } from "../src/config.ts";
 import { parseSkillMarkdown } from "../src/skills/validate.ts";
 import { BUILTIN_SKILLS, seedBuiltinSkills } from "../src/skills/builtin.ts";
 import { parseInvocations, resolveInvocations } from "../src/chat/invoke.ts";
+import { liveModelSkipReason } from "./live-model.ts";
+
+/** A live model is required here; without one this suite SKIPS, named. */
+const MODEL_SKIP = liveModelSkipReason();
 
 test("every builtin passes the same validation as a third-party skill", () => {
   assert.ok(BUILTIN_SKILLS.length >= 4, "a library, not a sample");
@@ -132,7 +136,7 @@ test("the KAI workflow pack resolves, loads, and carries output contracts", asyn
   assert.ok(trace.some((s) => s.id === "execution-trace"), "failure post-mortem finds execution-trace");
 });
 
-test("an adapted skill rides a real turn end to end", async (t) => {
+test("an adapted skill rides a real turn end to end", { skip: MODEL_SKIP }, async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "kai-skills-ride-"));
   const rt = createCoreRuntime({
     dbPath: join(dir, "core.db"),

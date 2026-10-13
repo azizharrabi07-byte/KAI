@@ -176,6 +176,22 @@ pass Guard — enabling it silently would let a critic reach a worker unapproved
   Measured tokens (hermes and codex parse them; opencode reports none) are debited
   to the durable budget under a `token` kind, idempotently per report id.
 
+### Tool calls have a real ceiling, and tests no longer read your credentials
+
+`maxToolCalls` was declared in `WorkBudget` and enforced nowhere. It is now charged at
+the **one boundary every policy-checked call passes** — the tool registry — before the
+tool runs, into the **same ledger** the dispatch allowance uses. Scope is the plan
+revision, so a goal cannot multiply its tool budget by adding work items; the ceiling is
+the item's existing `maxToolCalls`; a redelivered approval resume is charged **once**; a
+parked call is not charged, because Guard still comes first. `enforceabilityOf` now
+reports `maxToolCalls` **enforced for KAI's own calls** and **unenforceable for a
+worker's internal ones**, naming which — it never claims to bound what it cannot observe.
+
+The test suite no longer reads the developer's real `KAI_HOME`. A unique throwaway home is
+created per run, and the nine suites that need a live model **skip with a named reason**
+via `core/tests/live-model.ts`, which inspects CONFIGURATION ONLY — so a real failure can
+never be misreported as a missing credential.
+
 ### Approvals bind to the ACTION, not just the tool
 
 An approval used to name a tool id and nothing else, so a real "yes" to one action

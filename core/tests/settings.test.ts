@@ -18,6 +18,10 @@ import { createCoreRuntime } from "../src/runtime.ts";
 import { createKaiServer } from "../src/server.ts";
 import { loadConfig } from "../src/config.ts";
 import { MODEL_DEFAULTS, resolveModelSettings } from "../src/model/config.ts";
+import { liveModelSkipReason } from "./live-model.ts";
+
+/** A live model is required here; without one this suite SKIPS, named. */
+const MODEL_SKIP = liveModelSkipReason();
 
 function freshDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -183,7 +187,7 @@ test("LIVE HTTP: POST parks without approval, executes with one, GET reports sou
   assert.equal(got.effective.sources.name, "settings");
 });
 
-test("live effect: the next inference call carries the persisted model name", async (t) => {
+test("live effect: the next inference call carries the persisted model name", { skip: MODEL_SKIP }, async (t) => {
   const dir = freshDir("kai-settings-live-");
   const seen: string[] = [];
   const rt = boot(dir, {

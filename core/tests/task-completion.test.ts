@@ -25,6 +25,10 @@ import { createKaiServer } from "../src/server.ts";
 import { loadConfig } from "../src/config.ts";
 import { createProviderRegistry } from "../src/providers/registry.ts";
 import { isContinueText } from "../src/chat/tasks.ts";
+import { liveModelSkipReason } from "./live-model.ts";
+
+/** A live model is required here; without one this suite SKIPS, named. */
+const MODEL_SKIP = liveModelSkipReason();
 
 function freshDir(prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), prefix));
@@ -91,7 +95,7 @@ test("isContinueText: continuations resume, new requests do not", () => {
   }
 });
 
-test("A: search -> inspect -> explain delivers the explanation (COMPLETED)", async (t) => {
+test("A: search -> inspect -> explain delivers the explanation (COMPLETED)", { skip: MODEL_SKIP }, async (t) => {
   const dir = freshDir("kai-task-a-");
   const seen: string[] = [];
   const rt = boot(dir, (async (_url, init = {}) => {
@@ -120,7 +124,7 @@ test("A: search -> inspect -> explain delivers the explanation (COMPLETED)", asy
   assert.equal(task, null, "a completed task leaves nothing open");
 });
 
-test("B: read -> exact quote is verified verbatim (COMPLETED)", async (t) => {
+test("B: read -> exact quote is verified verbatim (COMPLETED)", { skip: MODEL_SKIP }, async (t) => {
   const dir = freshDir("kai-task-b-");
   const rt = boot(dir, (async (_url, init = {}) => {
     const body = typeof init.body === "string" ? JSON.parse(init.body) : {};
@@ -139,7 +143,7 @@ test("B: read -> exact quote is verified verbatim (COMPLETED)", async (t) => {
   assert.equal(answer.taskState, "COMPLETED");
 });
 
-test("C: research two topics -> structured comparison (COMPLETED)", async (t) => {
+test("C: research two topics -> structured comparison (COMPLETED)", { skip: MODEL_SKIP }, async (t) => {
   const dir = freshDir("kai-task-c-");
   let calls = 0;
   const rt = boot(dir, (async (_url, init = {}) => {
@@ -168,7 +172,7 @@ test("C: research two topics -> structured comparison (COMPLETED)", async (t) =>
   assert.equal(answer.taskState, "COMPLETED");
 });
 
-test("D1: budget-cut with synthesis delivers (COMPLETED, synthesized)", async (t) => {
+test("D1: budget-cut with synthesis delivers (COMPLETED, synthesized)", { skip: MODEL_SKIP }, async (t) => {
   const dir = freshDir("kai-task-d1-");
   const rt = boot(
     dir,
@@ -197,7 +201,7 @@ test("D1: budget-cut with synthesis delivers (COMPLETED, synthesized)", async (t
   assert.ok((answer.pendingTools ?? []).length > 0, "the remainder is named");
 });
 
-test("D2: budget-cut with empty synthesis pauses honestly (PAUSED)", async (t) => {
+test("D2: budget-cut with empty synthesis pauses honestly (PAUSED)", { skip: MODEL_SKIP }, async (t) => {
   const dir = freshDir("kai-task-d2-");
   const seen: string[] = [];
   const rt = boot(
@@ -224,7 +228,7 @@ test("D2: budget-cut with empty synthesis pauses honestly (PAUSED)", async (t) =
   void bodiesOf(seen);
 });
 
-test("E: 'continue' resumes the open task from the resume prompt", async (t) => {
+test("E: 'continue' resumes the open task from the resume prompt", { skip: MODEL_SKIP }, async (t) => {
   const dir = freshDir("kai-task-e-");
   const seen: string[] = [];
   let phase: "search" | "resume" = "search";
@@ -260,7 +264,7 @@ test("E: 'continue' resumes the open task from the resume prompt", async (t) => 
   assert.ok(tasks !== null);
 });
 
-test("F: tasks persist across a restart; PAUSED stays resumable", async (t) => {
+test("F: tasks persist across a restart; PAUSED stays resumable", { skip: MODEL_SKIP }, async (t) => {
   const dir = freshDir("kai-task-f-");
   const mk = () =>
     boot(dir, (async () => {

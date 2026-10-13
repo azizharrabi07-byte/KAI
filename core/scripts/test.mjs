@@ -21,11 +21,11 @@
  *   plus, with --with-dist, every compiled test under core/dist
  */
 
-import { readdirSync, existsSync, readFileSync } from "node:fs";
+import { readdirSync, existsSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join, dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 
 const CORE = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -89,26 +89,46 @@ console.log("");
 // rules call `decideAccess` directly with explicit inputs, so they are unaffected.
 process.env.KAI_DEV_MODE = "1";
 
-// ── KAI_HOME is NOT isolated here, and that is a MEASURED decision ───────────
+// ── KAI_HOME is ISOLATED for the whole run ───────────────────────────────────
 //
-// Isolating `KAI_HOME` to a throwaway directory was implemented and measured. It
-// is the correct end state, and it cannot land yet: 16 suites silently depend on
-// the developer's real home because it holds a working model credential. With an
-// isolated home they fail with
+// `KAI_HOME` defaults to the developer's real `%LOCALAPPDATA%\KAI`, so a suite
+// that boots a real Core read the DEVELOPER'S credentials, identity and settings.
+// That made the suite depend on the machine: a working model provider changed
+// what a Doer pass did, and a spent one changed it back.
 //
-//     ModelError: the "kai-model" model provider has no API key configured
+// This was implemented once before and REVERTED, because nine suites silently
+// relied on the developer's credential and failed with
+// `ModelError: no API key configured` instead of skipping. They are now guarded by
+// `tests/live-model.ts`, which asks about CONFIGURATION ONLY — so a suite that
+// needs a live model SKIPS with a named reason, while a suite that ran and failed
+// still fails. That is what makes isolation landable.
 //
-// instead of skipping. The affected suites are the ones that boot a real Core and
-// then make a model call: `settings` (live effect), `mcp/manager` (approved
-// retry), `skills-builtin` (a real turn), `subagent-memory-isolation` (5), and
-// the chat/campaign task suites (7).
+// A throwaway home is created per RUN (one node process serves every suite, so a
+// per-suite home is not something this runner can give). It is unique via
+// `mkdtempSync`, so concurrent runs cannot collide over a directory, a database or
+// a port, and removal is registered on exit AND on SIGINT.
 //
-// The fix is a shared "no model is configured -> skip with a named reason" helper
-// applied to those suites, so an unavailable credential reads as SKIPPED rather
-// than FAILED. Until that lands, isolating here would trade a real coupling for
-// sixteen red tests, which is worse than naming the coupling.
-//
-// Everything else about this runner is unchanged.
+// A suite that sets `KAI_HOME` itself still wins: it assigns the variable before
+// booting, which is the explicit opt-in the five real-path suites rely on.
+if (!process.env.KAI_HOME) {
+  const isolatedHome = mkdtempSync(join(tmpdir(), "kai-test-home-"));
+  process.env.KAI_HOME = isolatedHome;
+
+  const cleanup = () => {
+    try {
+      rmSync(isolatedHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch {
+      // A leftover temp directory is not worth failing a test run over.
+    }
+  };
+  process.on("exit", cleanup);
+  process.on("SIGINT", () => {
+    cleanup();
+    process.exit(130);
+  });
+
+  console.log(`[kai-test] KAI_HOME isolated to ${isolatedHome}`);
+}
 
 const result = spawnSync(process.execPath, ["--test", ...files], {
   stdio: "inherit",

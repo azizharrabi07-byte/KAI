@@ -195,7 +195,17 @@ export interface LimitEnforceability {
  * A limit that is not set is not reported as unenforceable — there is nothing to
  * enforce. A limit that IS set and cannot be measured is reported, loudly.
  */
-export function enforceabilityOf(limits: BudgetLimits, capability: WorkerUsageCapability): LimitEnforceability {
+export function enforceabilityOf(
+  limits: BudgetLimits,
+  capability: WorkerUsageCapability,
+  /**
+   * Whether the tool calls in question are KAI'S OWN, which pass through the one
+   * registry boundary and are therefore counted and ceilinged. A worker's
+   * INTERNAL tool calls are a different thing entirely: no adapter reports them,
+   * and claiming to bound them would be a claim KAI cannot keep.
+   */
+  opts: { kaiOwnedToolCalls?: boolean } = {},
+): LimitEnforceability {
   const unenforceable: { limit: string; reason: string }[] = [];
 
   const tokensEnforceable = capability.inputTokens || capability.outputTokens;
@@ -205,7 +215,8 @@ export function enforceabilityOf(limits: BudgetLimits, capability: WorkerUsageCa
       reason: "this worker reports no token usage, so a token ceiling cannot be held",
     });
   }
-  if (limits.maxToolCalls !== undefined && !capability.toolCalls) {
+  const kaiOwnsToolCalls = opts.kaiOwnedToolCalls === true;
+  if (limits.maxToolCalls !== undefined && !kaiOwnsToolCalls) {
     unenforceable.push({
       limit: "maxToolCalls",
       reason:
@@ -228,7 +239,11 @@ export function enforceabilityOf(limits: BudgetLimits, capability: WorkerUsageCa
     maxReassignments: "enforced",
     maxRuntimeMs: "enforced",
     maxTokens: limits.maxTokens === undefined ? "enforced" : tokensEnforceable ? "enforced" : "unenforceable",
-    maxToolCalls: limits.maxToolCalls === undefined ? "enforced" : capability.toolCalls ? "enforced" : "unenforceable",
+    // KAI's OWN tool calls are counted at the registry boundary, so a ceiling on
+    // them is real. A worker's internal calls are still unobservable, and that
+    // distinction is what `unenforceable` above records.
+    maxToolCalls:
+      limits.maxToolCalls === undefined ? "enforced" : kaiOwnsToolCalls || capability.toolCalls ? "enforced" : "unenforceable",
     maxCostUsd: limits.maxCostUsd === undefined ? "enforced" : capability.costUsd ? "enforced" : "unenforceable",
     unenforceable,
   };

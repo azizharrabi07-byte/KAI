@@ -121,7 +121,17 @@ export interface SupervisorToolsPort {
   invoke(
     id: string,
     input: unknown,
-    opts?: { missionId?: string; turnId?: string; source?: string; approvalId?: string },
+    opts?: {
+      missionId?: string;
+      turnId?: string;
+      source?: string;
+      approvalId?: string;
+      /** The goal revision whose tool-call allowance this call spends. */
+      goalId?: string;
+      goalRevisionId?: string;
+      /** The item's declared ceiling, when it has one. */
+      maxToolCalls?: number;
+    },
   ): Promise<{
     ok: boolean;
     result?: unknown;
@@ -806,6 +816,11 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       turnId: `supervise:${item.id}`,
       source: "orchestrator:verify",
       ...(opts?.approvalId !== undefined ? { approvalId: opts.approvalId } : {}),
+      // The tool-call allowance belongs to the PLAN REVISION, exactly as the
+      // dispatch allowance does, so a goal cannot multiply it by adding items.
+      ...(item.goalId !== undefined ? { goalId: item.goalId } : {}),
+      ...(item.goalRevisionId !== undefined ? { goalRevisionId: item.goalRevisionId } : {}),
+      ...(item.budget?.maxToolCalls !== undefined ? { maxToolCalls: item.budget.maxToolCalls } : {}),
     };
     if (deps.tools === undefined) {
       return {

@@ -2081,6 +2081,39 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     policy,
     approvals,
     publish,
+    /**
+     * The tool-call allowance, at the ONE boundary every policy-checked call
+     * passes through. It reaches the SAME ledger the dispatch allowance uses —
+     * no second budget store — and charges the call BEFORE it runs.
+     *
+     * Scope: the plan revision, so a goal cannot multiply its tool budget by
+     * adding work items. A call with no goal linkage is not budgeted here, and
+     * `enforceabilityOf` says so rather than implying it was counted.
+     */
+    toolBudget: {
+      scopeFor: (opts) => {
+        const goalId = opts?.goalId;
+        if (goalId === undefined) return null;
+        return {
+          scope: {
+            goalId,
+            ...(opts?.goalRevisionId !== undefined ? { planRevisionId: opts.goalRevisionId } : {}),
+            chainId: goalId,
+          },
+          limits: opts?.maxToolCalls !== undefined ? { maxToolCalls: opts.maxToolCalls } : {},
+        };
+      },
+      reserve: ({ toolId, scope, limits, idempotencyKey }) => {
+        const reserved = budgetLedger.reserve({
+          scope,
+          kind: "toolCall",
+          limits,
+          idempotencyKey,
+          detail: `tool call ${toolId}`,
+        });
+        return reserved.ok ? { ok: true } : { ok: false, reason: reserved.reason };
+      },
+    },
     // Stamped on every action record so a trace names the build that produced it.
     coreBuildId: loadIdentity().buildId,
     /**
@@ -4029,6 +4062,9 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
           ...(opts?.missionId !== undefined ? { missionId: opts.missionId } : {}),
           ...(opts?.turnId !== undefined ? { turnId: opts.turnId } : {}),
           ...(opts?.approvalId !== undefined ? { approvalId: opts.approvalId } : {}),
+          ...(opts?.goalId !== undefined ? { goalId: opts.goalId } : {}),
+          ...(opts?.goalRevisionId !== undefined ? { goalRevisionId: opts.goalRevisionId } : {}),
+          ...(opts?.maxToolCalls !== undefined ? { maxToolCalls: opts.maxToolCalls } : {}),
         });
         if (invoked.ok) return { ok: true as const, result: invoked.result };
         return {
