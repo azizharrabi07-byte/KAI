@@ -33,6 +33,7 @@ import { buildGoalsView as buildGoals } from "./goals";
 import { buildCockpitView } from "./cockpit";
 import { createOrb, setOrbMood, boop, mountOrbParallax, MOOD_LABELS, MOOD_ORDER, type Mood } from "./orb";
 import { MoodDriver } from "./mood";
+import { hasTypedArgs } from "./slash-args";
 import { createAgentApi, type Subagent } from "../../agents/api";
 import { createSessionRoutes } from "../../chat/session-routes";
 import { sessionDisplayTitle } from "../../chat/title";
@@ -1476,7 +1477,9 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
       const suggestions = argSuggestions(first.source, rest);
       rows = suggestions.map((s) => ({ label: s.value, sub: s.sub, apply: `/${exact.id} ${s.value} ` }));
       if (rows.length === 0) {
-        rows = [{ label: first.name, sub: first.description ?? exact.usage, apply: `/${exact.id} ` }];
+        // A free-form argument has no list to choose from, so this row must not
+        // replace what was typed — its apply text keeps the existing argument.
+        rows = [{ label: first.name, sub: first.description ?? exact.usage, apply: `/${exact.id} ${rest}` }];
       }
     } else {
       slashPop.classList.remove("on");
@@ -1524,7 +1527,19 @@ export function mountPresence(root: HTMLElement, ctx: ShellContext): ShellPage {
       return true;
     }
     if (e.key === "Enter" || e.key === "Tab") {
+      // A free-form argument is TYPED, not chosen from a list. `/work Fix the
+      // broken login test` must keep that text: accepting a row writes the row's
+      // template (`/work `) over the composer, so doing that while the user has
+      // already typed arguments silently discards the whole task and submits an
+      // empty command. That is the reported `/work` payload loss.
+      const hasArgs = hasTypedArgs(chatInput.value);
       e.preventDefault();
+      if (hasArgs) {
+        // Enter runs exactly what the user wrote; Tab only dismisses the menu.
+        slashPop.classList.remove("on");
+        if (e.key === "Enter") submit();
+        return true;
+      }
       const target = current >= 0 ? buttons[current] : buttons[0];
       target?.click();
       // Tab completes the text so typing can continue; Enter sends it —

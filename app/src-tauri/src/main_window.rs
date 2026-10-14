@@ -127,8 +127,28 @@ pub fn attach(app: &AppHandle) {
     let hidden = win.clone();
     let events_handle = app.clone();
     win.on_window_event(move |event| {
+        // Every event, so an unexplained close is attributable. The window went
+        // away ~76s after launch with no interaction and NOTHING in our code asks
+        // for it, so the event immediately before the close is the evidence.
+        let name = match event {
+            tauri::WindowEvent::CloseRequested { .. } => "CloseRequested",
+            tauri::WindowEvent::Destroyed => "Destroyed",
+            tauri::WindowEvent::Focused(_) => "Focused",
+            tauri::WindowEvent::Resized(_) => "Resized",
+            tauri::WindowEvent::Moved(_) => "Moved",
+            tauri::WindowEvent::ScaleFactorChanged { .. } => "ScaleFactorChanged",
+            tauri::WindowEvent::ThemeChanged(_) => "ThemeChanged",
+            _ => "other",
+        };
+        if name != "Resized" {
+            crate::log::line(format!("main window event: {name}"));
+        }
         match event {
             tauri::WindowEvent::CloseRequested { api, .. } => {
+                // This is the ONLY path that hides the main window, so it must say
+                // so: a hidden workspace that nothing claims to have hidden is the
+                // "app shut itself down" report, and there was no line to explain it.
+                crate::log::line("main window: CloseRequested — hiding (KAI keeps running)");
                 api.prevent_close();
                 let _ = hidden.hide();
                 // Closed → the island returns as the companion (owner §36).
