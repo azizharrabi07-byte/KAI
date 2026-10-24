@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Only the app's own script files run: text from a model, a site or a file can never become code here.
+       The page itself calls DeepSeek alone; the other providers are called from the main process. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' data: blob:; font-src 'self' data:; connect-src https://api.deepseek.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KAI2</title>
+  <link rel="icon" href="desktop/icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="desktop.js"></script>
+  <script src="theme.js"></script>
+</head>
+<body>
+  <div class="titlebar"><div class="titlebar-name"></div>
+    <button type="button" class="tasks-button" title="Tasks and schedule" aria-expanded="false">
+      <span class="tasks-button-label">Tasks</span>
+      <span class="tasks-badge" hidden></span>
+    </button>
+  </div>
+
+  <section class="tasks-panel" hidden aria-label="Tasks and schedule">
+    <div class="summary-head">
+      <span class="summary-title">Tasks &amp; Schedule</span>
+      <button type="button" class="tasks-close" aria-label="Close">×</button>
+    </div>
+    <div class="tasks-body"></div>
+  </section>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-search">
+          <search-button class="sidebar-search-button"></search-button>
+          <input class="sidebar-search-input" type="text" placeholder="Search" aria-label="Search chats" aria-keyshortcuts="Control+K Meta+K" data-i18n-attr="placeholder:search;aria-label:search.label" autocomplete="off" spellcheck="false" inert>
+          <button class="sidebar-search-clear" type="button" tabindex="-1" aria-label="Clear search" data-i18n-attr="aria-label:search.clear">
+            <svg viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M1.5 1.5l5 5M6.5 1.5l-5 5"/></svg>
+          </button>
+        </div>
+        <add-button class="sidebar-new-chat" label="New chat" data-i18n-attr="label:chat.new"></add-button>
+      </div>
+      <nav class="chats" aria-label="Chats" data-i18n-attr="aria-label:chats.label">
+        <div class="chats-scroll"><div class="chats-list"></div></div>
+        <div class="scrollbar chats-scrollbar" aria-hidden="true"><div class="scrollbar-thumb"></div></div>
+      </nav>
+      <div class="sidebar-footer">
+        <settings-button class="sidebar-settings" data-i18n="settings">Settings</settings-button>
+      </div>
+    </aside>
+    <main class="main is-empty">
+      <sidebar-toggle class="sidebar-toggle"></sidebar-toggle>
+      <browser-toggle class="browser-toggle" hidden></browser-toggle>
+      <div class="thread-view">
+        <div class="thread">
+          <div class="thread-list"></div>
+        </div>
+        <div class="scrollbar thread-scrollbar" aria-hidden="true"><div class="scrollbar-thumb"></div></div>
+        <scroll-button class="thread-bottom glass-lens"></scroll-button>
+      </div>
+      <div class="drop-zone" aria-hidden="true">
+        <div class="drop-art"></div>
+        <div class="drop-title" data-i18n="drop.title">Drop files here</div>
+        <div class="drop-hint" data-i18n="drop.hint">Photos, code, documents and anything else</div>
+      </div>
+      <div class="welcome" aria-hidden="true"><div class="welcome-flight"><kai-avatar></kai-avatar></div></div>
+      <!-- What KAI is doing, rendered from Core's OWN tool events (see kai-activity.js).
+           Hidden until there is real activity, so routine chat stays uncluttered. -->
+      <kai-activity hidden></kai-activity>
+      <div class="approval-tray" hidden></div>
+      <div class="mode-notice" hidden role="status" aria-live="polite"></div>
+      <section class="summary-panel" hidden aria-label="Daily summary">
+        <div class="summary-head">
+          <span class="summary-title">Daily summary</span>
+          <button type="button" class="summary-close" aria-label="Close">×</button>
+        </div>
+        <pre class="summary-body"></pre>
+      </section>
+      <div class="composer">
+        <button type="button" class="composer-folder"></button>
+        <div class="composer-attachments"><div class="attachments-row" aria-label="Attachments" data-i18n-attr="aria-label:attach.label"></div></div>
+        <input class="composer-picker" type="file" multiple hidden>
+        <div class="composer-field">
+          <div class="composer-placeholder" aria-hidden="true" data-i18n="composer.placeholder">Ask anything</div>
+          <div class="composer-mirror" aria-hidden="true"><div class="composer-mirror-lines"></div></div>
+          <div class="composer-ghosts" aria-hidden="true"></div>
+          <textarea class="composer-input" aria-label="Message" aria-placeholder="Ask anything" data-i18n-attr="aria-label:composer.label;aria-placeholder:composer.placeholder" autofocus></textarea>
+          <div class="scrollbar composer-scrollbar" aria-hidden="true"><div class="scrollbar-thumb"></div></div>
+        </div>
+        <div class="composer-toolbar">
+          <div class="composer-tools">
+            <add-button class="composer-add" label="Add photos, videos and files" data-i18n-attr="label:attach.add"></add-button>
+            <button type="button" class="composer-mode" aria-haspopup="menu" aria-expanded="false" hidden></button>
+            <!-- KAI Doer: whether KAI may act on its own. Reads and writes the REAL
+                 Core switch (owner-only); the label never claims a state Core refused. -->
+            <button type="button" class="composer-doer" aria-pressed="false"
+                    title="KAI Doer — let KAI take permitted next steps by itself"></button>
+            <!-- Monster Mode: how far KAI carries a mission without being asked
+                 again. Core enforces the limits; the label mirrors Core. -->
+            <button type="button" class="composer-monster" aria-pressed="false"
+                    title="Monster Mode — KAI plans, dispatches and verifies a mission on its own"></button>
+            <!-- Pending approvals from Core. Hidden until there is something to decide,
+                 so routine chat stays uncluttered. -->
+            <button type="button" class="composer-approvals" hidden></button>
+            <!-- The day's work summary, on demand. Never consumes the once-a-day offer. -->
+            <button type="button" class="composer-summary" title="Daily summary — what got done, verified"><span class="composer-summary-label">Summary</span></button>
+          </div>
+          <div class="composer-actions">
+            <model-button class="composer-model"></model-button>
+            <effort-button class="composer-effort"></effort-button>
+            <send-button class="composer-send" disabled></send-button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="effort-panel" popover="manual" role="dialog" aria-label="Effort" data-i18n-attr="aria-label:effort">
+    <div class="effort-slider" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="3" aria-label="Effort" data-i18n-attr="aria-label:effort">
+      <div class="effort-track"><span class="effort-fill"></span></div>
+      <span class="effort-thumb glass-lens"></span>
+    </div>
+  </div>
+
+  <div class="model-stage" popover="manual" role="dialog" aria-label="Model" data-i18n-attr="aria-label:model"></div>
+
+  <div class="note-panel" popover="auto" role="dialog" aria-labelledby="note-title">
+    <div class="note-head">
+      <span class="note-thumb" aria-hidden="true"></span>
+      <span class="note-title" id="note-title"></span>
+    </div>
+    <textarea class="note-input" rows="3" spellcheck="true" aria-label="Note" data-i18n-attr="placeholder:note.placeholder;aria-label:note.label"></textarea>
+    <div class="note-foot">
+      <span class="note-hint" data-i18n="note.hint">Press Enter to save</span>
+      <button type="button" class="note-done" data-i18n="note.done">Done</button>
+    </div>
+  </div>
+
+  <dialog class="settings" closedby="any" aria-labelledby="settings-title" tabindex="-1">
+    <nav class="settings-nav" aria-label="Settings sections" data-i18n-attr="aria-label:settings.sections">
+      <div class="settings-heading" id="settings-title" data-i18n="settings">Settings</div>
+      <div class="settings-tabs" role="tablist" aria-orientation="vertical" aria-labelledby="settings-title">
+        <span class="settings-glide" aria-hidden="true"></span>
+        <button type="button" class="settings-tab" role="tab" data-page="general" aria-controls="settings-general" aria-selected="true">
+          <svg class="settings-tab-icon is-sliders" viewBox="30 30 60 60" fill="none" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="slide-a1" d="M38 47H46"/><path class="slide-a2" d="M58 47H82"/><path class="slide-b1" d="M38 73H62"/><path class="slide-b2" d="M74 73H82"/><circle class="knob-a" cx="52" cy="47" r="6"/><circle class="knob-b" cx="68" cy="73" r="6"/></svg>
+          <span data-i18n="settings.general">General</span>
+        </button>
+        <button type="button" class="settings-tab" role="tab" data-page="providers" aria-controls="settings-providers" aria-selected="false" tabindex="-1">
+          <svg class="settings-tab-icon is-plug" viewBox="30 30 60 60" fill="none" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="plug"><path d="M52 36v10M68 36v10"/><path d="M44 46h32v7a15 15 0 0 1-15 15h-2a15 15 0 0 1-15-15z"/></g><path d="M60 68v8a6 6 0 0 1-6 6h-4"/></svg>
+          <span data-i18n="settings.providers">Providers</span>
+        </button>
+        <button type="button" class="settings-tab" role="tab" data-page="usage" aria-controls="settings-usage" aria-selected="false" tabindex="-1">
+          <svg class="settings-tab-icon is-bars" viewBox="30 30 60 60" fill="none" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="bar-a" d="M42 80V62"/><path class="bar-b" d="M60 80V40"/><path class="bar-c" d="M78 80V52"/></svg>
+          <span data-i18n="settings.usage">Usage</span>
+        </button>
+        <button type="button" class="settings-tab" role="tab" data-page="appearance" aria-controls="settings-appearance" aria-selected="false" tabindex="-1">
+          <svg class="settings-tab-icon is-contrast" viewBox="30 30 60 60" fill="none" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="60" cy="60" r="21"/><path class="half" d="M60 39a21 21 0 0 1 0 42z" fill="currentColor"/></svg>
+          <span data-i18n="settings.appearance">Appearance</span>
+        </button>
+        <button type="button" class="settings-tab" role="tab" data-page="character" aria-controls="settings-character" aria-selected="false" tabindex="-1">
+          <svg class="settings-tab-icon is-avatar" viewBox="30 30 60 60" fill="none" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="avatar-body" d="M60 31c15 0 26 10 26 23 0 13-10 21-26 21S34 67 34 54c0-13 11-23 26-23z"/><circle class="avatar-eye-a" cx="50" cy="52" r="3.2" fill="currentColor" stroke="none"/><circle class="avatar-eye-b" cx="70" cy="52" r="3.2" fill="currentColor" stroke="none"/><path class="avatar-tuft" d="M60 31c1-4 4-6 8-6"/></svg>
+          <span data-i18n="settings.character">Character</span>
+        </button>
+      </div>
+    </nav>
+    <section class="settings-page" aria-labelledby="settings-page-title">
+      <header class="settings-page-header">
+        <h2 class="settings-page-title" id="settings-page-title" data-i18n="settings.general">General</h2>
+        <close-button class="settings-close"></close-button>
+      </header>
+      <div class="settings-panel" id="settings-general" role="tabpanel" data-page="general" aria-labelledby="settings-page-title"></div>
+      <div class="settings-panel" id="settings-providers" role="tabpanel" data-page="providers" aria-labelledby="settings-page-title" hidden>
+        <p class="settings-lead" data-i18n="settings.lead">Connect the services whose models KAI can use. Keys and sign-ins stay on this computer.</p>
+        <div class="settings-providers"></div>
+      </div>
+      <div class="settings-panel" id="settings-usage" role="tabpanel" data-page="usage" aria-labelledby="settings-page-title" hidden></div>
+      <div class="settings-panel" id="settings-appearance" role="tabpanel" data-page="appearance" aria-labelledby="settings-page-title" hidden></div>
+      <div class="settings-panel" id="settings-character" role="tabpanel" data-page="character" aria-labelledby="settings-page-title" hidden></div>
+    </section>
+    <div class="scrollbar settings-scrollbar" aria-hidden="true"><div class="scrollbar-thumb"></div></div>
+  </dialog>
+
+  <div class="splash" aria-hidden="true">
+    <div class="splash-bg"><div class="splash-aura"></div><canvas class="splash-mist"></canvas></div>
+    <div class="splash-fly"><div class="splash-ghost"><div class="splash-ghost-body"><ghost-thinking></ghost-thinking></div></div></div>
+    <div class="splash-word">KAI2</div>
+  </div>
+  <script src="splash-mist.js"></script>
+
+  <script src="i18n.js"></script>
+  <script src="liquid-glass.js"></script>
+  <script src="icon-button.js"></script>
+  <script src="sidebar-toggle.js"></script>
+  <script src="browser-toggle.js"></script>
+  <script src="add-button.js"></script>
+  <script src="search-button.js"></script>
+  <script src="search-field.js"></script>
+  <script src="settings-button.js"></script>
+  <script src="close-button.js"></script>
+  <script src="clear-button.js"></script>
+  <script src="effort-button.js"></script>
+  <!-- KAI2: KAI's real character engine (the KAI app's `app/src/character/`, compiled
+       into one file — see the header of kai-character-engine.js). Ghost, welcome,
+       mini chat and the effort panel all mount THIS. Loaded before ghost-thinking.js. -->
+  <script src="kai-character-engine.js"></script>
+  <!-- KAI3D: the 3D character (built from avatar3d/). Registers <kai-avatar> and window.KaiAvatar.
+       Loaded BEFORE ghost-thinking.js: that element mounts the 3D face when this is available,
+       and falls back to the 2D engine above when it is not. -->
+  <script src="kai-avatar3d.js"></script>
+  <script src="ghost-thinking.js"></script>
+  <script src="welcome-ghost.js"></script>
+  <script src="scrollbar.js"></script>
+  <script src="smooth-height.js"></script>
+  <script src="link-chip.js"></script>
+  <script src="composer-text.js"></script>
+  <script src="send-button.js"></script>
+  <script src="scroll-button.js"></script>
+  <script src="deepseek.js"></script>
+  <script src="providers.js"></script>
+  <!-- KAI2: replaced the provider seam. Loaded last so it wins. -->
+  <script src="kai-bridge.js"></script>
+  <!-- KAI2: what the character is doing, from real events only. Must come after
+       kai-bridge.js: it wraps the seam the bridge installs. -->
+  <script src="kai-character-state.js"></script>
+  <!-- KAI2: the activity inspector. Must come after kai-bridge.js, which is where the
+       real Core tool events are recorded; this only renders them. -->
+  <script src="kai-activity.js"></script>
+  <script src="tex.js"></script>
+  <script src="highlight.js"></script>
+  <script src="markdown.js"></script>
+  <script src="diagram.js"></script>
+  <script src="stream-view.js"></script>
+  <script src="row-glide.js"></script>
+  <script src="file-kinds.js"></script>
+  <script src="attachment-reader.js"></script>
+  <script src="attachments.js"></script>
+  <script src="media-slider.js"></script>
+  <script src="media-embed.js"></script>
+  <script src="settings.js"></script>
+  <script src="settings-general.js"></script>
+  <script src="settings-appearance.js"></script>
+  <script src="settings-character.js"></script>
+  <script src="effort-paint.js"></script>
+  <script src="effort-morph.js"></script>
+  <script src="effort-stage.js"></script>
+  <script src="effort-slider.js"></script>
+  <script src="glyphs.js"></script>
+  <script src="model-button.js"></script>
+  <script src="chat-store.js"></script>
+  <script src="usage.js"></script>
+  <script src="settings-usage.js"></script>
+  <script src="user-context.js"></script>
+  <script src="chat-lock.js"></script>
+  <script src="library.js"></script>
+  <script src="agent-tools.js"></script>
+  <script src="agent-prompt.js"></script>
+  <script src="approval-card.js"></script>
+  <script src="stats-card.js"></script>
+  <script src="chat.js"></script>
+  <script src="chat-list.js"></script>
+  <script src="folder-pill.js"></script>
+  <script src="dock.js"></script>
+  <script src="mode-picker.js"></script>
+  <script src="add-menu.js"></script>
+  <script src="model-stage.js"></script>
+  <script src="selection-focus.js"></script>
+  <script src="selection-menu.js"></script>
+  <script src="mini-chat.js"></script>
+  <script src="browser-panel.js"></script>
+  <script src="lock-ui.js"></script>
+  <script src="script.js"></script>
+  <script src="splash.js"></script>
+</body>
+</html>

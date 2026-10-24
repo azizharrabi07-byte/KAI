@@ -1,0 +1,81 @@
+{
+  "name": "kai2",
+  "productName": "KAI2",
+  "version": "1.3.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kai/kai2-desktop.git"
+  },
+  "description": "KAI2 — the KAI desktop application.",
+  "main": "desktop/main.js",
+  "scripts": {
+    "start": "electron .",
+    "shortcut": "electron . --create-shortcut",
+    "test": "node --test",
+    "stamp:core": "node scripts/stamp-core-expectation.mjs",
+    "dist": "npm run stamp:core -- \"C:\\\\tmp\\\\kai-exec\\\\app\\\\target\\\\release\\\\core\" && electron-builder --win nsis --publish never && node scripts/verify-core-contract.mjs",
+    "dist:portable": "npm run stamp:core -- \"C:\\\\tmp\\\\kai-exec\\\\app\\\\target\\\\release\\\\core\" && electron-builder --win portable --publish never && node scripts/verify-core-contract.mjs",
+    "dist:mac": "electron-builder --mac dmg --universal --publish never",
+    "dist:linux": "electron-builder --linux tar.gz --publish never",
+    "verify:core": "node scripts/verify-core-contract.mjs",
+    "build:avatar": "node avatar3d/build.mjs",
+    "dist:portable:track": "node scripts/stamp-core-expectation.mjs \"C:\\\\tmp\\\\kai-exec\\\\app\\\\target\\\\release\\\\core\" --mode track && electron-builder --win portable --publish never && node scripts/verify-core-contract.mjs",
+    "test:live": "node scripts/live-checks.mjs"
+  },
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.kai.kai2",
+    "productName": "KAI2",
+    "icon": "desktop/icon.ico",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!images/**",
+      "!.github/**",
+      "!test/**",
+      "!scripts/**",
+      "!**/*.md"
+    ],
+    "asar": true,
+    "win": {
+      "target": "portable",
+      "icon": "desktop/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "KAI2",
+      "artifactName": "KAI2-${version}-Setup.exe",
+      "uninstallDisplayName": "KAI2"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "desktop/icon.png",
+      "category": "public.app-category.utilities",
+      "artifactName": "OpenGhost-${version}-mac.${ext}",
+      "identity": null
+    },
+    "linux": {
+      "target": "tar.gz",
+      "icon": "desktop/icon.png",
+      "category": "Utility",
+      "artifactName": "OpenGhost-${version}-linux.${ext}"
+    },
+    "portable": {
+      "artifactName": "KAI2.exe"
+    }
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0"
+  }
+}

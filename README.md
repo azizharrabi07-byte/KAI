@@ -28,8 +28,13 @@ KAI's character, icon and sounds are original — no upstream brand or artwork i
 
 ## Architecture
 
+> **Two desktop shells live here.** `desktop-electron/` is the Electron app the owner actually
+> runs (`KAI2.exe`) — the one wired to the delivery pipeline, the Monster Mode control and the
+> activity inspector. `app/` is the Tauri shell (`Rust · WebView2`), a separate, older surface.
+> They are not interchangeable; see the handoff before touching either.
+
 ```
-KAI desktop app   (Tauri 2 · Rust · TypeScript · WebView2)
+KAI desktop app   (desktop-electron/ · Electron)   [app/ · Tauri shell, older]
       │  loopback HTTP/SSE to KAI Core
       ▼
 KAI Core          (Node service · 127.0.0.1:8788)

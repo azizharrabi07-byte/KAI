@@ -1,0 +1,10 @@
+{
+  "service": "kai-core",
+  "mode": "pinned",
+  "coreBuildId": "75136495bb1b92c4",
+  "protocolVersion": 1,
+  "gitCommit": "548622cb7997ec4d4fb48296b60cc1ce614e7f41",
+  "stampedAt": "2026-10-24T15:53:59.126Z",
+  "stampedFrom": "C:\\tmp\\kai-exec\\app\\target\\release\\core\\build-info.json",
+  "note": "The Core build this KAI2 release expects. Regenerate with `npm run stamp:core -- <core-artifact-dir>` whenever the Core is rebuilt; a mismatch is refused rather than silently accepted. This file records WHICH Core KAI2 expects, it does not launch or supervise one."
+}
