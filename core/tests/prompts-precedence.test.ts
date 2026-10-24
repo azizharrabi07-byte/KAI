@@ -299,12 +299,12 @@ test("a flood of memory and skills cannot displace safety, identity or the reque
     identity: IDENTITY,
     memory: async (_q, o) => many.slice(0, o.limit),
     skills: { relevant: async (_q, l) => manySkills.slice(0, l) },
-    limits: { total: 4000 },
+    limits: { total: 5200 },
   });
   const request = "HOLD the release: do not deploy anything until I approve.";
   const res = await composer.compose(request, { mission: MISSION });
 
-  assert.ok(res.totalChars <= 4000, `total ${res.totalChars} <= 4000`);
+  assert.ok(res.totalChars <= 5200, `total ${res.totalChars} <= 5200`);
   assert.ok(res.problems.some((p) => /total limit/.test(p)), "the trim is reported, not hidden");
   for (const name of ["safety", "identity", "request"] as const) {
     assert.ok(res.sections.some((s) => s.name === name), `${name} survived the pressure`);

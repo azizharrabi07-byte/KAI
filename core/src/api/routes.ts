@@ -30,7 +30,7 @@
  */
 
 import type { CoreRuntime } from "../runtime.ts";
-import { decideAccess } from "./authz.ts";
+import { decideAccess, workerTokenMayAccess } from "./authz.ts";
 import { classifyCriterion } from "../goals/criteria.ts";
 import { buildWorkerPreflight } from "../workforce/preflight.ts";
 import { isGoalState, routeTo, type Goal, type GoalState } from "../goals/goal.ts";
@@ -51,6 +51,7 @@ import {
 } from "../mcp/routes.ts";
 import { registerToolRoutes } from "../tools/routes.ts";
 import { registerIdentityRoutes } from "../agent/identity-routes.ts";
+import { authorizeWorkerAction } from "./worker-authorize.ts";
 import { compileVisual, validateIntent, VISUAL_KINDS, VISUAL_LIMITS } from "../visual/spec.ts";
 import { createPlan } from "../plans/plans.ts";
 import type { ActionResultState } from "../observability/action-record.ts";
@@ -72,6 +73,7 @@ import type {
   MissionStep,
   ScheduledTask,
 } from "../shared/contracts.ts";
+import { isPolicyMode } from "../shared/contracts.ts";
 
 // ── Public surface ─────────────────────────────────────────────────────────────
 
@@ -92,11 +94,24 @@ export interface ApiRequest {
    */
   attested?: boolean;
   /**
+   * Whether the caller proved it holds the WORKER credential minted for the
+   * Hermes `pre_tool_call` hook. Computed by the server from
+   * `x-kai-worker-token`; a direct in-process call must pass it explicitly.
+   * It unlocks only `WORKER_TOKEN_ROUTES` (see authz.ts), never owner routes.
+   */
+  workerAttested?: boolean;
+  /**
    * Whether this Core has an owner credential at all. When false, owner-only
    * routes cannot be enforced and are allowed (a bare developer Core); when
    * true, an unattested owner-only request is REFUSED.
    */
   ownerAuthConfigured?: boolean;
+  /**
+   * Whether this Core holds a worker credential for the Hermes pre_tool_call
+   * hook (see worker-token.ts). Reported by GET /identity; never inferred from
+   * a request body.
+   */
+  workerAuthConfigured?: boolean;
   /**
    * An EXPLICIT developer switch. Never the silent default: it is set only when
    * the operator asked for it, and the decision records that it was used.
@@ -405,6 +420,8 @@ export const MUTATION_TOOL_IDS = {
   /** Plugin lifecycle — the SAME id runtime.ts registers. */
   pluginLifecycle: "plugin.lifecycle",
   policySet: "policy.set",
+  /** Change the policy MODE (elevations park; downgrades do not) — the SAME id runtime.ts registers. */
+  policyMode: "policy.mode",
   sessionManage: "session.manage",
   maintenanceRun: "maintenance.run",
 } as const;
@@ -455,6 +472,12 @@ async function invokeGate(
       return { ok: false, response: notFound(error.message) };
     case "VALIDATION_FAILED":
       return { ok: false, response: bad(error.message) };
+    case "ALREADY_DISPATCHED":
+      // The approval was already spent by the one dispatch attempt it authorised. That is
+      // a CONFLICT, not a server fault: the request is understood and refused because the
+      // operation it refers to has already happened, so the caller should read the
+      // existing outcome rather than retry. 500 here would read as a bug.
+      return { ok: false, response: conflict(error.message) };
     default:
       return {
         ok: false,
@@ -661,8 +684,25 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
       title: string;
       description?: string;
       steps: typeof steps;
+      metadata?: Record<string, unknown>;
     } = { title, steps };
     if (description !== undefined) input.description = description;
+
+    // ── Explicit acceptance criteria ──────────────────────────────────────────
+    // Stated UP FRONT and never inferred from what a worker later produces: a criterion
+    // derived from the worker's own output would be the worker grading itself. A mission
+    // without criteria can never complete, because the evidence gate has nothing it could
+    // have verified — which is the fail-closed direction this whole path is built for.
+    const criteria = body.criteria;
+    if (criteria !== undefined) {
+      if (
+        !Array.isArray(criteria) ||
+        criteria.some((entry) => typeof entry !== "string" || entry.trim().length === 0)
+      ) {
+        return bad('"criteria" must be an array of non-empty strings');
+      }
+      input.metadata = { criteria: (criteria as string[]).map((entry) => entry.trim()) };
+    }
 
     const mission: Mission = await runtime.createAndStartMission(input);
     return ok({ mission }, 201);
@@ -713,6 +753,66 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
       return { status: unavailable ? 503 : 422, body: { error: true, reason: outcome.reason } };
     }
     return ok({ mission: outcome.mission }, 201);
+  }
+
+  // ── POST /missions/auto — plan, start and run, without asking again ──────────
+  //
+  // This is Monster Mode's actual entry point. It is deliberately ONE call: the
+  // owner states the outcome, and KAI plans, dispatches and verifies it through
+  // the same mission engine a hand-approved plan uses. Nothing here bypasses
+  // policy — every step still meets the mission gate when it runs — and nothing
+  // here widens authority: with DOER OFF the executor refuses to start the
+  // mission and says so.
+  async function autoMissionHandler(req: ApiRequest): Promise<ApiResponse> {
+    const body = asBodyObject(req.body);
+    if (body === null || typeof body.goal !== "string" || body.goal.trim().length === 0) {
+      return bad('"body" must be a JSON object with a non-empty string "goal"');
+    }
+    const prefs = readOrchestrationPrefs(runtime.stores.settings);
+    // A truthful refusal beats a mission that silently never runs.
+    if (prefs.monster !== "ON") {
+      return { status: 409, body: { error: true, reason: "Monster Mode is OFF", code: "MONSTER_OFF" } };
+    }
+    if (prefs.doer !== "ON") {
+      return { status: 409, body: { error: true, reason: "DOER is OFF — autonomous missions may not start", code: "DOER_OFF" } };
+    }
+
+    const subagents = runtime.subagents.list().map((persona) => persona.spec.id);
+    const workers = (await runtime.registry.statusAll().catch(() => [] as Array<{ id: string }>)).map((w) => w.id);
+    const outcome = await createPlan(body.goal, {
+      model: runtime.model,
+      tools: runtime.tools,
+      agentIds: [...subagents, ...workers],
+      upsertMission: (mission) => runtime.stores.missions.upsertMission(mission),
+      publish: (type, payload, opts) => runtime.bus.publish(type, payload, { source: "core", ...(opts?.missionId !== undefined ? { missionId: opts.missionId } : {}) }),
+    });
+    if (!outcome.ok) {
+      const unavailable = /unavailable|unconfigured|not configured/i.test(outcome.reason);
+      return { status: unavailable ? 503 : 422, body: { error: true, reason: outcome.reason } };
+    }
+
+    // Mark it autonomous BEFORE starting: that flag is what subjects it to DOER
+    // and to Monster's step/time budgets inside the executor.
+    const planned = outcome.mission;
+    const marked = {
+      ...planned,
+      metadata: {
+        ...(planned.metadata ?? {}),
+        autonomous: true,
+        autonomyLimits: { steps: prefs.monsterSteps, minutes: prefs.monsterMinutes },
+      },
+    };
+    runtime.stores.missions.upsertMission(marked);
+
+    const gated = await invokeGate(runtime, MUTATION_TOOL_IDS.missionStart, { id: planned.id }, approvalIdOf(body));
+    if (!gated.ok) return gated.response;
+    const finished = gated.result as Mission;
+    return ok({
+      mission: finished,
+      autonomous: true,
+      appliedLimits: { steps: prefs.monsterSteps, minutes: prefs.monsterMinutes },
+      blocked: finished.metadata?.["blockedBy"] ?? null,
+    }, 201);
   }
 
   // ── POST /missions/:id/cancel ────────────────────────────────────────────────
@@ -809,14 +909,20 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     // than the approval merely being marked. The decision itself is KAI's own
     // bookkeeping (WRITE), so it goes through the boundary and is authorized by
     // the internal-state rule — it is the human's answer, not an action KAI took.
+    // "always" is a PERSISTENT grant and must be asked for explicitly. Anything
+    // else — absent, misspelled, any other value — is a one-off decision.
+    const scope = body.scope === "always" ? "always" : "once";
     const gated = await invokeGate(
       runtime,
       MUTATION_TOOL_IDS.approvalDecide,
-      { id, approved: body.approved },
+      { id, approved: body.approved, ...(scope === "always" ? { scope } : {}) },
       approvalIdOf(body),
     );
     if (!gated.ok) return gated.response;
-    const settled = gated.result as { approved: boolean; missionId?: string; resumed: boolean; reissued?: boolean; result?: unknown };
+    const settled = gated.result as {
+      approved: boolean; missionId?: string; resumed: boolean; reissued?: boolean;
+      result?: unknown; grant?: unknown;
+    };
     const decided = runtime.approvals.get(id);
     if (decided === null || decided.status === "PENDING") {
       return conflict(`approval "${id}" could not be decided`);
@@ -830,6 +936,7 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
       // verdict. `reissued: true` is the proof that "Allow" ran the work rather
       // than merely recording a verdict.
       ...(settled.reissued !== undefined ? { reissued: settled.reissued, result: settled.result ?? null } : {}),
+      ...(settled.grant !== undefined ? { grant: settled.grant } : {}),
     });
   }
 
@@ -1672,6 +1779,45 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     });
   }
 
+  /**
+   * Monster Mode: the effective profile and the limits it will actually apply.
+   * The limits are read from the SAME prefs the mission loop consults, so what
+   * this returns is what runs — not a description of what might run.
+   */
+  function getMonster(): ApiResponse {
+    const prefs = readOrchestrationPrefs(runtime.stores.settings);
+    return ok({
+      state: prefs.monster,
+      doer: prefs.doer,
+      guard: "ON",
+      limits: {
+        minutes: prefs.monsterMinutes,
+        steps: prefs.monsterSteps,
+        parallel: prefs.monsterParallel,
+      },
+      // Fixing the rule here, where the owner can read it: autonomy decides
+      // whether KAI continues by itself; policy still decides what it may do.
+      autonomyDoesNotGrantPermission: true,
+    });
+  }
+
+  async function setMonsterHandler(req: ApiRequest): Promise<ApiResponse> {
+    const body = asBodyObject(req.body);
+    if (body === null) return bad('"body" must be a JSON object, e.g. {"state": "ON"}');
+    const state = body.state;
+    if (state !== "ON" && state !== "OFF") {
+      return bad('"state" must be "ON" or "OFF"');
+    }
+    // Same asymmetry as Doer: OFF reduces authority and applies at once; ON
+    // widens it and therefore goes through the ordinary settings gate.
+    const gated =
+      state === "OFF"
+        ? await invokeGate(runtime, MUTATION_TOOL_IDS.settingsUpdate, { settings: { "orchestration.monster": "OFF" } }, approvalIdOf(body))
+        : await invokeGate(runtime, MUTATION_TOOL_IDS.settingsUpdate, { settings: { "orchestration.monster": "ON" } }, approvalIdOf(body));
+    if (!gated.ok) return gated.response;
+    return ok({ settings: gated.result, monster: getMonster().body });
+  }
+
   async function setDoerHandler(req: ApiRequest): Promise<ApiResponse> {
     const body = asBodyObject(req.body);
     if (body === null) return bad('"body" must be a JSON object, e.g. {"state": "ON"}');
@@ -1841,7 +1987,56 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     // 201 means a durable work item now exists (planned); it does NOT mean a
     // worker was dispatched. `delegated` stays false until dispatch happens,
     // so status is keyed on creation, never on the old delegation lie.
+    //
+    // A 200 with `workItemId: ""` was a LIE: at autonomy level 0 the orchestrator
+    // answers the objective itself and creates nothing, so every caller — the
+    // dashboard's Add box, KAI's own planning — was told "created" while the store
+    // stayed empty. Say so instead.
+    if (started.workItemId.length === 0) {
+      return conflict(
+        started.note ||
+          "no work item was created: the current autonomy level answers objectives itself rather than planning them",
+      );
+    }
     return ok(started, started.planned ? 201 : 200);
+  }
+
+  /**
+   * Drive a plan: run its stages in order. This is the command that turns a
+   * persisted plan into actual work — each stage is claimed, dispatched, verified
+   * and completed by `runWorkItem`, and the loop stops honestly on approval or
+   * failure.
+   */
+  async function runPlanWorkItem(req: ApiRequest, params: Record<string, string>): Promise<ApiResponse> {
+    const body = asBodyObject(req.body) ?? {};
+    const approvalId = typeof body.approvalId === "string" && body.approvalId.length > 0 ? body.approvalId : undefined;
+    const outcome = await runtime.runPlan(params.id ?? "", approvalId !== undefined ? { approvalId } : {});
+    return ok(outcome, outcome.state === "COMPLETED" ? 200 : 202);
+  }
+
+  /** Edit a task's metadata. Narrow: objective and criteria, never state or history. */
+  async function editWorkItem(req: ApiRequest, params: Record<string, string>): Promise<ApiResponse> {
+    const body = asBodyObject(req.body);
+    if (body === null) return bad('"body" must be a JSON object');
+    const changes: { objective?: string; criteria?: string[] } = {};
+    if (body.objective !== undefined) {
+      if (typeof body.objective !== "string" || body.objective.trim().length === 0) {
+        return bad('"objective" must be a non-empty string when present');
+      }
+      changes.objective = body.objective;
+    }
+    if (body.criteria !== undefined) {
+      if (!Array.isArray(body.criteria) || !body.criteria.every((c) => typeof c === "string")) {
+        return bad('"criteria" must be an array of strings when present');
+      }
+      changes.criteria = body.criteria as string[];
+    }
+    if (changes.objective === undefined && changes.criteria === undefined) {
+      return bad("nothing to change: give objective and/or criteria");
+    }
+    const edited = runtime.editWorkItem(params.id ?? "", changes);
+    if (!edited.ok) return conflict(edited.reason ?? "the work item could not be edited");
+    return ok({ workItem: edited.value });
   }
 
   async function runWorkItem(req: ApiRequest, params: Record<string, string>): Promise<ApiResponse> {
@@ -2466,6 +2661,11 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
         return notFound(invocation.error.message);
       case "POLICY_DENIED":
         return forbidden(invocation.error.message);
+      case "ALREADY_DISPATCHED":
+        // One approval, one dispatch attempt (Option A). The approval named here has
+        // already authorised its attempt, so this is a conflict to resolve by reading
+        // the existing outcome — not a server fault and not a fresh dispatch.
+        return conflict(invocation.error.message);
       case "APPROVAL_REQUIRED":
         // 409 with the id: the action is parked, not performed, and the caller
         // re-issues the same request with `approvalId` once a human decides.
@@ -2620,7 +2820,7 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
         : req.devMode === true
           ? "disabled-by-explicit-dev-mode"
           : "owner-controls-refused";
-    return ok({ ...loadIdentity(), ownerAuth });
+    return ok({ ...loadIdentity(), ownerAuth, workerAuth: req.workerAuthConfigured === true ? "configured" : "absent" });
   }
 
   // ── Action trace (Phase 1 observability, readable) ───────────────────────────
@@ -2726,6 +2926,111 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
       applied: result.applied,
       dropped: result.dropped,
       reason: result.reason,
+    });
+  }
+
+  /**
+   * The policy MODE — the authority level itself, made reachable.
+   *
+   * Reading it is a READ. Changing it is the owner's, and the two directions are
+   * deliberately ASYMMETRIC:
+   *
+   *   • RAISING authority (`request` → `confirm`) rides the `policy.mode` WRITE
+   *     tool, so the default policy parks it and a human decides. The elevation is
+   *     two-phase, so one request can never widen authority by itself.
+   *   • LOWERING authority (`downgrade`), or abandoning a prepared elevation
+   *     (`cancel`), is applied DIRECTLY and never waits on an approval. Making the
+   *     safe direction the slow path is the wrong way round, and the mode engine
+   *     already refuses a "downgrade" that would really be an elevation.
+   */
+  async function getPolicyMode(): Promise<ApiResponse> {
+    return ok({
+      mode: runtime.policy.mode(),
+      state: runtime.policy.policyState(),
+      modes: ["ask-all", "normal", "auto-read", "elevated"],
+    });
+  }
+
+  async function setPolicyModeHandler(req: ApiRequest): Promise<ApiResponse> {
+    const body = asBodyObject(req.body);
+    if (body === null) {
+      return bad('"body" must be a JSON object with an "action"');
+    }
+    const action = body["action"];
+
+    if (action === "downgrade") {
+      const to = body["to"];
+      if (to !== undefined && !isPolicyMode(to)) {
+        return bad('"to" must be one of: ask-all, normal, auto-read, elevated');
+      }
+      const change = runtime.policy.downgrade({
+        ...(to !== undefined ? { to } : {}),
+        reason: "owner downgrade via POST /policy/mode",
+      });
+      if (!change.ok) return bad(change.reason);
+      return ok({
+        mode: runtime.policy.mode(),
+        state: runtime.policy.policyState(),
+        reason: change.reason,
+      });
+    }
+
+    if (action === "cancel") {
+      const change = runtime.policy.cancelElevation();
+      if (!change.ok) return bad(change.reason);
+      return ok({
+        mode: runtime.policy.mode(),
+        state: runtime.policy.policyState(),
+        reason: change.reason,
+      });
+    }
+
+    if (action !== "request" && action !== "confirm") {
+      return bad('"action" must be one of: request, confirm, cancel, downgrade');
+    }
+
+    const gated = await invokeGate(
+      runtime,
+      MUTATION_TOOL_IDS.policyMode,
+      { action, to: body["to"], scope: body["scope"], requestId: body["requestId"] },
+      approvalIdOf(body),
+    );
+    if (!gated.ok) return gated.response;
+    // Read the tool's result structurally: the registry returns `unknown`, and a
+    // shape assumed rather than checked is exactly the class of bug this route
+    // exists to avoid.
+    const result = asBodyObject(gated.result);
+    if (result === null) {
+      return bad("the policy mode change returned no result");
+    }
+    if (result["ok"] !== true) {
+      const reason = result["reason"];
+      return bad(typeof reason === "string" ? reason : "the policy mode change was refused");
+    }
+    return ok({
+      mode: result["mode"],
+      state: result["state"],
+      reason: result["reason"],
+    });
+  }
+
+  /**
+   * GET /summary/daily — the evidence-backed day report, on demand.
+   *
+   * The OFFER is the scheduler's job (at most once per local day, durable). This route
+   * only RENDERS: asking for it never consumes the day's offer, never notifies, and
+   * never records a delivery, so opening it twice cannot suppress tomorrow's offer.
+   */
+  async function getDailySummary(req: ApiRequest): Promise<ApiResponse> {
+    const from = req.query.get("from") ?? undefined;
+    const to = req.query.get("to") ?? undefined;
+    const result = runtime.summary.reportFor(from, to);
+    return ok({
+      from: result.from,
+      to: result.to,
+      markdown: result.text,
+      report: result.report,
+      empty: result.report.empty,
     });
   }
 
@@ -3408,6 +3713,19 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
   // is security-relevant, so it requires a human by default.
   const routeDefs: RouteDef[] = [
     route("GET", "/identity", "READ", (req) => getIdentity(req)),
+    // A delegated worker declares the exact action it is about to take and KAI decides
+    // BEFORE the side effect. requiresOwner: the caller must hold the per-install owner
+    // credential — loopback is not trust, and 127.0.0.1 is reachable by every local
+    // process. A deny is 403 and a park is 409, mirroring the invoke boundary; the guard
+    // treats anything that is not 200+allow as a block.
+    route("POST", "/worker/authorize", "WRITE", async (req) => {
+      const decision = await authorizeWorkerAction(runtime, req.body);
+      if (decision.decision === "allow") return ok(decision);
+      if (decision.decision === "needs_approval") {
+        return { status: 409, body: { error: true, ...decision } };
+      }
+      return { status: 403, body: { error: true, ...decision } };
+    }, { requiresOwner: true }),
     // KAI's live soul: READ serves the current text + version; WRITE replaces
     // it through the policy-gated soul.set tool (parks by default).
     route("GET", "/soul", "READ", () => getSoul()),
@@ -3428,10 +3746,23 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     route("GET", "/work-items", "READ", (req) => Promise.resolve(listWorkItems(req))),
     route("POST", "/work-items", "WRITE", (req) => createWorkItem(req)),
     route("GET", "/work-items/:id", "READ", (_req, p) => Promise.resolve(getWorkItem(p))),
+    route("POST", "/work-items/:id/edit", "WRITE", (req, p) => editWorkItem(req, p)),
+    route("POST", "/work-items/:id/plan/run", "WRITE", (req, p) => runPlanWorkItem(req, p)),
     route("POST", "/work-items/:id/run", "WRITE", (req, p) => runWorkItem(req, p)),
     route("POST", "/work-items/:id/review", "READ", (req, p) => reviewWorkItem(req, p)),
     route("POST", "/work-items/audit", "WRITE", (req) => auditWorkItem(req)),
     route("GET", "/bench", "READ", () => Promise.resolve(listBench())),
+    // The REAL invocations, newest first. Read-only and bounded: it is the record
+    // the registry already publishes, not a second event system.
+    route("GET", "/activity/tools", "READ", (req) =>
+      Promise.resolve(
+        (() => {
+          const raw = Number(query(req).get("limit") ?? "50");
+          const limit = Number.isFinite(raw) ? Math.max(1, Math.min(200, Math.trunc(raw))) : 50;
+          return ok({ calls: runtime.recentToolCalls(limit) });
+        })(),
+      ),
+    ),
     route("GET", "/activity", "READ", (req) => Promise.resolve(listActivity(req))),
     // Goals: intake, challenge, plan, approval. Reads are open; every mutation
     // is owner-only, because a goal is what authorises KAI to act.
@@ -3457,6 +3788,9 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     // Changes KAI's autonomy: owner-only.
     route("POST", "/doer", "WRITE", (req) => setDoerHandler(req), { requiresOwner: true }),
     route("GET", "/doer/pending", "READ", () => Promise.resolve(listDoerPending())),
+    route("GET", "/monster", "READ", () => Promise.resolve(getMonster())),
+    // Widening autonomy is owner-only, like the Doer switch itself.
+    route("POST", "/monster", "WRITE", (req) => setMonsterHandler(req), { requiresOwner: true }),
     // The KAI Visual Engine's seam: structured visual intent, validated HERE.
     // READ: these routes compute and validate; they mutate nothing.
     route("POST", "/visual/compile", "READ", (req) => compileVisualHandler(req)),
@@ -3467,6 +3801,15 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     route("GET", "/policy", "READ", () => getPolicy()),
     // Rewrites what KAI is allowed to do: owner-only.
     route("POST", "/policy/rules", "WRITE", (req) => setPolicyRulesHandler(req), { requiresOwner: true }),
+    // The MODE (ask-all / normal / auto-read / elevated): reading it is a READ;
+    // changing it is the owner's. Elevations park for a human inside the handler;
+    // a downgrade applies immediately, because reducing authority is never the
+    // slow path.
+    route("GET", "/policy/mode", "READ", () => getPolicyMode()),
+    // The daily work summary. READING it is safe and side-effect free; the offer that
+    // notifies at most once a day lives in the scheduler, not here.
+    route("GET", "/summary/daily", "READ", (req) => getDailySummary(req)),
+    route("POST", "/policy/mode", "WRITE", (req) => setPolicyModeHandler(req), { requiresOwner: true }),
     route("GET", "/state", "READ", () => getState()),
     route("GET", "/employees", "READ", () => listEmployees()),
     route("GET", "/employees/:id", "READ", (_req, p) => getEmployee(p)),
@@ -3508,6 +3851,8 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     route("GET", "/missions/:id", "READ", (_req, p) => getMission(p)),
     route("POST", "/missions/:id/cancel", "WRITE", (req, p) => cancelMission(req, p)),
     route("POST", "/missions/:id/start", "WRITE", (req, p) => startMission(req, p)),
+    // Plan → dispatch → verify in one call. DOER and Monster are enforced inside.
+    route("POST", "/missions/auto", "WRITE", (req) => autoMissionHandler(req), { requiresOwner: true }),
     route("POST", "/plans", "WRITE", (req) => createPlanHandler(req)),
     route("GET", "/notifications", "READ", (req) => listNotifications(req)),
     route("POST", "/notifications/:id/read", "WRITE", (req, p) => markNotificationRead(req, p)),
@@ -3676,6 +4021,7 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
       method,
       path,
       attested: request.attested === true,
+      workerAttested: request.workerAttested === true,
       ownerAuthConfigured: request.ownerAuthConfigured === true,
       ...(request.devMode === true ? { devMode: true } : {}),
     });
@@ -3685,7 +4031,13 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
         body: { error: true, code: "OWNER_AUTH_REQUIRED", reason: decision.reason },
       };
     }
-    if (hit.def.requiresOwner === true && request.ownerAuthConfigured === true && request.attested !== true && request.devMode !== true) {
+    if (
+      hit.def.requiresOwner === true &&
+      request.ownerAuthConfigured === true &&
+      request.attested !== true &&
+      !(request.workerAttested === true && workerTokenMayAccess(method, path)) &&
+      request.devMode !== true
+    ) {
       return {
         status: 401,
         body: {
@@ -3721,3 +4073,4 @@ export function createCoreApi(runtime: CoreRuntime): CoreApi {
     },
   };
 }
+

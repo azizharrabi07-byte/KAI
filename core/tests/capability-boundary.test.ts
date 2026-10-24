@@ -403,6 +403,7 @@ test("mission derivation: a capability tool step is side-effecting exactly when 
 
   for (const [id, expected] of Object.entries(EXPECTED)) {
     const mission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: `classification ${id}`,
       steps: [{ title: "step", kind: "tool", target: `capability.${id}`, input: {} }],
     });

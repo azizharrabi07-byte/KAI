@@ -79,6 +79,7 @@ async function runCase(
   templateSideEffecting: boolean,
 ): Promise<CaseResult> {
   const mission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
     title: `classification ${toolId}`,
     steps: [{ title: "step", kind: "tool", target: toolId, sideEffecting: templateSideEffecting }],
   });

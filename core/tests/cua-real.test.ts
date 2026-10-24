@@ -220,7 +220,16 @@ test("real smoke: health() reports AVAILABLE from a real probe and finds the nam
 
 test("real smoke: probeNamedPipe connects to the daemon named pipe", async (t) => {
   if (!DRIVER_AVAILABLE) return t.skip(SKIP_REASON);
-  const probed = await probeNamedPipe(REAL_DRIVER_SEAM.windowsPipe, 2_000);
+  // The daemon serves ONE pipe (`\\.\pipe\cua-driver`) and `node --test` runs the
+  // suites in parallel, so the other driver-spawning tests in this file can hold
+  // it when this probe starts. That is contention for a shared resource, not an
+  // unreachable transport: measured here, the same probe connects in 1.5ms alone
+  // and times out at 2s under load. Retried a bounded number of times so the
+  // assertion still means "the pipe is reachable", which is what it claims.
+  let probed = await probeNamedPipe(REAL_DRIVER_SEAM.windowsPipe, 2_000);
+  for (let attempt = 0; attempt < 2 && !probed.reachable; attempt += 1) {
+    probed = await probeNamedPipe(REAL_DRIVER_SEAM.windowsPipe, 2_000);
+  }
   assert.equal(probed.reachable, true, `named pipe ${REAL_DRIVER_SEAM.windowsPipe} should be reachable: ${probed.detail ?? ""}`);
 });
 

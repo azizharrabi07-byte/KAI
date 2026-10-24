@@ -79,6 +79,7 @@ test("a mission runs a read tool step and an agent step through to COMPLETED", a
     await rt.start();
 
     const mission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "inspect this machine and ask Hermes about it",
       steps: [
         { title: "read core status", kind: "tool", target: "system.get_status" },
@@ -138,6 +139,7 @@ test("a step whose tool needs approval parks the mission and does NOT execute it
     });
 
     const mission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "publish something",
       steps: [{ title: "publish", kind: "tool", target: "test.publish_thing", sideEffecting: true }],
     });
@@ -180,6 +182,7 @@ test("a deny policy fails the step before the tool runs, with the reason recorde
     });
 
     const mission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "blocked by policy",
       steps: [{ title: "read", kind: "tool", target: "test.read_thing" }],
     });
@@ -218,7 +221,7 @@ test("a MISSED side-effecting scheduled task PARKS instead of starting a second 
       kind: "once",
       runAt: dueAt,
       action: "mission.create",
-      payload: { title: "scheduled machine check" },
+      payload: { title: "scheduled machine check", metadata: { criteria: ["file present: C:/tmp/kai-exec/core/package.json"] } },
       enabled: true,
       failureCount: 0,
       createdAt: new Date().toISOString(),
@@ -261,7 +264,7 @@ test("a due scheduled task fires, creates a mission and runs it — through the 
       kind: "once",
       runAt: new Date(dueMs).toISOString(),
       action: "mission.create",
-      payload: { title: "scheduled machine check" },
+      payload: { title: "scheduled machine check", metadata: { criteria: ["file present: C:/tmp/kai-exec/core/package.json"] } },
       enabled: true,
       failureCount: 0,
       createdAt: new Date().toISOString(),
@@ -335,6 +338,7 @@ test("state survives a restart, and recovery resumes only what is safe", async (
     // An interrupted mission whose next step touches the world: never auto-resumed.
     const dangerous = createMission({
       title: "interrupted while publishing",
+      metadata: { criteria: ["file present: package.json"] },
       steps: [
         { title: "already done", kind: "tool", target: "system.get_status" },
         { title: "would publish", kind: "tool", target: "system.get_status", sideEffecting: true },
@@ -349,6 +353,7 @@ test("state survives a restart, and recovery resumes only what is safe", async (
     // An interrupted mission with only safe work left: this one may be resumed.
     const safe = createMission({
       title: "interrupted with safe work left",
+      metadata: { criteria: ["file present: package.json"] },
       steps: [
         { title: "already done", kind: "tool", target: "system.get_status" },
         { title: "safe read", kind: "tool", target: "system.get_status" },
@@ -448,6 +453,7 @@ test("approving the approval resumes the parked mission and runs the step exactl
     });
 
     const mission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "publish once",
       steps: [{ title: "publish", kind: "tool", target: "test.publish_once", sideEffecting: true }],
     });
@@ -496,6 +502,7 @@ test("rejecting the approval fails the parked mission with a reason, and the ste
     });
 
     const mission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "publish rejected",
       steps: [{ title: "publish", kind: "tool", target: "test.publish_rejected", sideEffecting: true }],
     });
@@ -534,6 +541,7 @@ test("a decision recorded before a restart still settles the mission after it", 
       execute: async () => ({ published: true }),
     });
     const mission = await first.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "survives a restart",
       steps: [{ title: "publish", kind: "tool", target: "test.publish_restart", sideEffecting: true }],
     });
@@ -585,6 +593,7 @@ test("an approval that expired while Core was down is settled on restart, not le
       },
     });
     const mission = await first.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "expires while down",
       steps: [{ title: "publish", kind: "tool", target: "test.publish_expired", sideEffecting: true }],
     });
@@ -647,6 +656,7 @@ test("a mission agent step is governed by the worker tool's policy, not a side d
     assert.ok(rt.tools.get("agents.run_task"), "the worker tool is registered");
 
     const mission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "ask a worker",
       // Deliberately NOT side-effecting: that keeps the step-level check out of
       // the way so the assertion below is about the WORKER TOOL boundary and

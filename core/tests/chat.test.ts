@@ -314,6 +314,59 @@ test("identity falls back to the built-in soul when no soul is injected", async 
   assert.ok(answer.text.includes("KAI"), answer.text);
 });
 
+test("a model/provider question is answered from the LIVE provider, never by listing tools", async () => {
+  // The defect this pins: "Which API or LLM are you using?" reached the model,
+  // whose only concrete "API" surface on the wire is its own tool catalogue, so
+  // it answered by enumerating filesystem and git tools. The identity intent now
+  // owns this question and answers it from the live provider's description.
+  const { ctx } = buildHarness();
+  const brain = {
+    available: () => true,
+    describe: () => ({
+      provider: "mistral",
+      model: "codestral-latest",
+      configured: true,
+      tools: true,
+      toolIds: ["filesystem.read", "shell.run"],
+    }),
+    respond: async () => ({ text: "" }),
+    stream: async function* () {},
+    health: async () => ({ ok: true }),
+  } as unknown as RouterContext["brain"];
+  const router = createChatRouter({ ...withIdentity(ctx), brain });
+
+  for (const question of [
+    "Which API or LLM are you using right now?",
+    "Which API or LLM are you using?",
+    "which provider are you using",
+    "what llm are you",
+  ]) {
+    const answer = await router.answer(question);
+    assert.equal(answer.intent, "identity", question);
+    assert.equal(answer.fromState, true, question);
+    assert.ok(answer.text.includes("mistral"), `provider missing for ${question}: ${answer.text}`);
+    assert.ok(
+      answer.text.includes("codestral-latest"),
+      `model missing for ${question}: ${answer.text}`,
+    );
+    // The failure mode itself: a tool catalogue is never the answer to this.
+    assert.doesNotMatch(answer.text, /filesystem\.|shell\.run|git_status/);
+  }
+});
+
+test("a model/provider question with no brain reports unknown rather than inventing a model", async () => {
+  // No brain => nothing to read. KAI must say it does not run a model itself,
+  // and must never name a provider or model it cannot actually verify.
+  const { ctx } = buildHarness();
+  const router = createChatRouter(withIdentity(ctx));
+  for (const question of ["Which API or LLM are you using?", "Which model are you?"]) {
+    const answer = await router.answer(question);
+    assert.equal(answer.intent, "identity", question);
+    assert.ok(answer.text.includes("not a model myself"), answer.text);
+    assert.doesNotMatch(answer.text, /mistral|codestral|openai|gpt/i, answer.text);
+  }
+});
+
 // ── status.summary ────────────────────────────────────────────────────────────
 
 test("status.summary reports the stub's numbers and invents none", async () => {

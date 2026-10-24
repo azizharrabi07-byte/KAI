@@ -122,9 +122,18 @@ async function grantShare(
   assert.ok(typeof approvalId === "string" && approvalId.length > 0, "the parked share hands back an approval id");
   const decided = await post(api, `/approvals/${approvalId}/decide`, { approved: true });
   assert.equal(decided.status, 200, JSON.stringify(decided.body));
-  const granted = await post(api, "/memory/share", { ...input, approvalId });
-  assert.equal(granted.status, 201, `the approved share must grant: ${JSON.stringify(granted.body)}`);
-  const share = (granted.body as { share: { id: string } }).share;
+  // OPTION A: the VERDICT is the one dispatch this approval authorises — `reissueParked`
+  // re-issues the exact parked call — so the granted share comes back on the verdict.
+  // Re-posting with the same approval id would be a second dispatch, which the registry
+  // now refuses (correctly).
+  let share = (decided.body as { result?: { share?: { id: string } } }).result?.share;
+  if (share === undefined) {
+    // A share parked outside the registry's re-issue path still makes its own call; its
+    // approval is unspent, so exactly one dispatch happens either way.
+    const granted = await post(api, "/memory/share", { ...input, approvalId });
+    assert.equal(granted.status, 201, `the approved share must grant: ${JSON.stringify(granted.body)}`);
+    share = (granted.body as { share: { id: string } }).share;
+  }
   return { id: share.id, approvalId };
 }
 

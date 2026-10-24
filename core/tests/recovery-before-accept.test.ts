@@ -142,6 +142,7 @@ test("a side-effecting step parked on approval records BEFORE_ACCEPT, and POST /
     });
 
     const mission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "park before the effect",
       steps: [{ title: "write", kind: "tool", target: "test.gated", sideEffecting: true }],
     });

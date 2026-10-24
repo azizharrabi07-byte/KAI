@@ -106,6 +106,7 @@ test("a mission step whose write is refused FAILS honestly instead of completing
     // mission must FAIL with the refusal reason, never COMPLETE over it.
     // (This is the exact pathology in docs/evidence/live/missions.json.)
     const mission = createMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "refused write probe mission",
       steps: [
         {
@@ -128,6 +129,7 @@ test("a mission step whose write is refused FAILS honestly instead of completing
 test("a mission step without scope lands mission-scoped on its own mission", async () => {
   await withRuntime(async (rt) => {
     const mission = createMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "memory scope probe mission",
       steps: [
         {
@@ -159,6 +161,7 @@ test("a mission step without scope lands mission-scoped on its own mission", asy
 test("a mission step with an explicit scope is never rewritten by the runner", async () => {
   await withRuntime(async (rt) => {
     const mission = createMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "explicit scope probe mission",
       steps: [
         {

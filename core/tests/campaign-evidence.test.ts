@@ -24,6 +24,7 @@ import { createBenchmark } from "../src/orchestration/bench.ts";
 import { createDispatcher } from "../src/orchestration/dispatch.ts";
 import { createTrace } from "../src/orchestration/trace.ts";
 import { createLearning } from "../src/orchestration/learn.ts";
+import { evaluatingDeps } from "./learn-eval-fixture.ts";
 import { createOrchestrator, type Orchestrator } from "../src/orchestration/orchestrator.ts";
 import type { AutonomyPolicy } from "../src/orchestration/types.ts";
 import type { Stores } from "../src/shared/contracts.ts";
@@ -77,7 +78,7 @@ function harness(claimedArtifact: string = KAI_OWN_FILE): H {
     capabilities: () => ({ skills: ["typescript"], tools: ["read"] }),
   });
   const trace = createTrace({ store: stores.activity, prefs: () => ({ activity: "VERBOSE", reasoning: "SUMMARY" }) as const });
-  const learning = createLearning({ metrics: stores.skillMetrics, validate: () => ({ ok: true }), stage: () => ({ ok: true }) });
+  const learning = createLearning({ metrics: stores.skillMetrics, validate: () => ({ ok: true }), stage: () => ({ ok: true }), ...evaluatingDeps() });
   const orch = createOrchestrator({
     board,
     bench,

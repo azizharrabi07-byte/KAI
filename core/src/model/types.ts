@@ -72,11 +72,24 @@ export interface TokenUsage {
  * of the provider's configured defaults, so a caller (a persona, a subagent) can
  * pick a different model without a second provider object.
  */
+import type { ThinkingLevel } from "./thinking.ts";
+
+export type { ThinkingLevel } from "./thinking.ts";
+
 export interface ChatRequest {
   messages: ChatMessage[];
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  /**
+   * How hard KAI should think before answering.
+   *
+   * This is a KAI-owned REQUEST, not a provider guarantee: a provider that has no
+   * reasoning knob still receives the token budget the level implies, and the
+   * result reports which parts were actually applied. Never assume a level took
+   * effect — read it back from the result.
+   */
+  thinking?: ThinkingLevel;
   signal?: AbortSignal;
   /**
    * OpenAI-style function tools the model may choose from. Absent means the
@@ -221,6 +234,12 @@ export interface ModelCapabilities {
   embeddings: boolean;
   /** Whether the provider accepts an OpenAI-style `tools` array. */
   tools: boolean;
+  /**
+   * Whether the provider accepts `reasoning_effort`. Read by the thinking-level
+   * report so the UI can say honestly whether a level reached the wire as a
+   * reasoning setting or only as a token budget.
+   */
+  supportsReasoningEffort: boolean;
   /** The model ids this provider advertises (may be empty when unconfigured). */
   models: string[];
   /** The provider's configured default model. */

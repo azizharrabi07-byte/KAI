@@ -17,6 +17,7 @@ import { OpenCodeClient, PERMISSION_REPLIES } from "./agents/opencode.ts";
 import { AgentError, isAgentError, reasonOf } from "./errors.ts";
 import { loadConfig, redactedConfig, type KaiConfig } from "./config.ts";
 import { withResolvedHermesKey } from "./agents/hermes-key.ts";
+import { resolveWorkerToken } from "./worker-token.ts";
 
 const MAX_BODY_BYTES = 1_000_000;
 const HERMES_STATUS_POLL_MS = 15_000;
@@ -30,6 +31,7 @@ import { registerSessionRoutes } from "./sessions/routes.ts";
 import { registerCommandRoutes } from "./commands/routes.ts";
 import { presentWorkerResult, presentWorkerFailure, relayGuardIsLive, FALLBACK_SELF, type WorkerId } from "./chat/relay.ts";
 import { brainFailureReply, brainFailureReason } from "./chat/brain.ts";
+import { isThinkingLevel, thinkingPlan, THINKING_LEVELS } from "./model/thinking.ts";
 import { previewToolResult } from "./chat/result-preview.ts";
 import { beginTurn, finishTurn } from "./chat/turns.ts";
 
@@ -150,6 +152,15 @@ async function readChatBody(
     sendJson(res, 400, { error: "invalid_request", reason: "invalid_session_id" });
     return null;
   }
+  // An unknown level is REFUSED rather than ignored: silently dropping it would
+  // let the UI show a setting that the request never carried.
+  if (body["thinking"] !== undefined && !isThinkingLevel(body["thinking"])) {
+    sendJson(res, 400, {
+      error: "invalid_request",
+      reason: `invalid_thinking: expected one of ${THINKING_LEVELS.join(", ")}`,
+    });
+    return null;
+  }
   return body;
 }
 
@@ -212,6 +223,12 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
    * open.
    */
   const hostToken = config.server.hostToken;
+  /**
+   * The separate credential the Hermes `pre_tool_call` hook holds. It is
+   * checked ONLY for the narrow worker route (`workerTokenMayAccess`), so a
+   * leaked hook credential cannot act as the owner.
+   */
+  const workerToken = config.server.workerToken;
 
   /**
    * True only when the request carries the host token the app holds.
@@ -226,6 +243,17 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
     if (hostToken === undefined || hostToken.length === 0) return false;
     const provided = req.headers["x-kai-host-token"];
     return typeof provided === "string" && provided.length > 0 && secretMatches(provided, hostToken);
+  }
+
+  /**
+   * True only when the request carries the worker credential the hook was given.
+   * A worker credential never implies owner attestation; `authz.ts` decides
+   * which (very few) routes it may reach.
+   */
+  function workerAttested(req: http.IncomingMessage): boolean {
+    if (workerToken === undefined || workerToken.length === 0) return false;
+    const provided = req.headers["x-kai-worker-token"];
+    return typeof provided === "string" && provided.length > 0 && secretMatches(provided, workerToken);
   }
 
   /**
@@ -694,6 +722,9 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
         const body = await readChatBody(req, res);
         if (body === null) return;
         const text = body["text"] as string;
+        // The level the UI selected. Read from the validated body, so an
+        // unrecognised value was already refused above rather than dropped here.
+        const thinking = isThinkingLevel(body["thinking"]) ? body["thinking"] : undefined;
         const { conversation, settleTurn, captureConversationMemory: captureStreamed } = conversationFor(body);
 
         if (core === undefined || core.brain === undefined || !core.brain.available()) {
@@ -705,7 +736,55 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
         // router (agent runs, skill loads, refusals), and the decided text is
         // delivered as frames. Streaming a model reply for an agent invocation
         // would silently drop the delegation.
-        if (/^@[\w-]/.test(text.trimStart()) && core.chat !== undefined) {
+        //
+        // A question the router can answer DETERMINISTICALLY from real state
+        // routes there too. This is the fix for "which API/LLM are you using?":
+        // the model's only concrete "API" surface on the wire is its own tool
+        // catalogue, so it answered by enumerating tools. Identity is the intent
+        // that owns model/provider introspection, and it is answered from the
+        // live provider — so it must not be handed to the model at all.
+        // ── Conversational approval ──────────────────────────────────────────
+        // "I approve that request" is a real, unambiguous owner instruction and it
+        // must act, not be answered with words. This is bound TIGHTLY: only for a
+        // local owner turn, only when the message is plainly an approval, and only
+        // when exactly ONE request is pending — anything else asks which one. It
+        // goes through the SAME owner decision path as the card, so the two cannot
+        // disagree, and the parked turn resumes because it is still waiting.
+        const approvalIntent = classifyApprovalIntent(text);
+        if (approvalIntent !== null && core !== undefined) {
+          const pending = core.approvals.list().filter((a) => a.status === "PENDING");
+          if (pending.length > 1) {
+            res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache", connection: "keep-alive" });
+            res.write(`data: ${JSON.stringify({ delta: `${pending.length} requests are waiting. Tell me which one, or use the approval card.` })}\n\n`);
+            res.write(`data: ${JSON.stringify({ done: true, finishReason: "stop" })}\n\n`);
+            res.end();
+            return;
+          }
+          const [target] = pending;
+          if (target !== undefined) {
+            const decided = await core.decideApproval(target.id, approvalIntent === "approve");
+            res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache", connection: "keep-alive" });
+            const line =
+              approvalIntent === "approve"
+                ? `Approved "${target.toolId}". The action is running.`
+                : `Denied "${target.toolId}". Nothing was run.`;
+            res.write(`data: ${JSON.stringify({ delta: line })}\n\n`);
+            res.write(`data: ${JSON.stringify({ done: true, finishReason: "stop", approval: decided })}\n\n`);
+            res.end();
+            return;
+          }
+          if (pending.length === 0) {
+            res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache", connection: "keep-alive" });
+            res.write(`data: ${JSON.stringify({ delta: "Nothing is waiting for approval." })}\n\n`);
+            res.write(`data: ${JSON.stringify({ done: true, finishReason: "stop" })}\n\n`);
+            res.end();
+            return;
+          }
+        }
+        const invocationTurn = /^@[\w-]/.test(text.trimStart());
+        const introspectiveTurn =
+          !invocationTurn && core.chat !== undefined && core.chat.classify(text) === "identity";
+        if ((invocationTurn || introspectiveTurn) && core.chat !== undefined) {
           const answer = await core.chat.answer(
             text,
             ...(conversation?.id !== undefined ? [{ sessionId: conversation.id } as { sessionId: string }] : []),
@@ -853,6 +932,7 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
             text: streamText,
             system,
             ...(begun.objective !== streamText ? { objective: begun.objective } : {}),
+            ...(thinking !== undefined ? { thinking } : {}),
             signal: runController.signal,
             onToolEvent: (event) => {
               streamedToolEvents.push({ ...event });
@@ -911,6 +991,36 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
                   conversation_id: conversation?.id ?? null,
                   tool_iterations: chunk.toolIterations ?? 0,
                   tool_budget_exhausted: exhausted,
+                  // The structured tool records for this turn — rebuilt from the REAL
+                  // ToolStreamEvents observed above, never from model prose. A client can
+                  // therefore render the actual calls and results without polling a second
+                  // endpoint, and a denial arrives as a denial (its own status), not as
+                  // success. Absent when the turn used no tools.
+                  ...(calls.length > 0
+                    ? {
+                      tool_calls: calls.map((call) => ({
+                        id: call.id,
+                        name: call.name,
+                        ...(call.toolId !== undefined ? { toolId: call.toolId } : {}),
+                        ok: call.ok,
+                        status: call.status,
+                        ...(call.invocationId !== undefined ? { invocationId: call.invocationId } : {}),
+                        arguments: call.arguments ?? "",
+                        ...(call.result !== undefined ? { result: call.result } : {}),
+                        ...(call.approvalId !== undefined ? { approvalId: call.approvalId } : {}),
+                        startedAt: call.startedAt,
+                        completedAt: call.completedAt,
+                      })),
+                    }
+                    : {}),
+                  // What the level REALLY produced, computed from the same
+                  // mapping the provider applied and the provider's OWN
+                  // declaration — so the UI never has to guess, and a fallback
+                  // says so in plain language instead of implying a reasoning
+                  // mode that is not in force.
+                  ...(thinking !== undefined
+                    ? { thinking: thinkingPlan(thinking, described.supportsReasoningEffort) }
+                    : {}),
                   ...(synthesized ? { synthesized: true } : {}),
                   ...(cancelled ? { cancelled: true as const } : {}),
                   task_state: finished.state,
@@ -1355,7 +1465,9 @@ export function createKaiServer(config: KaiConfig, deps?: Partial<KaiServerDeps>
           // to do. Computed here, where the request headers are, and passed as a
           // fact — the API module never re-reads a header.
           attested: hostAttested(req),
+          workerAttested: workerAttested(req),
           ownerAuthConfigured: hostToken !== undefined && hostToken.length > 0,
+          workerAuthConfigured: workerToken !== undefined && workerToken.length > 0,
           // An explicit developer switch, never inferred. A normal installation
           // (the app always injects the token) never sets this.
           devMode: process.env.KAI_DEV_MODE === "1",
@@ -1521,10 +1633,38 @@ export async function main(): Promise<void> {
   // task over /v1/runs while every /chat turn sent no Authorization header at all.
   // A key the desktop app passed is left untouched.
   const config = withResolvedHermesKey(loadConfig());
+  // The worker credential the Hermes pre_tool_call hook reads. Resolved BEFORE
+  // the server is created so the running Core and the hook on disk agree.
+  const workerCredential = resolveWorkerToken({ explicit: config.server.workerToken });
+  config.server.workerToken = workerCredential.token;
+  if (workerCredential.token !== undefined) {
+    const detail = workerCredential.persisted
+      ? `${workerCredential.source} at ${workerCredential.file}`
+      : `held in memory only (${workerCredential.source}); the hook cannot read ${workerCredential.file}, so delegated tool calls will fail closed`;
+    console.log(`[kai-core] worker credential: ${detail}`);
+  } else {
+    console.error(
+      `[kai-core] worker credential: ABSENT — no delegated tool call can be authorized ` +
+        `(expected ${workerCredential.file}). Delegated runs will be blocked rather than ungated.`,
+    );
+  }
   // The Core control plane runs inside this process. The UI is a client of this
   // server rather than the owner of the state, so the island can be closed and
   // reopened without losing missions, memory or approvals.
-  const runtime = createCoreRuntime();
+  // The runtime must be handed the Hermes target the CONFIG resolved, not left to the
+  // adapter's own default. Without this the adapter dialled `http://127.0.0.1:8642`
+  // while `resolveHermesKey` took the PROFILE's key: a profile key presented to the
+  // default route, which the gateway answers 401 — the `AGENT_AUTH_FAILED` on
+  // `/v1/runs`. The URL and the credential must always describe the same route.
+  const runtime = createCoreRuntime({
+    agents: {
+      hermes: {
+        baseUrl: config.hermes.baseUrl,
+        ...(config.hermes.apiKey !== undefined ? { apiKey: config.hermes.apiKey } : {}),
+      },
+      ...(config.opencode.baseUrl !== undefined ? { opencode: { baseUrl: config.opencode.baseUrl } } : {}),
+    },
+  });
   const started = await runtime.start();
   console.log(
     `[kai-core] runtime started  agents=${JSON.stringify(started.agents)}` +
@@ -1604,4 +1744,22 @@ if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) {
     console.error("[kai-core] failed to start:", error instanceof Error ? error.message : error);
     process.exit(1);
   });
+}
+
+/**
+ * Read an OWNER's plain approval/denial from a chat message.
+ *
+ * Deliberately narrow: it must name approval or refusal explicitly. "sounds good",
+ * "ok" and "go ahead" are not authorization — a vague message is handed to the
+ * model exactly as before, and can never approve an action by implication.
+ * Returns null when the message is not an approval instruction.
+ */
+function classifyApprovalIntent(text: string): "approve" | "deny" | null {
+  const t = text.trim().toLowerCase();
+  if (t.length === 0 || t.length > 160) return null;
+  const deny = /\b(reject|deny|don't approve|do not approve|refuse|cancel that request)\b/;
+  const approve = /\b(i approve|approve (it|that|this)|you have my approval|you're approved|go ahead and approve)\b/;
+  if (deny.test(t) && !approve.test(t)) return "deny";
+  if (approve.test(t) && !deny.test(t)) return "approve";
+  return null;
 }

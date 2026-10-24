@@ -30,6 +30,7 @@ import { createWorkBoard, type WorkBoard } from "../src/orchestration/board.ts";
 import { createBenchmark } from "../src/orchestration/bench.ts";
 import { createDispatcher } from "../src/orchestration/dispatch.ts";
 import { createLearning } from "../src/orchestration/learn.ts";
+import { evaluatingDeps } from "./learn-eval-fixture.ts";
 import { createOrchestrator, type DelegateInput, type DelegateResult, type Orchestrator } from "../src/orchestration/orchestrator.ts";
 import { createTrace } from "../src/orchestration/trace.ts";
 import { createGoalStore, type GoalStore } from "../src/goals/store.ts";
@@ -129,7 +130,7 @@ function harness(opts: { dbPath?: string; dir?: string; goalsPath?: string } = {
     bench,
     dispatcher,
     trace: createTrace({ store: stores.activity, prefs: () => ({ activity: "VERBOSE", reasoning: "SUMMARY" }) as const }),
-    learning: createLearning({ metrics: stores.skillMetrics, validate: () => ({ ok: true }), stage: () => ({ ok: true }) }),
+    learning: createLearning({ metrics: stores.skillMetrics, validate: () => ({ ok: true }), stage: () => ({ ok: true }), ...evaluatingDeps() }),
     patterns: stores.promptPatterns,
     reviewRunner: async () => ({ verdict: "PASS", findings: [] }),
     delegate: async (input: DelegateInput): Promise<DelegateResult> => {

@@ -217,6 +217,8 @@ export interface SessionStore {
   appendToolCall(call: SessionToolCall): SessionToolCall;
   /** Every tool call of a session, oldest first. */
   toolCalls(sessionId: string, limit?: number): SessionToolCall[];
+  /** Every recent tool call across sessions, newest first. */
+  recentToolCalls(limit?: number): SessionToolCall[];
   /** How many turns the session has, counted from the turns table (never the cached column). */
   countTurns(sessionId: string): number;
   /** Remove every turn of a session and reset its counters. Returns turns removed. */
@@ -479,6 +481,11 @@ export function createSessionStore(opts: { path?: string; now?: () => Date } = {
       `SELECT * FROM session_tool_calls WHERE sessionId = ? ORDER BY rowid ASC, completedAt ASC LIMIT ?`,
     ),
     deleteToolCalls: db.prepare(`DELETE FROM session_tool_calls WHERE sessionId = ?`),
+    // Across ALL sessions, newest first: the activity inspector is about what KAI
+    // did, not about one conversation.
+    recentToolCalls: db.prepare(
+      `SELECT * FROM session_tool_calls ORDER BY completedAt DESC, rowid DESC LIMIT ?`,
+    ),
     turns: db.prepare(
       `SELECT * FROM session_turns WHERE sessionId = ? ORDER BY rowid DESC, at DESC LIMIT ?`,
     ),
@@ -761,6 +768,12 @@ export function createSessionStore(opts: { path?: string; now?: () => Date } = {
     return call;
   }
 
+  /** Every recent tool call, across sessions, newest first. */
+  function recentToolCalls(limit = 50): SessionToolCall[] {
+    const rows = stmts.recentToolCalls.all(limit) as unknown as Record<string, unknown>[];
+    return rows.map(rowToToolCall);
+  }
+
   function toolCalls(sessionId: string, limit = 500): SessionToolCall[] {
     const rows = stmts.toolCallsBySession.all(sessionId, limit) as unknown as Record<string, unknown>[];
     return rows.map(rowToToolCall);
@@ -921,6 +934,7 @@ export function createSessionStore(opts: { path?: string; now?: () => Date } = {
     turns,
     appendToolCall,
     toolCalls,
+    recentToolCalls,
     countTurns,
     clearTurns,
     replaceTurns,

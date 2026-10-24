@@ -24,9 +24,11 @@ import { fileURLToPath } from "node:url";
 
 import {
   ACCESS_POLICY,
+  WORKER_TOKEN_ROUTES,
   accessEntryFor,
   accessFor,
   decideAccess,
+  workerTokenMayAccess,
   type RouteAccess,
 } from "../src/api/authz.ts";
 
@@ -250,6 +252,55 @@ test("an owner route FAILS CLOSED: only a credential or an explicit developer sw
     const ok = decideAccess({ method, path, attested: true, ownerAuthConfigured: true });
     assert.equal(ok.allowed, true, `${key} is allowed with the owner credential`);
   }
+});
+
+test("the WORKER credential unlocks exactly POST /worker/authorize and nothing else", () => {
+  const key = "POST /worker/authorize";
+  assert.ok(WORKER_TOKEN_ROUTES.has(key), "the worker route set must contain the authorize route");
+
+  // Allowed even when no OWNER credential is configured: the two credentials are
+  // independent, and the worker one is deliberately weaker.
+  const allowed = decideAccess({
+    method: "POST",
+    path: "/worker/authorize",
+    attested: false,
+    workerAttested: true,
+    ownerAuthConfigured: false,
+  });
+  assert.equal(allowed.allowed, true);
+  assert.equal(allowed.status, 200);
+  assert.match(allowed.reason, /WORKER credential/);
+  assert.match(allowed.reason, /cannot change what KAI is authorized to do/);
+
+  // Every OTHER owner route refuses the same credential, whether or not an owner
+  // credential exists — a leaked hook token must never become the owner.
+  let checked = 0;
+  for (const [other, entry] of Object.entries(ACCESS_POLICY)) {
+    if (entry.access !== "owner" || other === key) continue;
+    checked += 1;
+    const { method, pattern } = splitKey(other);
+    for (const configured of [true, false]) {
+      const decision = decideAccess({
+        method,
+        path: concretePath(pattern),
+        attested: false,
+        workerAttested: true,
+        ownerAuthConfigured: configured,
+      });
+      assert.equal(decision.allowed, false, `${other} must NOT accept the worker credential`);
+      assert.notEqual(decision.status, 200, `${other} must not answer 200 to a worker credential`);
+    }
+  }
+  assert.ok(checked > 0, "the policy must contain owner routes besides the worker route");
+});
+
+test("worker route matching is exact: method case-insensitive, path not", () => {
+  assert.equal(workerTokenMayAccess("post", "/worker/authorize"), true);
+  assert.equal(workerTokenMayAccess("POST", "/worker/authorize"), true);
+  assert.equal(workerTokenMayAccess("POST", "/worker/authorize/"), false);
+  assert.equal(workerTokenMayAccess("GET", "/worker/authorize"), false);
+  assert.equal(workerTokenMayAccess("POST", "/soul"), false);
+  assert.deepEqual([...WORKER_TOKEN_ROUTES], ["POST /worker/authorize"]);
 });
 
 test("reads and public surfaces stay open to an unattested caller", () => {

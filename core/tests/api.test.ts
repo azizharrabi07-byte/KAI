@@ -55,6 +55,8 @@ interface Stub {
 }
 
 function createStub(): Stub {
+  // Approvals this stub has already spent (Option A: one per dispatch attempt).
+  const consumed = new Set<string>();
   const spies: Stub["spies"] = {
     createAndStartMission: [],
     publish: [],
@@ -159,6 +161,13 @@ function createStub(): Stub {
         };
         createdApprovals.push(approval);
         return approval;
+      },
+      // Option A: one approval authorises ONE dispatch attempt. The stub mirrors the
+      // real service so a test can assert a single dispatch, not a standing grant.
+      consume(id: string): boolean {
+        if (consumed.has(id)) return false;
+        consumed.add(id);
+        return true;
       },
       get(id: string): Approval | null {
         return createdApprovals.find((approval) => approval.id === id) ?? null;
@@ -327,7 +336,14 @@ function createStub(): Stub {
       if (decided !== null && approval !== null) approval.status = approved ? "APPROVED" : "REJECTED";
       return { approved, resumed: approval?.missionId !== undefined };
     },
+    // Option A: one approval authorises ONE dispatch attempt. The stub mirrors the real
+    // service, so a test can assert a single dispatch rather than a standing grant.
     approvals: {
+      consume(id: string): boolean {
+        if (consumed.has(id)) return false;
+        consumed.add(id);
+        return true;
+      },
       get(id: string): Approval | null {
         if (id === pendingApproval.id) return pendingApproval;
         if (id === decidedApproval.id) return decidedApproval;

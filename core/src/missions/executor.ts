@@ -39,6 +39,19 @@ import {
   sortSteps,
   type Publish,
 } from "./mission.ts";
+import { verifyMissionCriteria } from "./verify.ts";
+
+/**
+ * The mission's EXPLICIT acceptance criteria, read off the record.
+ *
+ * Deliberately never derived from what a step produced: a criterion that came from the
+ * worker's own output would be the worker grading itself.
+ */
+function missionCriteria(mission: Mission): string[] {
+  const raw = mission.metadata?.["criteria"];
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+}
 
 export type PolicyOutcome = "allow" | "deny" | "needs_approval";
 
@@ -62,6 +75,27 @@ export interface PolicyGate {
 }
 
 export type { Publish };
+
+/** The two switches an autonomous mission must respect, read live from settings. */
+export interface AutonomySwitches {
+  doer: "ON" | "OFF";
+  monster: "ON" | "OFF";
+  /** How many steps Monster Mode will carry before it stops with a blocker. */
+  steps: number;
+  /** Wall-clock ceiling for the whole run. */
+  minutes: number;
+}
+
+/**
+ * Did KAI start this mission on its own?
+ *
+ * Only missions marked `autonomous` are subject to DOER. A plan the owner
+ * approved by hand is theirs, and DOER OFF must not silently freeze it — that
+ * would turn a safety switch into a way to strand the owner's own work.
+ */
+export function isAutonomous(mission: Mission): boolean {
+  return mission.metadata?.["autonomous"] === true;
+}
 
 export interface StepRunner {
   (
@@ -215,6 +249,17 @@ export function createMissionExecutor(opts: {
   policy?: PolicyGate;
   publish?: Publish;
   runner: StepRunner;
+  /**
+   * The autonomy switches, read LIVE from Core settings.
+   *
+   * This is the boundary that makes DOER real: a mission that KAI started by
+   * itself must not run while the owner has said KAI may not act on its own,
+   * whatever the renderer shows or a client posts. Read per start, never cached,
+   * so flipping the switch takes effect on the next mission rather than the next
+   * process. Absent (a bare executor in tests) means "no autonomy policy", which
+   * is the previous behaviour.
+   */
+  autonomy?: () => AutonomySwitches;
   now?: () => Date;
   idFactory?: () => string;
 }): MissionExecutor {
@@ -342,10 +387,86 @@ export function createMissionExecutor(opts: {
    * the first hard outcome (failure, policy denial, parked approval, cancel).
    * COMPLETED/SKIPPED steps are never touched again.
    */
+  /**
+   * THE EVIDENCE GATE — the ONE place a mission may become COMPLETED.
+   *
+   * Both completion paths (the normal settle and crash recovery) go through this, because
+   * a second place that decided completion is exactly how a worker's word got through the
+   * first time. A mission completes only when it declared criteria AND every one of them
+   * was settled by something KAI observed. Otherwise it is left non-completed with a
+   * reason naming what is missing.
+   */
+  function settleCompleted(mission: Mission): boolean {
+    const criteria = missionCriteria(mission);
+    const verification = verifyMissionCriteria(criteria);
+    mission.metadata = { ...(mission.metadata ?? {}), verification };
+
+    if (criteria.length > 0 && verification.unverified.length === 0) {
+      mission.status = "COMPLETED";
+      mission.completedAt = iso();
+      persist(mission);
+      emit("mission.completed", { missionId: mission.id, verification }, mission);
+      return true;
+    }
+
+    if (verification.needsHuman && verification.unverified.every((entry) => /needs a person/i.test(entry.reason))) {
+      // Every outstanding criterion needs a PERSON, not a file check: that is a wait,
+      // not a failure, and it stays nonterminal so a decision can still land.
+      mission.status = "WAITING";
+      persist(mission);
+      return false;
+    }
+
+    const missing =
+      criteria.length === 0
+        ? "no acceptance criteria were declared, so there is nothing KAI could verify — a worker's word is not evidence"
+        : verification.unverified.map((entry) => entry.reason).join("; ");
+    mission.status = "FAILED";
+    mission.error = {
+      code: "VALIDATION_FAILED",
+      message: `the worker finished, but completion is UNVERIFIED: ${missing}`,
+      retryable: false,
+      at: iso(),
+    };
+    persist(mission);
+    emit("mission.failed", { missionId: mission.id, error: mission.error, verification }, mission);
+    return false;
+  }
+
   async function runSteps(mission: Mission): Promise<Mission> {
+    // Monster's limits are enforced, not advertised. Both are read once per run
+    // so a long mission cannot be extended by changing settings mid-flight — the
+    // mission runs under the limits that were in force when it began.
+    const switches = opts.autonomy?.();
+    const autonomous = isAutonomous(mission);
+    const stepLimit = switches !== undefined && autonomous ? switches.steps : Number.POSITIVE_INFINITY;
+    const deadline = switches !== undefined && autonomous
+      ? now().getTime() + switches.minutes * 60_000
+      : Number.POSITIVE_INFINITY;
+    let executed = 0;
+
     for (const step of sortSteps(mission)) {
       if (cancelled.has(mission.id)) return store.getMission(mission.id) ?? mission;
       if (step.status === "COMPLETED" || step.status === "SKIPPED") continue;
+
+      // Out of budget: stop with a truthful blocker rather than running on. The
+      // remaining steps keep their status, so resuming later continues from here
+      // instead of repeating what already ran.
+      const exhausted = executed >= stepLimit ? "steps" : now().getTime() > deadline ? "time" : null;
+      if (exhausted !== null) {
+        mission.metadata = {
+          ...(mission.metadata ?? {}),
+          blockedBy: "MONSTER_BUDGET",
+          blockedAt: iso(),
+          budget: exhausted,
+          stepsExecuted: executed,
+        };
+        mission.status = "WAITING";
+        persist(mission);
+        emit("mission.blocked", { missionId: mission.id, reason: `monster_${exhausted}`, stepsExecuted: executed }, mission);
+        return mission;
+      }
+      executed += 1;
 
       // Reset per step: an approval that cleared step 1 must never be presented
       // on behalf of step 2.
@@ -487,10 +608,7 @@ export function createMissionExecutor(opts: {
     if (cancelled.has(mission.id)) return store.getMission(mission.id) ?? mission;
 
     if (allStepsCompleted(mission)) {
-      mission.status = "COMPLETED";
-      mission.completedAt = iso();
-      persist(mission);
-      emit("mission.completed", { missionId: mission.id }, mission);
+      settleCompleted(mission);
     } else {
       // Nothing failed but not everything completed (e.g. a SKIPPED step):
       // honest WAITING beats a false COMPLETED.
@@ -507,6 +625,20 @@ export function createMissionExecutor(opts: {
       return mission;
     }
     if (inFlight.has(missionId)) return mission;
+
+    // ── DOER OFF BLOCKS AUTONOMOUS STARTS ────────────────────────────────────
+    // A mission KAI created on its own is not allowed to begin while the owner
+    // has turned autonomous execution off. It stays exactly as it was — DRAFT,
+    // with every step intact — so switching DOER back on can start it later.
+    // An explicitly owner-started mission (not autonomous) is unaffected: DOER
+    // governs KAI acting alone, not the owner acting.
+    const switches = opts.autonomy?.();
+    if (switches !== undefined && isAutonomous(mission) && switches.doer !== "ON") {
+      mission.metadata = { ...(mission.metadata ?? {}), blockedBy: "DOER_OFF", blockedAt: iso() };
+      persist(mission);
+      emit("mission.blocked", { missionId, reason: "doer_off" }, mission);
+      return mission;
+    }
 
     // A previous cancel is only relevant while its status is CANCELLED; we have
     // already returned above in that case, so clear any stale flag.
@@ -594,10 +726,9 @@ export function createMissionExecutor(opts: {
       const remaining = remainingSteps(mission);
 
       if (remaining.length === 0) {
-        mission.status = "COMPLETED";
-        if (mission.completedAt === undefined) mission.completedAt = iso();
-        persist(mission);
-        emit("mission.completed", { missionId: mission.id, recovered: true }, mission);
+        // Recovery must pass the SAME evidence gate as a normal settle: a mission that
+        // crashed just before its last step is not evidence that its criteria were met.
+        settleCompleted(mission);
         continue;
       }
 

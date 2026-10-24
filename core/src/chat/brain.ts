@@ -33,9 +33,20 @@ import type {
   ToolCall,
   ToolStreamEvent,
 } from "../model/types.ts";
-import { ModelError } from "../model/types.ts";
+import { ModelError, type ThinkingLevel } from "../model/types.ts";
 import type { ModelToolExecution, ModelToolPlane } from "../tools/model-plane.ts";
 import { synthesisDirective } from "../prompts/compose.ts";
+
+/**
+ * The most a single tool result may contribute to the continuation prompt.
+ *
+ * A browser read returns a whole page. Feeding ten of them back unbounded made
+ * the continuation large enough to exceed the provider's request timeout, so a
+ * research turn ran every tool and then produced NO answer at all. The model
+ * needs the substance of a result, not the entire document; the full record is
+ * still kept in `result` for the transcript and the activity timeline.
+ */
+const TOOL_RESULT_CHARS = 12_000;
 
 export type { ToolStreamEvent };
 
@@ -58,6 +69,11 @@ export interface BrainTurnInput {
   agentId?: string;
   model?: string;
   temperature?: number;
+  /**
+   * The thinking level for this turn, chosen in the UI. The provider applies it;
+   * the terminal frame reports which parameters it really produced.
+   */
+  thinking?: ThinkingLevel;
   signal?: AbortSignal;
   /**
    * Per-turn tool-event listener. Wins over the constructor's `onToolEvent`
@@ -137,6 +153,11 @@ export interface KaiBrainDescription {
   tools: boolean;
   /** The tool ids the model may choose from, when a tool plane is wired. */
   toolIds: string[];
+  /**
+   * Whether the provider accepts `reasoning_effort`. Reported so a thinking level
+   * can be described honestly: as a reasoning setting, or only as a token budget.
+   */
+  supportsReasoningEffort: boolean;
 }
 
 /**
@@ -177,6 +198,16 @@ export interface KaiBrainOptions {
    * both `respond()` and `stream()`. A throwing listener never breaks the turn.
    */
   onToolEvent?: (event: ToolStreamEvent) => void;
+  /**
+   * What to do when a tool parks for approval MID-TURN.
+   *
+   * Without this the turn ends at "I need your approval", the owner approves
+   * later, the parked call runs — and the model never learns that. The action
+   * succeeded and the user was told nothing about it. With it, the turn waits
+   * for the verdict, then continues in the SAME tool loop with the real result,
+   * so the assistant can answer the original question.
+   */
+  awaitApproval?: (approvalId: string, signal?: AbortSignal) => Promise<string | null>;
 }
 
 /** The default round cap: enough for search -> read -> answer, not an infinite loop. */
@@ -301,7 +332,57 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
         input,
         onChunk,
       );
-      const executed: ModelToolExecution = await activePlane.execute(call.name, call.arguments, toolContext(input));
+      let executed: ModelToolExecution = await activePlane.execute(call.name, call.arguments, toolContext(input));
+
+      // ── A parked call: WAIT for the verdict, then run it in this same turn ──
+      // The owner decides from the UI while this turn is still open. Parking and
+      // returning "needs approval" used to end the turn, so the approved action
+      // ran with nobody to tell — the model never saw its result and the user got
+      // no answer. Waiting keeps the tool-call context and resumes in place.
+      const parkedId = executed.status === "APPROVAL_REQUIRED" ? approvalIdOf(executed.value) : undefined;
+      if (parkedId !== undefined && options.awaitApproval !== undefined) {
+        const verdict = await options.awaitApproval(parkedId, input.signal);
+        if (verdict === "APPROVED") {
+          // Re-issue the SAME call with the approving id. It dispatches once: the
+          // registry claims the approval atomically.
+          //
+          // The id goes in BOTH places, exactly as the non-turn re-issue path does:
+          // as an invoke option (the registry's approval check reads it) and inside
+          // the input (a tool whose own validator insists on naming the approving
+          // record refuses an input that does not carry it). Passing only the option
+          // left the call unauthorised and the turn produced no text at all.
+          let reissuedArgs = call.arguments;
+          try {
+            const parsed = JSON.parse(call.arguments) as unknown;
+            if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+              reissuedArgs = JSON.stringify({ ...(parsed as Record<string, unknown>), approvalId: parkedId });
+            }
+          } catch {
+            // A non-JSON argument string cannot carry the id; the option still does.
+          }
+          executed = await activePlane.execute(call.name, reissuedArgs, {
+            ...toolContext(input),
+            approvalId: parkedId,
+          });
+        } else if (verdict !== null) {
+          // Rejected or expired: the action must NOT run. The model is told, so it
+          // explains the refusal instead of pretending it happened.
+          executed = {
+            ok: false,
+            status: verdict === "EXPIRED" ? "EXPIRED" : "REJECTED",
+            value: {
+              error: verdict === "EXPIRED" ? "approval_expired" : "approval_rejected",
+              message:
+                verdict === "EXPIRED"
+                  ? "the owner did not answer this request in time, so it was not run"
+                  : "the owner rejected this action, so it was not run",
+            },
+            toolId: executed.toolId,
+            invocationId: executed.invocationId,
+          } as ModelToolExecution;
+        }
+      }
+
       const completedAt = new Date().toISOString();
       const approvalId = approvalIdOf(executed.value);
       records.push({
@@ -342,10 +423,15 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
         input,
         onChunk,
       );
+      const whole = JSON.stringify(executed.value ?? null);
       messages.push({
         role: "tool",
         toolCallId: call.id,
-        content: JSON.stringify(executed.value ?? null),
+        content: whole.length > TOOL_RESULT_CHARS
+          // Said plainly, because a silently shortened result invites the model to
+          // treat the cut as the end of the document.
+          ? `${whole.slice(0, TOOL_RESULT_CHARS)}\n… [result truncated: ${whole.length} characters total]`
+          : whole,
       });
     }
   }
@@ -399,6 +485,7 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
         purpose: `${input.purpose ?? purpose}:synthesis`,
         ...(input.model !== undefined ? { model: input.model } : {}),
         ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+        ...(input.thinking !== undefined ? { thinking: input.thinking } : {}),
         ...(input.signal !== undefined ? { signal: input.signal } : {}),
       });
       return { text: result.text, ran: true };
@@ -429,6 +516,7 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
         configured: capabilities.chat,
         tools: capabilities.tools && plane !== undefined,
         toolIds: plane !== undefined ? plane.toolIds() : [],
+        supportsReasoningEffort: capabilities.supportsReasoningEffort,
       };
     },
 
@@ -454,6 +542,7 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
             ...(declarations !== undefined ? { tools: declarations } : {}),
             ...(input.model !== undefined ? { model: input.model } : {}),
             ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+          ...(input.thinking !== undefined ? { thinking: input.thinking } : {}),
             ...(input.signal !== undefined ? { signal: input.signal } : {}),
           });
         } catch (error) {
@@ -542,6 +631,7 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
           purpose: input.purpose ?? purpose,
           ...(input.model !== undefined ? { model: input.model } : {}),
           ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+          ...(input.thinking !== undefined ? { thinking: input.thinking } : {}),
           ...(input.signal !== undefined ? { signal: input.signal } : {}),
         });
       }
@@ -579,6 +669,7 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
             purpose: input.purpose ?? purpose,
             ...(input.model !== undefined ? { model: input.model } : {}),
             ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+          ...(input.thinking !== undefined ? { thinking: input.thinking } : {}),
             ...(input.signal !== undefined ? { signal: input.signal } : {}),
           })) {
             if (chunk.done) {
@@ -618,6 +709,7 @@ export function createKaiBrain(options: KaiBrainOptions): KaiBrain {
                     purpose: `${input.purpose ?? purpose}:synthesis`,
                     ...(input.model !== undefined ? { model: input.model } : {}),
                     ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+          ...(input.thinking !== undefined ? { thinking: input.thinking } : {}),
                     ...(input.signal !== undefined ? { signal: input.signal } : {}),
                   })) {
                     if (chunk.done) break;

@@ -34,6 +34,7 @@ export const SECTION_ORDER: readonly SectionName[] = [
   "safety",
   "identity",
   "guidance",
+  "shark",
   "user-context",
   "memory",
   "skills",
@@ -45,6 +46,7 @@ export type SectionName =
   | "safety"
   | "identity"
   | "guidance"
+  | "shark"
   | "user-context"
   | "memory"
   | "skills"
@@ -120,6 +122,7 @@ export interface PromptLimits {
   safety: number;
   identity: number;
   guidance: number;
+  shark: number;
   userContext: number;
   memory: number;
   memoryItem: number;

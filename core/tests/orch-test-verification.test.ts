@@ -25,6 +25,7 @@ import { createWorkBoard } from "../src/orchestration/board.ts";
 import { createBenchmark } from "../src/orchestration/bench.ts";
 import { createDispatcher } from "../src/orchestration/dispatch.ts";
 import { createLearning } from "../src/orchestration/learn.ts";
+import { evaluatingDeps } from "./learn-eval-fixture.ts";
 import { createOrchestrator } from "../src/orchestration/orchestrator.ts";
 import { createTrace } from "../src/orchestration/trace.ts";
 import { openSqliteStores, type Stores } from "../src/storage/sqlite.ts";
@@ -79,7 +80,7 @@ async function runCase(c: Case): Promise<{ met: boolean; detail: string; support
         capabilities: () => ({ skills: [], tools: ["read", "shell"] }),
       }),
       trace: createTrace({ store: stores.activity, prefs: () => ({ activity: "OFF", reasoning: "SUMMARY" }) as const }),
-      learning: createLearning({ metrics: stores.skillMetrics, validate: () => ({ ok: true }), stage: () => ({ ok: true }) }),
+      learning: createLearning({ metrics: stores.skillMetrics, validate: () => ({ ok: true }), stage: () => ({ ok: true }), ...evaluatingDeps() }),
       patterns: stores.promptPatterns,
       reviewRunner: async () => ({ verdict: "PASS", findings: [] }),
       delegate: async () => ({ ok: true, reply: HANDOFF }),

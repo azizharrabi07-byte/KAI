@@ -17,6 +17,7 @@
  */
 
 import type { SkillMetricsStore } from "../shared/contracts.ts";
+import { reportCovers, type EvaluationReport } from "../learning/evaluate.ts";
 
 export interface LearningStep {
   label: string;
@@ -69,6 +70,14 @@ export interface LearningDeps {
   /** Injected staging port (runtime wires real skillStaging). */
   stage: (input: StageInput) => StageCheck;
   validate: (markdown: string) => StageCheck;
+  /**
+   * §4C — the revision-specific verdict for a candidate. REQUIRED, not optional:
+   * an optional gate is a bypass waiting to be omitted, and every promotion path
+   * must enforce the same rule. The dep owns the baseline and task-set lookup.
+   */
+  evaluate: (input: { skillId: string; markdown: string }) => EvaluationReport;
+  /** The active revision's content hash, or null when nothing is active yet. */
+  activeSha256: (skillId: string) => string | null;
 }
 
 export type SubmitResult = { ok: true; stagedId: string } | { ok: false; refused: true; reason: string };
@@ -163,6 +172,29 @@ export function createLearning(deps: LearningDeps): SkillLearning {
     const checked = deps.validate(markdown);
     if (!checked.ok) return { ok: false, refused: true, reason: checked.reason ?? "validation failed" };
     const id = slugify(candidate.title);
+
+    // §4C — the promotion gate. No candidate reaches staging without a PASS that is
+    // bound to these exact bytes and to the baseline that is active NOW. A report for
+    // a different revision, or one produced before the active revision moved, proves
+    // nothing about what is being promoted and is refused.
+    let report: EvaluationReport;
+    try {
+      report = deps.evaluate({ skillId: id, markdown });
+    } catch (err) {
+      // An evaluator that throws must not be read as success — nor as a regression.
+      return { ok: false, refused: true, reason: `evaluation error: ${err instanceof Error ? err.message : String(err)}` };
+    }
+    if (report.verdict !== "PASS") {
+      return { ok: false, refused: true, reason: `evaluation ${report.verdict}: ${report.reasons.join("; ")}` };
+    }
+    if (!reportCovers(report, markdown, deps.activeSha256(id))) {
+      return {
+        ok: false,
+        refused: true,
+        reason: "evaluation does not cover these candidate bytes and the currently active revision",
+      };
+    }
+
     const staged = deps.stage({ id, markdown });
     if (!staged.ok) return { ok: false, refused: true, reason: staged.reason ?? "staging refused" };
     return { ok: true, stagedId: id };

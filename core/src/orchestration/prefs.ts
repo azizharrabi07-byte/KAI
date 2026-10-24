@@ -37,6 +37,13 @@ export const ORCHESTRATION_KEYS = [
   // layer: Guard (policy, risk, approvals, the execution registry) is never
   // affected by this switch. A fresh install starts OFF.
   "orchestration.doer",
+  // Monster Mode — the high-autonomy execution profile. Separate from Doer:
+  // Doer says "may KAI act on its own at all", Monster says "how far does it
+  // carry a mission without being asked again". Neither touches Guard.
+  "orchestration.monster",
+  "orchestration.monsterMinutes",
+  "orchestration.monsterSteps",
+  "orchestration.monsterParallel",
 ] as const;
 
 export type OrchestrationKey = (typeof ORCHESTRATION_KEYS)[number];
@@ -94,6 +101,14 @@ export function validateOrchestrationValue(key: OrchestrationKey, value: unknown
       return intIn(key, value, 0, 50);
     case "orchestration.doer":
       return oneOf(key, value, ["ON", "OFF"]);
+    case "orchestration.monster":
+      return oneOf(key, value, ["ON", "OFF"]);
+    case "orchestration.monsterMinutes":
+      return intIn(key, value, 1, 240);
+    case "orchestration.monsterSteps":
+      return intIn(key, value, 1, 100);
+    case "orchestration.monsterParallel":
+      return intIn(key, value, 1, 8);
   }
 }
 
@@ -122,6 +137,16 @@ export const DEFAULT_AGENTS_VIEW: "COMPACT" | "DETAILED" = "COMPACT";
 export type DoerState = "ON" | "OFF";
 export const DEFAULT_DOER: DoerState = "OFF";
 
+/**
+ * Monster Mode — carry an authorized mission through its dependent steps
+ * without asking again for each one. Bounded on purpose: the limits are not
+ * advisory, the mission loop reads them, and exceeding one stops the mission
+ * with a blocker instead of continuing silently. Default OFF.
+ */
+export type MonsterState = "ON" | "OFF";
+export const DEFAULT_MONSTER: MonsterState = "OFF";
+export const MONSTER_LIMITS = { minutes: 30, steps: 24, parallel: 3 } as const;
+
 export interface OrchestrationPrefs {
   autonomy: AutonomyPolicy;
   activity: TraceLevel;
@@ -133,6 +158,11 @@ export interface OrchestrationPrefs {
   jevMaxCalls: number;
   /** Autonomous goal execution. Guard is unaffected: it is always active. */
   doer: DoerState;
+  /** High-autonomy execution profile. Bounded, and never a permission grant. */
+  monster: MonsterState;
+  monsterMinutes: number;
+  monsterSteps: number;
+  monsterParallel: number;
 }
 
 /** Read effective orchestration prefs: stored rows over safe defaults. */
@@ -168,5 +198,9 @@ export function readOrchestrationPrefs(store: SettingsStore): OrchestrationPrefs
     decision: pick("orchestration.decision", ["deterministic", "deterministic+jev"] as const, "deterministic"),
     jevMaxCalls: num("orchestration.jevMaxCalls", 5),
     doer: pick("orchestration.doer", ["ON", "OFF"] as const, DEFAULT_DOER),
+    monster: pick("orchestration.monster", ["ON", "OFF"] as const, DEFAULT_MONSTER),
+    monsterMinutes: num("orchestration.monsterMinutes", MONSTER_LIMITS.minutes),
+    monsterSteps: num("orchestration.monsterSteps", MONSTER_LIMITS.steps),
+    monsterParallel: num("orchestration.monsterParallel", MONSTER_LIMITS.parallel),
   };
 }

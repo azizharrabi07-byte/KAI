@@ -33,9 +33,13 @@ async function probeLive(url: string): Promise<boolean> {
     return false;
   }
 }
+// A live agent is only usable if it is UP **and** this process holds its credential.
+// Probing reachability alone made these tests run against a Hermes the harness could
+// not authenticate to, so they failed on a null conversation id instead of being
+// skipped — a red suite that said nothing about the code.
 const LIVE = {
-  hermes: await probeLive("http://127.0.0.1:8642/health"),
-  opencode: await probeLive("http://127.0.0.1:4096/global/health"),
+  hermes: (await probeLive("http://127.0.0.1:8642/health")) && Boolean(process.env.KAI_HERMES_KEY),
+  opencode: (await probeLive("http://127.0.0.1:4096/global/health")) && Boolean(process.env.KAI_HERMES_KEY),
 };
 
 async function start(config: KaiConfig): Promise<{ base: string; close: () => Promise<void> }> {
@@ -94,7 +98,7 @@ test("kai core: GET /integrations mirrors the aggregate", async (t) => {
   }
 });
 
-test("kai core: GET /agents/hermes/sessions returns sessions with ids", { skip: LIVE.hermes ? false : "Hermes is not running" }, async (t) => {
+test("kai core: GET /agents/hermes/sessions returns sessions with ids", { skip: LIVE.hermes ? false : "Hermes is not running or this process has no KAI_HERMES_KEY" }, async (t) => {
   const s = await start(loadConfig(process.env));
   t.after(() => s.close());
 
@@ -246,7 +250,7 @@ test("kai core: POST /chat rejects a body with no text", async (t) => {
   assert.equal(wrongMethod.status, 405);
 });
 
-test("kai core: POST /chat runs a real turn through Hermes and returns the reply", { skip: LIVE.hermes ? false : "Hermes is not running" }, async (t) => {
+test("kai core: POST /chat runs a real turn through Hermes and returns the reply", { skip: LIVE.hermes ? false : "Hermes is not running or this process has no KAI_HERMES_KEY" }, async (t) => {
   const s = await start(loadConfig(process.env));
   t.after(() => s.close());
 
@@ -260,8 +264,8 @@ test("kai core: POST /chat runs a real turn through Hermes and returns the reply
   assert.equal(response.status, 200, "the control layer must answer");
   const body = (await response.json()) as {
     agent: string;
-    worker: string;
-    session_id: string;
+    worker?: string;
+    conversation_id: string;
     reply: string;
     usage: unknown;
   };
@@ -272,19 +276,22 @@ test("kai core: POST /chat runs a real turn through Hermes and returns the reply
   // came back as "Hermes Agent by Nous Research" speaking as the product.
   assert.equal(body.agent, "core", "KAI speaks; the worker is provenance, not the speaker");
   assert.equal(body.worker, "hermes");
-  assert.ok(body.session_id.length > 0, "a session id must come back for the next turn");
+  // The field is `conversation_id` — the API was renamed from `session_id` and this
+  // assertion kept the old name, which is why it only surfaced when Hermes happened
+  // to be up and the test actually ran.
+  assert.ok(body.conversation_id.length > 0, "a conversation id must come back for the next turn");
   assert.equal(body.reply, token, `expected exactly ${token}, got ${JSON.stringify(body.reply)}`);
-  console.log(`      -> /chat: session=${body.session_id} reply=${JSON.stringify(body.reply)}`);
+  console.log(`      -> /chat: session=${body.conversation_id} reply=${JSON.stringify(body.reply)}`);
 
   // A second turn on the same session proves the session id is reusable.
   const followUp = await fetch(`${s.base}/chat`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ text: "What token did I just ask you to reply with?", session_id: body.session_id }),
+    body: JSON.stringify({ text: "What token did I just ask you to reply with?", conversation_id: body.conversation_id }),
   });
   assert.equal(followUp.status, 200);
-  const second = (await followUp.json()) as { session_id: string; reply: string };
-  assert.equal(second.session_id, body.session_id, "the same session must be reused");
+  const second = (await followUp.json()) as { conversation_id: string; reply: string };
+  assert.equal(second.conversation_id, body.conversation_id, "the same conversation must be reused");
   assert.ok(second.reply.includes(token), `the agent must remember the turn, got ${JSON.stringify(second.reply)}`);
   console.log(`      -> /chat (2nd turn, same session): ${JSON.stringify(second.reply)}`);
 });

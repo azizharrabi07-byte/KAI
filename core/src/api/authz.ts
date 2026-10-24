@@ -125,6 +125,16 @@ export const ACCESS_POLICY: Readonly<Record<string, AccessPolicyEntry>> = Object
   "GET /work-items": { access: "read", reason: "the work board" },
   "POST /work-items": { access: "owner", reason: "creates a durable work item and may start its run" },
   "GET /work-items/:id": { access: "read", reason: "one work item" },
+  "POST /work-items/:id/plan/run": {
+    access: "owner",
+    reason: "executes a plan's stages through the real worker/approval boundary",
+  },
+  "POST /work-items/:id/edit": {
+    access: "owner",
+    // Changing a task's objective changes what its acceptance criteria mean, so it
+    // is the owner's call — the same class as creating one.
+    reason: "edits a durable work item's objective or criteria",
+  },
   "POST /work-items/:id/run": {
     access: "owner",
     reason: "starts the orchestrator loop for an item — it executes work, not merely records it",
@@ -134,6 +144,11 @@ export const ACCESS_POLICY: Readonly<Record<string, AccessPolicyEntry>> = Object
     reason: "reviews an existing item against criteria and returns the verdict; declares no record and writes no row",
   },
   "POST /work-items/audit": { access: "owner", reason: "ingests an external worker report as a durable work item and may launch it" },
+  "POST /worker/authorize": {
+    access: "owner",
+    reason:
+      "answers whether a delegated worker may perform one specific action; an unrelated local process must not be able to ask it or harvest its verdicts",
+  },
   "GET /bench": { access: "read", reason: "the bench" },
   "GET /activity": { access: "read", reason: "the activity feed over persisted events" },
 
@@ -154,6 +169,9 @@ export const ACCESS_POLICY: Readonly<Record<string, AccessPolicyEntry>> = Object
   // ── KAI Doer: the autonomy switch ────────────────────────────────────────────
   "GET /doer": { access: "read", reason: "the Doer switch's current state" },
   "POST /doer": { access: "owner", reason: "turns KAI's autonomous execution ON or OFF — the autonomy switch itself" },
+  "GET /monster": { access: "read", reason: "Monster Mode's effective state and the limits it applies" },
+  "POST /monster": { access: "owner", reason: "changes how far KAI carries a mission without being asked again" },
+  "POST /missions/auto": { access: "owner", reason: "starts a mission KAI plans and runs itself — DOER and Monster are enforced" },
   "GET /doer/pending": { access: "read", reason: "the durable pending-result inbox" },
 
   // ── Pure computations (POST, but they write nothing) ─────────────────────────
@@ -167,6 +185,25 @@ export const ACCESS_POLICY: Readonly<Record<string, AccessPolicyEntry>> = Object
   "POST /policy/rules": {
     access: "owner",
     reason: "REWRITES what KAI is allowed to do (policy.set): changing KAI's own authority is an owner decision",
+  },
+  "GET /activity/tools": {
+    access: "read",
+    reason: "the real tool invocations KAI made, newest first: arguments and outcomes as recorded",
+  },
+  "GET /summary/daily": {
+    access: "read",
+    // Rendering the report is side-effect free: it never consumes the once-a-day
+    // offer, never notifies and never records a delivery. The OFFER is the scheduler's
+    // job, so reading this twice is harmless.
+    reason: "the day's work summary, built from real missions and verified outcomes",
+  },
+  "GET /policy/mode": {
+    access: "read",
+    reason: "the policy mode now in force, and any elevation prepared but not yet confirmed",
+  },
+  "POST /policy/mode": {
+    access: "owner",
+    reason: "RAISES or lowers KAI's authority level: an elevation parks for the owner, a downgrade applies at once",
   },
   "GET /state": { access: "read", reason: "aggregate runtime state" },
 
@@ -376,10 +413,32 @@ export interface AccessInput {
   path: string;
   /** The caller proved it holds the per-install owner credential. */
   attested?: boolean;
+  /**
+   * The caller proved it holds the WORKER credential minted for the Hermes
+   * `pre_tool_call` hook. That credential unlocks `WORKER_TOKEN_ROUTES` only;
+   * it is never equivalent to the owner credential.
+   */
+  workerAttested?: boolean;
   /** This Core HAS an owner credential to verify against. */
   ownerAuthConfigured?: boolean;
   /** An EXPLICIT developer switch. Never assumed; absence means "absent". */
   devMode?: boolean;
+}
+
+/**
+ * The ONLY routes a worker credential may reach.
+ *
+ * Adding to this set is a security decision, not a convenience: the worker
+ * credential lives in a file a separate process can read, so everything it
+ * unlocks is reachable by anything that can read that file.
+ */
+export const WORKER_TOKEN_ROUTES: ReadonlySet<string> = Object.freeze(
+  new Set(["POST /worker/authorize"]),
+) as ReadonlySet<string>;
+
+/** True when `method path` is one of the narrow worker-credential routes. */
+export function workerTokenMayAccess(method: string, path: string): boolean {
+  return WORKER_TOKEN_ROUTES.has(`${method.toUpperCase()} ${path}`);
 }
 
 export interface AccessDecision {
@@ -395,8 +454,9 @@ export const OWNER_AUTH_REQUIRED = "OWNER_AUTH_REQUIRED";
 
 /**
  * Decide one request. Reads and public surfaces are always allowed; an `owner`
- * route requires the owner credential once a credential exists — and the two
- * states that bypass that rule are BOTH named in `reason`, never silent.
+ * route requires the owner credential once a credential exists — except the
+ * narrow worker routes, which the separate worker credential can unlock. Every
+ * path that allows an owner route is named in `reason`, never silent.
  */
 export function decideAccess(input: AccessInput): AccessDecision {
   const method = typeof input.method === "string" ? input.method.toUpperCase() : "";
@@ -417,6 +477,13 @@ export function decideAccess(input: AccessInput): AccessDecision {
   }
   if (input.attested === true) {
     return { allowed: true, status: 200, reason: `owner route allowed: the caller presented the owner credential (${entry.reason})` };
+  }
+  if (input.workerAttested === true && workerTokenMayAccess(method, path)) {
+    return {
+      allowed: true,
+      status: 200,
+      reason: `worker route allowed: the caller presented the WORKER credential, which unlocks only ${method} ${path} and cannot change what KAI is authorized to do (${entry.reason})`,
+    };
   }
   if (input.devMode === true) {
     return {

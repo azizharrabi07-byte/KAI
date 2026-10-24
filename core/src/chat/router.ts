@@ -521,6 +521,14 @@ const RULES: IntentRule[] = [
       /\bwhat\s+(?:are|is)\s+you\s+(?:built|based|running)\s+on\b/,
       /\bwho\s+do\s+you\s+work\s+for\b/,
       /\bare\s+you\s+the\s+same\s+as\s+(?:hermes|opencode|claude|codex)\b/,
+      // "Which API/LLM/provider are you using?" is the SAME question as "which
+      // model are you?". It asks what KAI actually runs on, so it must be
+      // answered from real provider state — not left to the model, which sees
+      // its own tool catalogue on the wire and answers by enumerating tools.
+      // The trailing `\byou\b` keeps an unrelated "which API endpoint should I
+      // call for my app" out of the identity intent.
+      /\b(?:which|what)\s+(?:api|llm|model|provider|endpoint)\b[^.?]*\byou\b/,
+      /\byour\s+(?:api|llm|model|provider|endpoint)\b/,
     ],
   },
   {
@@ -1031,6 +1039,35 @@ export function createChatRouter(ctx: RouterContext): ChatRouter {
    * question that names a worker ("Are you Hermes?") is DENIED — Hermes is a
    * worker KAI may use, not what KAI is. No worker call is made here.
    */
+  /**
+   * What KAI actually runs on, read from the live provider's own description.
+   *
+   * Deliberately NOT read from a config file, a default, or from memory: the
+   * only honest source is the provider KAI will really call on the next turn.
+   * A brain that is absent, or that throws when asked, is reported as unknown
+   * rather than guessed at — and KAI still says plainly that it is not the model.
+   */
+  function modelFact(): string {
+    let provider: string | undefined;
+    let model: string | undefined;
+    try {
+      const described = ctx.brain?.describe();
+      if (typeof described?.provider === "string" && described.provider.length > 0) {
+        provider = described.provider;
+      }
+      if (typeof described?.model === "string" && described.model.length > 0) {
+        model = described.model;
+      }
+    } catch {
+      // Reported as unknown below — never invented from a fallback.
+    }
+    if (provider === undefined && model === undefined) {
+      return "I'm not a model myself; when a task needs one I delegate to a worker and it runs whichever model it is configured with.";
+    }
+    const on = [provider, model].filter((value): value is string => value !== undefined).join(" / ");
+    return `I'm not a model myself — I'm KAI. My own turns right now run on the configured provider ${on}.`;
+  }
+
   function answerIdentity(t: string): RouterAnswer {
     const self = identitySelfDescription();
     const worker = KNOWN_AGENT_IDS.find((id) => new RegExp(`\\b${id}\\b`).test(t));
@@ -1043,12 +1080,11 @@ export function createChatRouter(ctx: RouterContext): ChatRouter {
       parts.push(`No — I'm not ${AGENT_LABEL[confused] ?? confused}.`);
     }
     parts.push(self);
-    if (/\bmodel\b/.test(t)) {
-      // "Which model are you?" must NOT be answered by reading a config file or
-      // by naming the runtime: KAI is not a model, it delegates to one.
-      parts.push(
-        "I'm not a model myself; when a task needs one I delegate to a worker and it runs whichever model it is configured with.",
-      );
+    if (/\b(?:model|api|llm|provider|endpoint)\b/.test(t)) {
+      // Answered from the LIVE provider's own description — not from a config
+      // file, a default, or memory. The user is asking what KAI actually runs
+      // on, so the only honest source is the provider KAI will really call.
+      parts.push(modelFact());
     } else if (worker === undefined && confused === undefined) {
       parts.push(
         "Hermes and OpenCode are workers I can use; I'm still KAI when they are unavailable.",
@@ -1446,6 +1482,16 @@ export function createChatRouter(ctx: RouterContext): ChatRouter {
 
   async function answer(text: string, opts?: { sessionId?: string }): Promise<RouterAnswer> {
     const t = normalize(text);
+    // ── AN EXPLICIT `@name` OUTRANKS CLASSIFICATION ───────────────────────────
+    // `@hermes <task>` used to be classified as `agent.status` because the text
+    // mentions an agent, so KAI answered "hermes is idle — no task right now"
+    // and the task in the same message was never dispatched. The user naming an
+    // agent and giving it work is the clearest instruction there is; nothing may
+    // pre-empt it, least of all a keyword.
+    if (ctx.invocations !== undefined && parseInvocations(text) !== null) {
+      const direct = await answerInvocation(text);
+      if (direct.answer !== undefined) return direct.answer;
+    }
     const intent = classify(text);
     const sessionId = opts?.sessionId;
     switch (intent) {

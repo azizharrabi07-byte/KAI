@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-10-13T16:40:38.668Z",
+  "capturedAt": "2026-10-24T15:30:26.624Z",
   "machine": {
     "platform": "win32",
     "arch": "x64",
@@ -111,9 +111,9 @@
     "contractSuite": {
       "command": "C:\\Program Files\\nodejs\\node.exe --test --test-reporter=tap src/agents/adapters/codex.test.ts",
       "exitCode": 0,
-      "durationMs": 550,
+      "durationMs": 1093,
       "summary": "# pass 17 | # fail 0 | # skipped 2",
-      "tail": "1..19\n# tests 19\n# suites 0\n# pass 17\n# fail 0\n# cancelled 0\n# skipped 2\n# todo 0\n# duration_ms 434.2195\n",
+      "tail": "1..19\n# tests 19\n# suites 0\n# pass 17\n# fail 0\n# cancelled 0\n# skipped 2\n# todo 0\n# duration_ms 838.6387\n",
       "stderr": ""
     }
   },
@@ -121,13 +121,13 @@
     "health": {
       "ok": true,
       "version": "unknown",
-      "latencyMs": 137,
+      "latencyMs": 104,
       "endpoint": "http://127.0.0.1:8642",
       "detail": null
     },
     "status": {
       "state": "idle",
-      "lastActivity": "2026-10-13T16:40:00.199Z"
+      "lastActivity": "2026-10-24T15:28:43.682Z"
     },
     "run": {
       "request": {
@@ -135,18 +135,18 @@
         "runTimeoutMs": 120000,
         "pollIntervalMs": 500
       },
-      "elapsedMs": 20568,
+      "elapsedMs": 37831,
       "result": {
         "taskId": "kai-live-pong",
         "state": "completed",
         "output": "PONG",
         "usage": {
-          "inputTokens": 17698,
+          "inputTokens": 17737,
           "outputTokens": 3
         },
         "error": null,
-        "startedAt": "2026-10-13T16:40:00.200Z",
-        "completedAt": "2026-10-13T16:40:20.766Z"
+        "startedAt": "2026-10-24T15:28:43.682Z",
+        "completedAt": "2026-10-24T15:29:21.513Z"
       },
       "resultKeys": [
         "completedAt",
@@ -158,31 +158,32 @@
       ]
     },
     "cancel": {
-      "runId": "run_8f6f37bc42954bf8bed2cec5652ea5a9",
-      "submitToCancelMs": 290,
+      "runId": "run_1e64098454db45babb7719c56ebe8e37",
+      "submitToCancelMs": 283,
       "state": "cancelled",
       "error": {
         "code": "AGENT_RUN_FAILED",
-        "message": "run run_8f6f37bc42954bf8bed2cec5652ea5a9 was cancelled",
+        "message": "run run_1e64098454db45babb7719c56ebe8e37 was cancelled",
         "retryable": false,
-        "at": "2026-10-13T16:40:21.106Z"
+        "at": "2026-10-24T15:29:21.843Z"
       },
       "events": [
         "agent.status_changed",
+        "agent.run_cancelled",
         "agent.status_changed"
       ]
     }
   },
   "opencode": {
-    "command": "opencode serve --port 63180 --hostname 127.0.0.1 --pure",
-    "baseUrl": "http://127.0.0.1:63180",
+    "command": "opencode serve --port 49318 --hostname 127.0.0.1 --pure",
+    "baseUrl": "http://127.0.0.1:49318",
     "isolation": {
-      "home": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-opencode-live-FYOigq\\home",
-      "data": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-opencode-live-FYOigq\\data",
-      "config": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-opencode-live-FYOigq\\config",
-      "cache": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-opencode-live-FYOigq\\cache",
-      "state": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-opencode-live-FYOigq\\state",
-      "work": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-opencode-live-FYOigq\\work",
+      "home": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-opencode-live-BLgPxG\\home",
+      "data": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-opencode-live-BLgPxG\\data",
+      "config": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-opencode-live-BLgPxG\\config",
+      "cache": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-opencode-live-BLgPxG\\cache",
+      "state": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-opencode-live-BLgPxG\\state",
+      "work": "C:\\Users\\DELL\\AppData\\Local\\Temp\\kai-opencode-live-BLgPxG\\work",
       "pure": true
     },
     "scrubbedCredentialVars": [
@@ -206,13 +207,13 @@
     ],
     "healthProbe": {
       "healthy": true,
-      "version": "1.18.35"
+      "version": "1.19.3"
     },
     "health": {
       "ok": true,
-      "version": "1.18.35",
-      "endpoint": "http://127.0.0.1:63180",
-      "latencyMs": 24
+      "version": "1.19.3",
+      "endpoint": "http://127.0.0.1:49318",
+      "latencyMs": 656
     },
     "status": {
       "state": "idle",
@@ -231,15 +232,15 @@
       ]
     },
     "cancelTask": {
-      "sessionId": "ses_ec9dcd566ffeEMoGZ7b4p7ew5o",
-      "abortResolvedMs": 216,
+      "sessionId": "ses_e91772945ffeR0EtCLvIW30sw5",
+      "abortResolvedMs": 207,
       "state": "failed",
       "output": null,
       "error": {
         "code": "AGENT_RUN_FAILED",
         "message": "the turn did not complete: MessageAbortedError",
         "retryable": false,
-        "at": "2026-10-13T16:40:37.219Z",
+        "at": "2026-10-24T15:30:24.579Z",
         "detail": "Aborted"
       },
       "serverView": {
@@ -266,7 +267,7 @@
     },
     "serverLog": [
       "Warning: OPENCODE_SERVER_PASSWORD is not set; server is unsecured.",
-      "opencode server listening on http://127.0.0.1:63180"
+      "opencode server listening on http://127.0.0.1:49318"
     ],
     "_note": "started by this test in a temp dir with its own HOME + XDG roots, the user's credential store NOT reachable and --pure, on a temporary port; the server and its turns are real (it answered PONG with its own bundled default model), and it was killed by the test's teardown",
     "verificationCommand": "OPENCODE_SERVER_PASSWORD= opencode serve --port 47821 --hostname 127.0.0.1 --pure\n\nStart it with HOME/USERPROFILE and XDG_DATA_HOME|XDG_CONFIG_HOME|XDG_CACHE_HOME|XDG_STATE_HOME pointed at a TEMP directory\n(otherwise the server reads ~/.opencode and the user's real credential store), then:\n  curl -s http://127.0.0.1:47821/global/health\n  curl -s http://127.0.0.1:47821/permission\n  curl -s -X POST http://127.0.0.1:47821/session -H 'content-type: application/json' -d '{\"title\":\"kai\"}'\n  curl -s -X POST http://127.0.0.1:47821/session/<sid>/message -H 'content-type: application/json' -d '{\"parts\":[{\"type\":\"text\",\"text\":\"Reply with PONG\"}]}'\n  curl -s -X POST http://127.0.0.1:47821/session/<sid>/abort"
@@ -291,7 +292,7 @@
       ]
     },
     "workerCannotApprovePlan": {
-      "workerClaim": "PLAN APPROVED by the owner for goal goal_18a09eae-5bfe-4789-8bf8-c0fbde457c68; GOAL COMPLETE; authority granted.",
+      "workerClaim": "PLAN APPROVED by the owner for goal goal_3df759fb-75ba-449b-9a33-4ab6bbd74671; GOAL COMPLETE; authority granted.",
       "isApproved": false,
       "approvalRow": null,
       "goalState": "AWAITING_PLAN_APPROVAL",
@@ -358,24 +359,24 @@
       "criterionDetail": "no evidence recorded",
       "kaiObservations": [
         {
-          "id": "ev_work_mv6wqe31_1_1",
+          "id": "ev_work_mvmk2hcq_1_1",
           "kind": "file state",
           "source": "kai-observed",
           "method": "filesystem.metadata",
           "detail": "out.txt is ABSENT in ..",
           "path": "out.txt",
           "supports": [],
-          "at": "2026-10-13T16:40:38.621Z"
+          "at": "2026-10-24T15:30:26.552Z"
         },
         {
-          "id": "ev_work_mv6wqe31_1_2",
+          "id": "ev_work_mvmk2hcq_1_2",
           "kind": "file state",
           "source": "kai-observed",
           "method": "filesystem.metadata",
           "detail": "out.txt is ABSENT in ..",
           "path": "out.txt",
           "supports": [],
-          "at": "2026-10-13T16:40:38.644Z"
+          "at": "2026-10-24T15:30:26.583Z"
         }
       ],
       "detailAfterWorkerReportedRecord": "claimed by a worker but never observed by KAI",

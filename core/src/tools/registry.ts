@@ -397,6 +397,15 @@ export function createToolRegistry(opts: {
 }): ToolRegistry {
   const policy = opts.policy;
   const approvals = opts.approvals;
+  /**
+   * The outcome of the ONE attempt each approval authorised, keyed by approval id.
+   *
+   * A replay of a spent approval returns THIS rather than dispatching again, so a caller
+   * that re-issues sees the real result instead of having to interpret a new error. It is
+   * process-local: after a restart the same retry gets ALREADY_DISPATCHED, which is the
+   * safe direction — it refuses rather than re-runs.
+   */
+  const replayed = new Map<string, ToolResult>();
   // Accepted for symmetry with the other Core services. The registry publishes
   // exactly one event type: `action.executed`, from `recordAction` below —
   // one attempt, one record, whether it ran, was refused, or failed. Approval
@@ -849,8 +858,38 @@ export function createToolRegistry(opts: {
           detail: `approval is still ${approval.status}`,
         });
       }
-      // APPROVED and bound to this tool: fall through to execute. The approval
-      // that AUTHORISED the run rides on the invocation and the record.
+      // ── ONE APPROVAL, ONE DISPATCH ATTEMPT (Option A) ──────────────────────
+      //
+      // The automatic re-issue (`decideApproval` → `reissueParked`) is the AUTHORITATIVE
+      // consumer: it presents this exact approval id, so by the time anything else does,
+      // the attempt has been made. Claiming here makes that a hard invariant. The claim is
+      // atomic — the store only spends an APPROVED, unspent row — so two racing consumers
+      // cannot both win and a redelivered resume cannot execute twice.
+      if (!approvals.consume(approvalId)) {
+        // A replay of the ONE attempt this approval authorised: answer with the RECORDED
+        // OUTCOME, so a re-issuing caller sees the real result instead of having to
+        // interpret a new error. Nothing is dispatched again.
+        const prior = replayed.get(approvalId);
+        if (prior !== undefined) return prior;
+        return settle(meta, {
+          status: "DENIED",
+          decision,
+          approvalId,
+          approval: { required: true, approvalId, status: approval.status },
+          error: toolError(
+            "ALREADY_DISPATCHED",
+            `approval "${approvalId}" was already spent: it authorised one dispatch attempt, and a further attempt needs a new approval`,
+            now,
+            approvalId,
+          ),
+          detail: "approval already spent",
+        });
+      }
+
+      meta.approval = { required: true, approvalId, status: approval.status };
+      // APPROVED, bound, and now SPENT: fall through to execute this one attempt.
+      meta.approval = { required: true, approvalId, status: approval.status };
+      // APPROVED, bound, and now SPENT: fall through to execute this one attempt.
       meta.approval = { required: true, approvalId, status: approval.status };
     }
 
@@ -898,15 +937,23 @@ export function createToolRegistry(opts: {
       // it really produced it. `settle` reads it through `deriveToolProvenance`,
       // which applies the generic dedupe guard first, so a deduped write names
       // nothing and the trace stays unambiguous.
-      return settle(meta, { status: "EXECUTED", decision, executed: true, result });
+      const settled = settle(meta, { status: "EXECUTED", decision, executed: true, result });
+      // Remember what the one attempt this approval authorised produced, so a replay can
+      // answer with the real outcome instead of a bare refusal.
+      if (invokeOpts?.approvalId !== undefined) replayed.set(invokeOpts.approvalId, settled);
+      return settled;
     } catch (error) {
       // A tool that throws is a tool that failed, not a registry that failed.
-      return settle(meta, {
+      const failed = settle(meta, {
         status: "FAILED",
         decision,
         error: toolError("INTERNAL", `tool "${id}" failed while executing: ${detailOf(error)}`, now, detailOf(error)),
         detail: detailOf(error),
       });
+      // A consumed approval authorised this attempt even though it failed: record the
+      // failure, so a retry reads the outcome rather than launching a second execution.
+      if (invokeOpts?.approvalId !== undefined) replayed.set(invokeOpts.approvalId, failed);
+      return failed;
     }
   }
 

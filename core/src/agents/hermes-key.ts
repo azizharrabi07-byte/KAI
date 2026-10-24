@@ -23,7 +23,11 @@
  *   1. whatever the caller passed (the desktop app passes the key it holds in the Windows
  *      Credential Manager, as `KAI_HERMES_KEY`, when it spawns this process),
  *   2. `KAI_HERMES_KEY` or `API_SERVER_KEY` in the environment,
- *   3. the Hermes install's own `~/.hermes/.env`, so the Core also works when it is
+ *   3. the targeted Hermes PROFILE's own `.env`
+ *      (`~/.hermes/profiles/<profile>/.env`) when `KAI_HERMES_PROFILE` is set — the
+ *      profile is where the worker's hooks and credentials live, so its key is the one
+ *      that matches the `/p/<profile>` route,
+ *   4. the Hermes install's own `~/.hermes/.env`, so the Core also works when it is
  *      started by hand from a terminal.
  *
  * The key is never written to this repository, never logged, and never returned in a
@@ -38,20 +42,11 @@ import { join } from "node:path";
 
 import type { KaiConfig } from "../config.ts";
 
-export function resolveHermesKey(
-  explicit?: string,
-  env: NodeJS.ProcessEnv = process.env,
-  home: string = homedir(),
-): string | undefined {
-  if (typeof explicit === "string" && explicit.length > 0) return explicit;
-
-  const fromEnv = env.KAI_HERMES_KEY ?? env.API_SERVER_KEY;
-  if (typeof fromEnv === "string" && fromEnv.length > 0) return fromEnv;
-
+/** Read `API_SERVER_KEY` out of an env file, or undefined when it is not there. */
+function keyFromEnvFile(path: string): string | undefined {
   try {
-    const envPath = join(home, ".hermes", ".env");
-    if (!existsSync(envPath)) return undefined;
-    for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
+    if (!existsSync(path)) return undefined;
+    for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
       const match = /^\s*API_SERVER_KEY\s*=\s*(.+?)\s*$/.exec(line);
       if (match !== null && match[1] !== undefined) {
         return match[1].replace(/^["']|["']$/g, "");
@@ -62,6 +57,27 @@ export function resolveHermesKey(
     // auth failure with a code the UI can show.
   }
   return undefined;
+}
+
+export function resolveHermesKey(
+  explicit?: string,
+  env: NodeJS.ProcessEnv = process.env,
+  home: string = homedir(),
+  profile?: string,
+): string | undefined {
+  if (typeof explicit === "string" && explicit.length > 0) return explicit;
+
+  const fromEnv = env.KAI_HERMES_KEY ?? env.API_SERVER_KEY;
+  if (typeof fromEnv === "string" && fromEnv.length > 0) return fromEnv;
+
+  // A profile name is a path component; refuse anything that could escape profiles/.
+  const wanted = (profile ?? env.KAI_HERMES_PROFILE ?? "").trim();
+  if (/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(wanted)) {
+    const fromProfile = keyFromEnvFile(join(home, ".hermes", "profiles", wanted, ".env"));
+    if (fromProfile !== undefined && fromProfile.length > 0) return fromProfile;
+  }
+
+  return keyFromEnvFile(join(home, ".hermes", ".env"));
 }
 
 /**
@@ -81,7 +97,7 @@ export function withResolvedHermesKey(
   home: string = homedir(),
 ): KaiConfig {
   if (config.hermes.apiKey !== undefined && config.hermes.apiKey.length > 0) return config;
-  const key = resolveHermesKey(undefined, env, home);
+  const key = resolveHermesKey(undefined, env, home, config.hermes.profile);
   if (key === undefined) return config;
   return { ...config, hermes: { ...config.hermes, apiKey: key } };
 }

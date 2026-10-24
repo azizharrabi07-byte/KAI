@@ -27,6 +27,7 @@ import { createWorkBoard, type WorkBoard } from "../src/orchestration/board.ts";
 import { createBudgetLedger } from "../src/orchestration/budget.ts";
 import { createDispatcher } from "../src/orchestration/dispatch.ts";
 import { createLearning } from "../src/orchestration/learn.ts";
+import { evaluatingDeps } from "./learn-eval-fixture.ts";
 import { createOrchestrator, type Orchestrator } from "../src/orchestration/orchestrator.ts";
 import { createTrace } from "../src/orchestration/trace.ts";
 import { createGoalStore, type GoalStore } from "../src/goals/store.ts";
@@ -77,7 +78,7 @@ function harness(opts: { denyPolicy?: () => boolean } = {}): Harness {
       capabilities: () => ({ skills: [], tools: ["read"] }),
     }),
     trace: createTrace({ store: stores.activity, prefs: () => ({ activity: "OFF", reasoning: "SUMMARY" }) as const }),
-    learning: createLearning({ metrics: stores.skillMetrics, validate: () => ({ ok: true }), stage: () => ({ ok: true }) }),
+    learning: createLearning({ metrics: stores.skillMetrics, validate: () => ({ ok: true }), stage: () => ({ ok: true }), ...evaluatingDeps() }),
     patterns: stores.promptPatterns,
     reviewRunner: async () => ({ verdict: "PASS", findings: [] }),
     delegate: async () => ({ ok: false, reply: "STATUS: failed\nRESULT: no\nBLOCKERS: nope" }),

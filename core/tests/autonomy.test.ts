@@ -205,6 +205,7 @@ test("the runtime wires the loop: a settled failure is evaluated through the liv
   // reports as INTERNAL — a TRANSIENT failure. So the loop must evaluate it, START
   // A RETRY, evaluate the retry in turn, and stop there: exactly one re-attempt.
   const failed = await runtime.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
     title: "autonomy probe",
     steps: [{ title: "call a broken capability action", kind: "tool", target: "capability.system", input: { action: "no.such.action" } }],
   });

@@ -26,6 +26,7 @@ import test from "node:test";
 
 import { createApprovalService } from "../src/approvals/service.ts";
 import { createLearning, slugify, type ProposeInput } from "../src/orchestration/learn.ts";
+import { evaluatingDeps } from "./learn-eval-fixture.ts";
 import { createSkillRegistry } from "../src/skills/registry.ts";
 import { createSkillStaging, SKILL_INSTALL_TOOL_ID } from "../src/skills/staging.ts";
 import { createSkillStore } from "../src/skills/store.ts";
@@ -56,6 +57,7 @@ function rig(t: { after(fn: () => void): void }): Rig {
       return staged.ok ? { ok: true } : { ok: false, reason: staged.error.message };
     },
     validate: () => ({ ok: true }),
+    ...evaluatingDeps(),
   });
   t.after(() => {
     try {

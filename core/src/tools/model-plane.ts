@@ -70,7 +70,7 @@ export interface ModelToolPlane {
   execute(
     name: string,
     argsJson: string,
-    opts?: { sessionId?: string; agentId?: string; source?: string; executionId?: string; signal?: AbortSignal },
+    opts?: { sessionId?: string; agentId?: string; source?: string; executionId?: string; approvalId?: string; signal?: AbortSignal },
   ): Promise<ModelToolExecution>;
 }
 
@@ -236,6 +236,10 @@ export function createModelToolPlane(options: ModelToolPlaneOptions): ModelToolP
         ...(opts?.sessionId !== undefined ? { sessionId: opts.sessionId } : {}),
         ...(opts?.agentId !== undefined ? { agentId: opts.agentId } : {}),
         ...(opts?.executionId !== undefined ? { executionId: opts.executionId } : {}),
+        // A call parked on an approval runs ONLY when re-issued with that id:
+        // the registry consumes it exactly once, which is what stops a second
+        // dispatch of the same approval.
+        ...(opts?.approvalId !== undefined ? { approvalId: opts.approvalId } : {}),
         ...(opts?.signal !== undefined ? { signal: opts.signal } : {}),
       });
       if (invoked.ok) {

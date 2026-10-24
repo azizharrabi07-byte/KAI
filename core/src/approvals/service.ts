@@ -77,6 +77,14 @@ export interface ApprovalRequestInput {
 export interface ApprovalService {
   request(input: ApprovalRequestInput): Approval;
   decide(id: string, approved: boolean): { ok: true; approval: Approval } | { ok: false; reason: string };
+  /**
+   * Spend an approval exactly once, and report whether THIS call spent it.
+   *
+   * An approval authorises one exact action. A worker that was approved retries with the
+   * same binding; that retry must succeed and the approval must then be gone, so one "yes"
+   * can never become standing permission.
+   */
+  consume(id: string): boolean;
   /** Marks PENDING approvals past expiresAt as EXPIRED. */
   expireStale(now?: Date): string[];
   /** Disarms expiry timers and releases waiters. Call before closing the store. */
@@ -112,6 +120,14 @@ export function createApprovalService(opts: {
 }): ApprovalService {
   const { store, publish } = opts;
   const now = opts.now ?? (() => new Date());
+  /**
+   * Approvals spent by THIS process, for a store that cannot persist the marker.
+   *
+   * Every store shipped in this tree records `consumedAt` durably; this exists so a
+   * double or a future adapter cannot silently turn single-use authority back into
+   * standing permission. It refuses a second use rather than granting an unrecorded one.
+   */
+  const spentInProcess = new Set<string>();
 
   let seq = 0;
   const idFactory =
@@ -302,5 +318,26 @@ export function createApprovalService(opts: {
     return store.listApprovals(listOpts);
   }
 
-  return { request, decide, expireStale, waitFor, get, list, dispose };
+  /**
+   * Spend an approval exactly once, and report whether THIS call spent it.
+   *
+   * A worker that was approved for one action retries with the same binding; the
+   * approval must authorise that retry and then be gone. `false` means it was not
+   * APPROVED, or another retry already spent it — in which case the caller must ask
+   * again rather than proceed.
+   *
+   * The store persists the marker when it can (`consumedAt`, durable across a restart).
+   * A store that cannot is still single-use for this process, which is the safe
+   * direction: it refuses a second use rather than granting one it cannot record.
+   */
+  function consume(id: string): boolean {
+    const row = store.getApproval(id);
+    if (row === null || row.status !== "APPROVED" || row.consumedAt !== undefined) return false;
+    if (spentInProcess.has(id)) return false;
+    if (typeof store.consumeApproval === "function") return store.consumeApproval(id, now().toISOString());
+    spentInProcess.add(id);
+    return true;
+  }
+
+  return { request, decide, consume, expireStale, waitFor, get, list, dispose };
 }

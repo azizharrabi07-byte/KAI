@@ -114,6 +114,8 @@ export interface DailyActivityReport {
   /** Durable decisions/events in the window (from the activity log). */
   decisions: { kind: string; label: string; at: string }[];
   nextPriorities: string[];
+  /** Real tool executions in the window, grouped by outcome. */
+  toolWork?: { tool: string; executions: number; failed: number; examples: string[] }[];
   /** A concrete prompt for the next worker, when one is genuinely useful. */
   nextWorkerPrompt?: string;
   /** True when nothing happened in the window. */
@@ -335,6 +337,20 @@ function nextPromptFor(items: SummaryItem[]): string | undefined {
 export function createDailySummaryService(opts: {
   workItems: WorkItemStore;
   activity: ActivityStore;
+  /**
+   * The durable tool calls (kai-sessions.db -> session_tool_calls). Optional so
+   * every existing caller is unaffected; when present, real execution shows up in
+   * the report instead of the day reading as empty while KAI demonstrably worked.
+   */
+  toolCalls?: (limit?: number) => readonly {
+    toolName?: string;
+    toolId?: string;
+    status?: string;
+    arguments?: unknown;
+    result?: unknown;
+    startedAt?: string;
+    completedAt?: string;
+  }[];
   notifications: NotificationService;
   settings: SettingsStore;
   now?: () => Date;
@@ -399,6 +415,38 @@ export function createDailySummaryService(opts: {
       .list({ limit: 500 })
       .filter((e) => inWindow(e.at))
       .map((e) => ({ kind: e.kind, label: e.label, at: e.at }));
+    // ── Real execution ──────────────────────────────────────────────────────
+    // The report used to read only work items and decisions, so a day where KAI
+    // demonstrably ran the browser still read "nothing to report". These are the
+    // same durable rows the activity inspector shows.
+    const calls = (opts.toolCalls?.(500) ?? []).filter((c) => {
+      const at = c.completedAt ?? c.startedAt;
+      return typeof at === "string" && inWindow(at);
+    });
+    const grouped = new Map<string, { executions: number; failed: number; examples: string[] }>();
+    for (const call of calls) {
+      const name = String(call.toolName ?? call.toolId ?? "unknown");
+      const entry = grouped.get(name) ?? { executions: 0, failed: 0, examples: [] };
+      entry.executions += 1;
+      const status = String(call.status ?? "").toUpperCase();
+      if (status === "FAILED" || status === "DENIED") entry.failed += 1;
+      // One short, sanitized example per tool: what it acted ON, never the payload.
+      if (entry.examples.length < 2) {
+        const args = call.arguments;
+        let hint = "";
+        if (typeof args === "string") hint = args;
+        else if (args !== null && typeof args === "object") hint = JSON.stringify(args);
+        // Redact, then KEEP the whole JSON: the renderer parses it to build a human
+        // sentence, and a truncated body no longer parses at all.
+        hint = hint.replace(/"(?:api[-_]?key|token|authorization|password)"\s*:\s*"[^"]*"/gi, '"$1":"***"');
+        if (hint.length > 0) entry.examples.push(`${status || "?"} ${hint}`);
+      }
+      grouped.set(name, entry);
+    }
+    const toolWork = [...grouped.entries()]
+      .map(([tool, e]) => ({ tool, executions: e.executions, failed: e.failed, examples: e.examples }))
+      .sort((a, b) => b.executions - a.executions);
+
     const nextPriorities: string[] = [];
     if (totals.blocked > 0) nextPriorities.push(`Unblock ${totals.blocked} blocked item(s) — they need a decision or a prerequisite`);
     if (totals.reportedOnly > 0) nextPriorities.push(`Collect evidence for ${totals.reportedOnly} worker-reported completion(s) before trusting them`);
@@ -412,7 +460,8 @@ export function createDailySummaryService(opts: {
       items,
       decisions,
       nextPriorities,
-      empty: items.length === 0 && decisions.length === 0,
+      empty: items.length === 0 && decisions.length === 0 && toolWork.length === 0,
+      ...(toolWork.length > 0 ? { toolWork } : {}),
     };
     const prompt = nextPromptFor(items);
     if (prompt !== undefined) report.nextWorkerPrompt = prompt;
@@ -421,6 +470,26 @@ export function createDailySummaryService(opts: {
 
   function renderReport(report: DailyActivityReport): string {
     const { totals } = report;
+    // Plain language, not a dump. The first version printed raw JSON arguments and a
+    // "0 verified / 0 failed / …" line, which read like a log file rather than a
+    // summary of someone's day. Tool ids are translated, arguments become the SUBJECT
+    // of the sentence, and empty categories are left out entirely.
+    const toolBlock = (): string[] => {
+      const work = report.toolWork ?? [];
+      if (work.length === 0) return [];
+      const lines = ["", "### What KAI did", ""];
+      for (const t of work) {
+        const n = t.executions;
+        const noun = n === 1 ? "time" : "times";
+        const failed = t.failed > 0 ? ` (${t.failed} of them failed)` : "";
+        lines.push(`- ${humanTool(t.tool)} — ${n} ${noun}${failed}`);
+        for (const ex of t.examples) {
+          const line = humanExample(ex);
+          if (line.length > 0) lines.push(`  - ${line}`);
+        }
+      }
+      return lines;
+    };
     if (report.empty) {
       return [
         `## Work summary — ${report.from.slice(0, 10)} → ${report.to.slice(0, 10)}`,
@@ -432,11 +501,16 @@ export function createDailySummaryService(opts: {
     const lines: string[] = [];
     lines.push(`## Work summary — ${report.from.slice(0, 10)} → ${report.to.slice(0, 10)}`);
     lines.push("");
-    lines.push(
-      `**${totals.tasks}** item(s): **${totals.verified}** verified · ${totals.reportedOnly} worker-reported (unverified) · ` +
-        `${totals.running} running · ${totals.waiting} waiting · ${totals.blocked} blocked · ${totals.failed} failed · ` +
-        `${totals.cancelled} cancelled · ${totals.planned} planned.`,
-    );
+    lines.push(...toolBlock());
+    // Only when there ARE tasks. A line of zeroes tells the reader nothing except
+    // that the report is machine output.
+    if (totals.tasks > 0) {
+      lines.push(
+        `**${totals.tasks}** item(s): **${totals.verified}** verified · ${totals.reportedOnly} worker-reported (unverified) · ` +
+          `${totals.running} running · ${totals.waiting} waiting · ${totals.blocked} blocked · ${totals.failed} failed · ` +
+          `${totals.cancelled} cancelled · ${totals.planned} planned.`,
+      );
+    }
     const detail = (c: SummaryItem["classification"], title: string): void => {
       const picked = report.items.filter((i) => i.classification === c);
       if (picked.length === 0) return;
@@ -521,4 +595,46 @@ export function createDailySummaryService(opts: {
     offerMinutes: () => offerTimeMinutes(config().time),
     today: () => localParts(now(), config().timezone).date,
   };
+}
+
+/** A tool id said the way a person would say it. */
+function humanTool(tool: string): string {
+  const t = tool.toLowerCase();
+  if (t.includes("browser")) return "Browsed the web";
+  if (t.includes("shell") || t.includes("powershell")) return "Ran commands";
+  if (t.includes("filesystem_write") || t.includes("write_file")) return "Wrote files";
+  if (t.includes("filesystem")) return "Looked through files";
+  if (t.includes("git")) return "Checked the repository";
+  if (t.includes("memory")) return "Used its memory";
+  if (t.includes("mission")) return "Checked missions";
+  if (t.includes("agent") || t.includes("workforce")) return "Checked the workforce";
+  return tool.replace(/^(capability|kai)[._]/, "").replace(/[._]/g, " ");
+}
+
+/**
+ * One example line a person can read: what the call acted ON, never the payload.
+ * `EXECUTED {"action":"navigate","input":{"url":"…"}}` becomes
+ * `Opened https://…`.
+ */
+function humanExample(example: string): string {
+  const status = /^FAILED/i.test(example) ? "Failed: " : "";
+  const jsonStart = example.indexOf("{");
+  if (jsonStart < 0) return `${status}${example.replace(/^[A-Z_?]+\s*/, "").slice(0, 100)}`.trim();
+  let parsed: unknown;
+  try { parsed = JSON.parse(example.slice(jsonStart)); } catch { return ""; }
+  const rec = (parsed ?? {}) as Record<string, unknown>;
+  const inner = (rec.input ?? rec) as Record<string, unknown>;
+  const action = typeof rec.action === "string" ? rec.action : "";
+  const url = typeof inner.url === "string" ? inner.url : "";
+  if (url) {
+    const label = action === "navigate" ? "Opened" : action === "open" ? "Opened" : "Used";
+    return `${status}${label} ${url.length > 120 ? url.slice(0, 117) + "…" : url}`;
+  }
+  const query = typeof inner.query === "string" ? inner.query : "";
+  if (query) return `${status}Searched for “${query}”`;
+  const target = typeof inner.targetId === "string" ? inner.targetId : "";
+  if (target) return `${status}${action === "read" ? "Read the page" : "Worked on the page"}`;
+  const path = typeof inner.path === "string" ? inner.path : "";
+  if (path) return `${status}${path.slice(0, 120)}`;
+  return "";
 }

@@ -69,6 +69,11 @@ export interface PolicyState {
   scope: ModeScope;
   /** Set while an elevation is prepared but unconfirmed. */
   pending?: PendingElevation;
+  /**
+   * Durable policy rules. Without this a grant lives only as long as the process,
+   * so "Allow always" silently became "allow until restart".
+   */
+  rules?: unknown[];
   updatedAt: string;
 }
 

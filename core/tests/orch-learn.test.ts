@@ -13,6 +13,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createLearning } from "../src/orchestration/learn.ts";
+import { evaluatingDeps } from "./learn-eval-fixture.ts";
 import type { ProposeInput, StageInput } from "../src/orchestration/learn.ts";
 import type { SkillMetricsRecord, SkillMetricsStore } from "../src/shared/contracts.ts";
 
@@ -40,6 +41,7 @@ function harness(opts: { valid?: boolean; staged?: boolean } = {}) {
       staged.push(input);
       return opts.staged === false ? { ok: false, reason: "storage denied" } : { ok: true };
     },
+    ...evaluatingDeps(),
   });
   return { metrics, validated, staged, learning };
 }

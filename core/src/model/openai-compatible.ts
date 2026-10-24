@@ -37,6 +37,9 @@
  */
 
 import { createHash } from "node:crypto";
+import { appendFileSync as diagAppend } from "node:fs";
+import { tmpdir as diagTmp } from "node:os";
+import { join as diagJoin } from "node:path";
 import { hostname, userInfo } from "node:os";
 
 import {
@@ -54,6 +57,7 @@ import {
   type TokenUsage,
   type ToolCall,
 } from "./types.ts";
+import { thinkingPlan, type ThinkingPlan } from "./thinking.ts";
 
 /** The routing header the opencode-go gateway requires on a routed request. */
 export const OPENCODE_SESSION_HEADER = "x-opencode-session";
@@ -112,6 +116,15 @@ export interface OpenAICompatibleOptions {
   model: string;
   /** Per-request timeout in ms (a chat turn takes seconds). */
   timeoutMs?: number;
+  /**
+   * Whether this endpoint accepts an OpenAI-style `reasoning_effort` field.
+   *
+   * Defaults to FALSE, and that default is the safe one: most OpenAI-compatible
+   * endpoints reject an unknown field with a 400, so a preference must never be
+   * able to turn a working turn into an outage. Set it only for an endpoint that
+   * is known to honour the parameter.
+   */
+  supportsReasoningEffort?: boolean;
   /** Injectable for tests; defaults to the global fetch. */
   fetchImpl?: typeof fetch;
   /**
@@ -299,6 +312,21 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleOptions)
     };
   }
 
+  /**
+   * Apply a thinking level to an outbound body, and return what was applied.
+   *
+   * A caller-supplied `maxTokens` WINS over the level's budget: an explicit budget
+   * is a stronger statement than a preference, and silently overriding it would
+   * make an unrelated caller's limit vanish.
+   */
+  function applyThinking(body: Record<string, unknown>, request: ChatRequest): ThinkingPlan | undefined {
+    if (request.thinking === undefined) return undefined;
+    const plan = thinkingPlan(request.thinking, options.supportsReasoningEffort === true);
+    if (request.maxTokens === undefined) body["max_tokens"] = plan.maxTokens;
+    if (plan.reasoningEffort !== undefined) body["reasoning_effort"] = plan.reasoningEffort;
+    return plan;
+  }
+
   async function chat(request: ChatRequest): Promise<ChatResult> {
     const model = request.model ?? defaultModel;
     const body: Record<string, unknown> = {
@@ -309,6 +337,7 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleOptions)
     };
     if (request.temperature !== undefined) body["temperature"] = request.temperature;
     if (request.maxTokens !== undefined) body["max_tokens"] = request.maxTokens;
+    applyThinking(body, request);
 
     const { json } = await jsonRequest("/chat/completions", {
       method: "POST",
@@ -339,6 +368,26 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleOptions)
         detail: JSON.stringify(record["error"]).slice(0, 300),
       });
     }
+    // TEMPORARY DIAGNOSTIC at the exact provider boundary.
+    try {
+      diagAppend(
+        diagJoin(diagTmp(), "kai-brain-trace.log"),
+        JSON.stringify({
+          at: new Date().toISOString(),
+          purpose: request.purpose ?? null,
+          msgs: request.messages.map((m) => ({
+            role: m.role,
+            len: (m.content ?? "").length,
+            toolId: m.toolCallId ?? null,
+            calls: m.toolCalls?.map((c) => c.name) ?? null,
+          })),
+          tools: (request.tools ?? []).length,
+          finish: asString(choice["finish_reason"]),
+          textLen: text.length,
+          calls: toolCalls.length,
+        }) + "\n",
+      );
+    } catch { /* diagnostics must never break a turn */ }
     return {
       text,
       ...(toolCalls.length > 0 ? { toolCalls } : {}),
@@ -360,6 +409,7 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleOptions)
     };
     if (request.temperature !== undefined) body["temperature"] = request.temperature;
     if (request.maxTokens !== undefined) body["max_tokens"] = request.maxTokens;
+    applyThinking(body, request);
 
     if (!configured) {
       throw new ModelError("unconfigured", `the "${id}" model provider has no API key configured`, {
@@ -517,6 +567,7 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleOptions)
     };
     if (request.temperature !== undefined) body["temperature"] = request.temperature;
     if (request.maxTokens !== undefined) body["max_tokens"] = request.maxTokens;
+    applyThinking(body, request);
 
     let result: ChatResult;
     try {
@@ -625,6 +676,10 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleOptions)
         structured: configured,
         embeddings: configured,
         tools: configured,
+        // The provider's OWN declaration, passed in at construction. Never
+        // inferred from the model name: guessing what an endpoint accepts is how
+        // a preference becomes a 400.
+        supportsReasoningEffort: options.supportsReasoningEffort === true,
         models: [],
         defaultModel,
       };

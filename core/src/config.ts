@@ -9,6 +9,19 @@
 export interface HermesConfig {
   /** Base URL of the Hermes Agent api-server. Default http://127.0.0.1:8642 */
   baseUrl: string;
+  /**
+   * The Hermes PROFILE this Core's worker runtime targets, when it is not the host's
+   * default profile.
+   *
+   * A profile is where the worker's own authority lives: its config, its hooks and its
+   * credentials. Targeting a profile therefore means the default URL becomes that
+   * profile's multiplexed route (`/p/<profile>`) and the API key is read from
+   * `~/.hermes/profiles/<profile>/.env` — otherwise the worker would run under the
+   * default profile while KAI believed it had installed a boundary there.
+   *
+   * Absent means the default profile, exactly as before.
+   */
+  profile: string | undefined;
   /** Bearer key (env KAI_HERMES_KEY, fallback API_SERVER_KEY). NEVER logged. */
   apiKey: string | undefined;
   /** Per-request timeout in ms. */
@@ -44,6 +57,17 @@ export interface ServerConfig {
    * trusting any local process that can reach the unauthenticated route.
    */
   hostToken: string | undefined;
+  /**
+   * Credential the Hermes worker's `pre_tool_call` hook uses to ask THIS Core
+   * whether one tool invocation is authorized.
+   *
+   * It is deliberately NOT the owner token: it unlocks exactly one route
+   * (`POST /worker/authorize`) and cannot change KAI's authority. It is read
+   * from `KAI_WORKER_TOKEN` when the app supplies one, otherwise the Core mints
+   * one and writes it to a user-private file so the out-of-process hook can
+   * read it. Absent means no worker credential exists and the hook fails closed.
+   */
+  workerToken: string | undefined;
 }
 
 export interface KaiConfig {
@@ -90,6 +114,30 @@ function stripSlash(url: string): string {
   return url.replace(/\/+$/, "");
 }
 
+/**
+ * A Hermes profile name is a PATH COMPONENT (`profiles/<name>/`), so only a name that
+ * cannot escape that directory is accepted. An unusable value is treated as absent
+ * rather than passed through: a bad profile must not silently become a different one.
+ */
+/**
+ * Put a base URL on a profile's multiplexed route, idempotently.
+ *
+ * A profile is where the worker's authority, hooks and credentials live, so the route
+ * must name it too — otherwise the profile's key is presented to the default route and
+ * every call is refused. An already-routed URL is left alone.
+ */
+function withProfileRoute(base: string, profile: string | undefined): string {
+  if (profile === undefined) return base;
+  const trimmed = base.replace(/\/+$/, "");
+  return new RegExp(`/p/${profile}$`).test(trimmed) ? trimmed : `${trimmed}/p/${profile}`;
+}
+
+function profileName(value: string | undefined): string | undefined {
+  const cleaned = clean(value);
+  if (cleaned === undefined) return undefined;
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(cleaned) ? cleaned : undefined;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): KaiConfig {
   const allowedOrigins = clean(env.KAI_CORE_ALLOWED_ORIGINS)
     ? clean(env.KAI_CORE_ALLOWED_ORIGINS)!.split(",").map((o) => o.trim()).filter(Boolean)
@@ -97,7 +145,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): KaiConfig {
 
   return {
     hermes: {
-      baseUrl: stripSlash(clean(env.KAI_HERMES_URL) ?? DEFAULTS.HERMES_URL),
+      // The profile OWNS the route as well as the credential, so both must follow it.
+      //
+      // These two used to disagree: the URL only gained `/p/<profile>` when
+      // `KAI_HERMES_URL` was UNSET, while `hermes-key.ts` took the profile's key
+      // unconditionally. With `KAI_HERMES_URL` set that produced a profile key against
+      // the default route — measured as 401 on `/v1/runs` (the install key is 202 there,
+      // and the profile key is 202 only on `/p/kai/v1/runs`). Applying the profile to
+      // whatever base was chosen makes the pair impossible to mis-match.
+      baseUrl: stripSlash(
+        withProfileRoute(
+          clean(env.KAI_HERMES_URL) ?? DEFAULTS.HERMES_URL,
+          profileName(env.KAI_HERMES_PROFILE),
+        ),
+      ),
+      profile: profileName(env.KAI_HERMES_PROFILE),
       apiKey: clean(env.KAI_HERMES_KEY) ?? clean(env.API_SERVER_KEY),
       timeoutMs: intFrom(env.KAI_HERMES_TIMEOUT_MS, DEFAULTS.REQUEST_TIMEOUT_MS),
       chatTimeoutMs: intFrom(env.KAI_HERMES_CHAT_TIMEOUT_MS, DEFAULTS.CHAT_TIMEOUT_MS),
@@ -112,6 +174,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): KaiConfig {
       port: intFrom(env.KAI_CORE_PORT, DEFAULTS.SERVER_PORT),
       allowedOrigins,
       hostToken: clean(env.KAI_HOST_TOKEN),
+      workerToken: clean(env.KAI_WORKER_TOKEN),
     },
   };
 }
@@ -124,6 +187,7 @@ export function redactedConfig(config: KaiConfig): Record<string, unknown> {
   return {
     hermes: {
       baseUrl: config.hermes.baseUrl,
+      profile: config.hermes.profile ?? null,
       apiKeyPresent: config.hermes.apiKey !== undefined,
       timeoutMs: config.hermes.timeoutMs,
       chatTimeoutMs: config.hermes.chatTimeoutMs,

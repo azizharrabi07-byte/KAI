@@ -30,6 +30,7 @@ import { createBenchmark } from "../src/orchestration/bench.ts";
 import { createDispatcher } from "../src/orchestration/dispatch.ts";
 import { createTrace } from "../src/orchestration/trace.ts";
 import { createLearning } from "../src/orchestration/learn.ts";
+import { evaluatingDeps } from "./learn-eval-fixture.ts";
 import {
   createOrchestrator,
   type DelegateInput,
@@ -178,7 +179,7 @@ function harness(opts: { level?: AutonomyPolicy["level"]; maxRetries?: number; m
     capabilities: () => ({ skills: ["typescript", "testing"], tools: ["read", "edit", "shell"] }),
   });
   const trace = createTrace({ store: stores.activity, prefs: () => ({ activity: "VERBOSE", reasoning: "SUMMARY" }) as const });
-  const learning = createLearning({ metrics: stores.skillMetrics, validate: () => ({ ok: true }), stage: () => ({ ok: true }) });
+  const learning = createLearning({ metrics: stores.skillMetrics, validate: () => ({ ok: true }), stage: () => ({ ok: true }), ...evaluatingDeps() });
   const state: HarnessState = {
     autonomy: baseAutonomy(opts.level ?? 2, opts.maxRetries ?? 2, opts.maxReassignments),
     policyOutcome: "allow",

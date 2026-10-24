@@ -168,6 +168,36 @@ const TERMINAL_FAILED = new Set(["failed", "error", "errored"]);
 const TERMINAL_CANCELLED = new Set(["cancelled", "canceled", "stopped", "aborted"]);
 const TERMINAL_COMPLETED = new Set(["completed", "complete", "succeeded", "done"]);
 
+/**
+ * A run that has PARKED, waiting for a decision, before it executes a flagged operation.
+ * This is the only point at which a delegated worker can be stopped before a side effect:
+ * the gateway holds the run until it is answered.
+ */
+const AWAITING_APPROVAL_STATUS = "waiting_for_approval";
+
+/** What Hermes reported about the operation it is holding back. */
+export interface RunApprovalRequest {
+  runId: string;
+  taskId: string;
+  /**
+   * The pending approval as the gateway reported it — e.g. the flagged command, already
+   * redacted by the worker before egress — plus the choices it will accept.
+   */
+  approval: Record<string, unknown>;
+  /** The choices the gateway will accept for THIS request. */
+  choices: readonly string[];
+}
+
+/**
+ * KAI's answer to a parked run.
+ *
+ * Deliberately two values, not four. The gateway also accepts `session` and `always`,
+ * which authorize FUTURE calls without asking again — a worker could then obtain its own
+ * authorization by tripping the gate once. KAI answers for exactly one occurrence, or
+ * refuses; widening is not expressible here on purpose.
+ */
+export type RunApprovalDecision = "once" | "deny";
+
 export interface HermesAdapterOptions {
   baseUrl?: string;
   apiKey?: string;
@@ -180,6 +210,19 @@ export interface HermesAdapterOptions {
   /** Injected for tests so a run loop can finish without real sleeping. */
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
+  /**
+   * KAI's authorization decision for an operation Hermes has parked. Called while the run
+   * is HELD, so a refusal means the operation never executes.
+   *
+   * When this is absent, a parked run is DENIED and the run fails closed — a delegated
+   * worker must not be able to proceed on the strength of nobody having wired a decision
+   * in. Returning `once` authorizes only that occurrence: a later, different call parks
+   * again and is decided again, so an authorization can never be replayed against
+   * changed arguments.
+   */
+  authorizeRunApproval?: (
+    request: RunApprovalRequest,
+  ) => Promise<RunApprovalDecision> | RunApprovalDecision;
   /**
    * KAI's own identity for a DELEGATED turn, supplied as the run's system
    * instruction (`instructions` on POST /v1/runs). Without it a delegated run
@@ -208,6 +251,12 @@ export function createHermesAdapter(options: HermesAdapterOptions = {}): AgentAd
   const now = options.now ?? (() => Date.now());
   const onEvent = options.onEvent;
   const delegatedIdentity = options.delegatedIdentity;
+  const authorizeRunApproval = options.authorizeRunApproval;
+  /**
+   * Requests already answered, keyed per run. Answering the same gateway request twice
+   * would be a second authorization for one decision, so a re-report is ignored.
+   */
+  const answeredApprovals = new Set<string>();
 
   // Reuse the verified client for health + session work.
   const client = new HermesClient({
@@ -274,6 +323,96 @@ export function createHermesAdapter(options: HermesAdapterOptions = {}): AgentAd
     } catch {
       // best effort: the run is being abandoned regardless
     }
+  }
+
+  /**
+   * Decide an operation the gateway is HOLDING.
+   *
+   * The run does not continue until this answers, which is what makes it enforcement
+   * rather than reporting: a `deny` here means the flagged operation never executes. KAI's
+   * policy/approval authority supplies the decision; this function only transports it.
+   *
+   * Returns `null` when the run may keep polling, or a terminal result when the run must
+   * end (KAI's answer could not be delivered, so the safe outcome is to stop it).
+   */
+  async function answerParkedRun(
+    runId: string,
+    taskId: string,
+    startedAt: string,
+    runBody: Record<string, unknown>,
+  ): Promise<AgentTaskResult | null> {
+    const approval = asRecord(runBody["approval"]);
+    const rawChoices = approval["choices"];
+    const choices: string[] = Array.isArray(rawChoices)
+      ? rawChoices.map((choice) => String(choice))
+      : [];
+    const requestId =
+      asString(approval["request_id"]) ?? asString(approval["id"]) ?? "";
+
+    // A gateway that re-reports the same request must not be answered twice: a second
+    // answer would be a second authorization for a single decision.
+    const key = `${runId}\u0000${requestId.length > 0 ? requestId : "current"}`;
+    if (answeredApprovals.has(key)) return null;
+
+    let decision: RunApprovalDecision = "deny";
+    let reason =
+      "no authorization decision is wired for delegated runs, so the operation was refused";
+
+    if (authorizeRunApproval !== undefined) {
+      try {
+        const answer = await authorizeRunApproval({ runId, taskId, approval, choices });
+        if (answer === "once") {
+          decision = "once";
+          reason = "authorized once by KAI policy";
+        } else {
+          reason = "refused by KAI policy";
+        }
+      } catch (cause) {
+        // KAI's authority being unreachable must never become an approval.
+        reason = `KAI could not decide this request (${describeErrorChain(cause)}), so it was refused`;
+      }
+    }
+
+    // Only a choice the gateway actually offered may be sent. `session` and `always` are
+    // never produced here — see RunApprovalDecision — so a worker cannot convert one
+    // KAI decision into standing authority for later, different calls.
+    if (!choices.includes(decision)) decision = "deny";
+
+    answeredApprovals.add(key);
+    emit("agent.approval_decided", { id: "hermes", runId, decision, reason });
+
+    let answer: { status: number; text: string; json: unknown };
+    try {
+      answer = await runsRequest(`/v1/runs/${encodeURIComponent(runId)}/approval`, {
+        method: "POST",
+        body: requestId.length > 0 ? { choice: decision, request_id: requestId } : { choice: decision },
+      });
+    } catch (cause) {
+      await bestEffortStop(runId);
+      const error = isAdapterFailure(cause) ? cause.kaiError : classifyTransport(cause, baseUrl);
+      emit("agent.error", { id: "hermes", runId, code: "AGENT_APPROVAL_UNANSWERED" });
+      return resultState(taskId, "abandoned", startedAt, {
+        error: makeKaiError(
+          "AGENT_RUN_ABANDONED",
+          `the parked operation on run ${runId} could not be answered, so the run was stopped`,
+          { detail: `${error.code}: ${error.message}` },
+        ),
+      });
+    }
+
+    if (answer.status < 200 || answer.status >= 300) {
+      await bestEffortStop(runId);
+      emit("agent.error", { id: "hermes", runId, code: "AGENT_APPROVAL_REJECTED" });
+      return resultState(taskId, "abandoned", startedAt, {
+        error: makeKaiError(
+          "AGENT_RUN_ABANDONED",
+          `KAI's decision on run ${runId} was not accepted (HTTP ${answer.status})`,
+          { detail: answer.text.slice(0, 500) },
+        ),
+      });
+    }
+
+    return null;
   }
 
   function resultState(
@@ -449,6 +588,13 @@ export function createHermesAdapter(options: HermesAdapterOptions = {}): AgentAd
           if (now() >= deadline) {
             await bestEffortStop(runId);
             emit("agent.error", { id: "hermes", runId, code: "AGENT_TIMEOUT" });
+            emit("agent.run_failed", {
+              subagentId: "hermes",
+              runId,
+              taskId: task.id,
+              state: "timed_out",
+              code: "AGENT_TIMEOUT",
+            });
             return resultState(task.id, "timed_out", startedAt, {
               error: makeKaiError("AGENT_TIMEOUT", `run ${runId} did not finish within ${runTimeoutMs}ms`),
             });
@@ -466,6 +612,13 @@ export function createHermesAdapter(options: HermesAdapterOptions = {}): AgentAd
               ? cause.kaiError
               : classifyTransport(cause, baseUrl);
             emit("agent.error", { id: "hermes", runId, code: "AGENT_RUN_ABANDONED" });
+            emit("agent.run_failed", {
+              subagentId: "hermes",
+              runId,
+              taskId: task.id,
+              state: "abandoned",
+              code: "AGENT_RUN_ABANDONED",
+            });
             return resultState(task.id, "abandoned", startedAt, {
               error: makeKaiError("AGENT_RUN_ABANDONED", `lost contact with run ${runId}; asked it to stop`, {
                 detail: `${error.code}: ${error.message}`,
@@ -493,12 +646,36 @@ export function createHermesAdapter(options: HermesAdapterOptions = {}): AgentAd
           const body = asRecord(poll.json);
           const status = (asString(body["status"]) ?? "").toLowerCase();
 
+          // ── A parked run: the one moment a side effect can still be stopped ──
+          // The gateway is holding the operation until it is answered. Left unhandled this
+          // burned the whole run budget and then reported a timeout, which looks like a
+          // slow worker rather than an undecided authorization.
+          if (status === AWAITING_APPROVAL_STATUS) {
+            const ended = await answerParkedRun(runId, task.id, startedAt, body);
+            if (ended !== null) return ended;
+            continue;
+          }
+
+          // ── The worker RESULT event ───────────────────────────────────────
+          // A terminal outcome is the thing KAI's Doer supervises: it is the
+          // only signal that says "the worker finished, go look". Emitting it
+          // here — at the one place that observes the real terminal status —
+          // means every caller of this adapter wakes the supervisor, without
+          // each caller having to remember to. `agent.status_changed idle` in
+          // the `finally` below says the worker is free again; it does not say
+          // the run produced a result, and it is not in the Doer's intake.
           if (TERMINAL_COMPLETED.has(status)) {
             const out: AgentTaskResult = resultState(task.id, "completed", startedAt);
             const output = asString(body["output"]);
             if (output !== null) out.output = output;
             const usage = usageOf(body["usage"]);
             if (usage !== undefined) out.usage = usage;
+            emit("agent.run_completed", {
+              subagentId: "hermes",
+              runId,
+              taskId: task.id,
+              state: "completed",
+            });
             return out;
           }
           if (TERMINAL_FAILED.has(status)) {
@@ -506,6 +683,13 @@ export function createHermesAdapter(options: HermesAdapterOptions = {}): AgentAd
               asString(body["error"]) ??
               asString(asRecord(body["error"])["message"]) ??
               undefined;
+            emit("agent.run_failed", {
+              subagentId: "hermes",
+              runId,
+              taskId: task.id,
+              state: "failed",
+              ...(detail !== undefined ? { detail } : {}),
+            });
             return resultState(task.id, "failed", startedAt, {
               error: makeKaiError(
                 "AGENT_RUN_FAILED",
@@ -515,6 +699,7 @@ export function createHermesAdapter(options: HermesAdapterOptions = {}): AgentAd
             });
           }
           if (TERMINAL_CANCELLED.has(status)) {
+            emit("agent.run_cancelled", { subagentId: "hermes", runId, taskId: task.id, state: "cancelled" });
             return resultState(task.id, "cancelled", startedAt, {
               error: makeKaiError("AGENT_RUN_FAILED", `run ${runId} was cancelled`),
             });

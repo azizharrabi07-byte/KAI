@@ -21,7 +21,7 @@
  */
 
 /** Target schema version. Bump by appending to MIGRATIONS, never by editing. */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 8;
 
 export interface Migration {
   readonly version: number;
@@ -366,6 +366,22 @@ export const MIGRATIONS: readonly Migration[] = [
       // reads back as absent, and the registry then falls back to tool-level
       // binding rather than refusing every legacy approval.
       `ALTER TABLE approvals ADD COLUMN inputHash TEXT`,
+    ],
+  },
+  {
+    // Numbered 8, not 7: an earlier build stamped `user_version = 7` with a migration
+    // that is no longer in this source, so a 7 here would be SKIPPED on any database
+    // that build touched — leaving `consumedAt` missing while the code inserts it.
+    version: 8,
+    statements: [
+      // ── approvals: an approval is SPENT once, not standing authority ───────
+      // A worker asks KAI to authorise one exact action; the human approves it; the
+      // worker retries. Without this column that approval would authorise EVERY later
+      // identical call, so one "yes" would become permanent permission. `consumedAt`
+      // records the single use: a row with it set can never authorise again, and the
+      // worker has to ask afresh. Nullable, so every pre-migration row reads back as
+      // spent-never, which for a PENDING/REJECTED row is exactly right.
+      `ALTER TABLE approvals ADD COLUMN consumedAt TEXT`,
     ],
   },
 ];

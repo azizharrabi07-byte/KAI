@@ -263,8 +263,8 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
 
     insertApproval: db.prepare(
       `INSERT OR REPLACE INTO approvals
-         (id, toolId, action, reason, risk, createdAt, status, expiresAt, decidedAt, missionId, stepId, inputHash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, toolId, action, reason, risk, createdAt, status, expiresAt, decidedAt, missionId, stepId, inputHash, consumedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ),
     getApproval: db.prepare(`SELECT * FROM approvals WHERE id = ?`),
     listApprovals: db.prepare(
@@ -274,6 +274,12 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
        LIMIT ?`,
     ),
     decideApproval: db.prepare(`UPDATE approvals SET status = ?, decidedAt = ? WHERE id = ?`),
+    // Spending an approval is its OWN transition: the status stays APPROVED (the human
+    // did approve it) while `consumedAt` records that the use is gone. Marking it
+    // EXPIRED would tell the audit trail something that did not happen.
+    consumeApproval: db.prepare(
+      `UPDATE approvals SET consumedAt = ? WHERE id = ? AND status = 'APPROVED' AND consumedAt IS NULL`,
+    ),
 
     upsertScheduledTask: db.prepare(
       `INSERT INTO scheduled_tasks
@@ -717,6 +723,7 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
     optional(approval, "missionId", row.missionId);
     optional(approval, "stepId", row.stepId);
     optional(approval, "inputHash", row.inputHash);
+    optional(approval, "consumedAt", row.consumedAt);
     return approval;
   }
 
@@ -735,6 +742,7 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
         a.missionId ?? null,
         a.stepId ?? null,
         a.inputHash ?? null,
+        a.consumedAt ?? null,
       );
     },
 
@@ -752,6 +760,13 @@ export function openSqliteStores(opts: { path?: string } = {}): Stores {
 
     decideApproval(id: string, status: ApprovalStatus, decidedAt: string): void {
       stmts.decideApproval.run(status, decidedAt, id);
+    },
+
+    consumeApproval(id: string, consumedAt: string): boolean {
+      // The WHERE clause is the guarantee: only an APPROVED, not-yet-spent row can be
+      // spent, so two racing retries cannot both succeed.
+      const result = stmts.consumeApproval.run(consumedAt, id) as { changes?: number } | undefined;
+      return (result?.changes ?? 0) > 0;
     },
   };
 
@@ -1188,7 +1203,21 @@ function migrate(db: DatabaseSync): void {
     db.exec("BEGIN");
     try {
       for (const statement of migration.statements) {
-        db.exec(statement);
+        try {
+          db.exec(statement);
+        } catch (error) {
+          // `ALTER TABLE … ADD COLUMN` is the one statement here that SQLite cannot make
+          // idempotent, and a database can legitimately already have the column: another
+          // build may have stamped a schema version this source does not carry. This file
+          // promises idempotent migrations, so an already-present column counts as applied.
+          // Every other failure still aborts the migration, untouched.
+          const alreadyAdded =
+            /^\s*ALTER\s+TABLE\s+\S+\s+ADD\s+COLUMN/i.test(statement) &&
+            error instanceof Error &&
+            /duplicate column name/i.test(error.message);
+          if (alreadyAdded) continue;
+          throw error;
+        }
       }
       db.exec(`PRAGMA user_version = ${Math.trunc(migration.version)}`);
       db.exec("COMMIT");

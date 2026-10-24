@@ -144,6 +144,7 @@ export interface BrowserCapabilityOptions {
 const ACTION_FIELDS: Readonly<Record<BrowserAction, readonly string[]>> = {
   open: ["url"],
   new_tab: ["url"],
+
   navigate: ["targetId", "url"],
   find: ["targetId", "query"],
   inspect: ["targetId", "force"],
@@ -225,11 +226,21 @@ function validateInput(
       return { ok: true, value: { ...(url.value !== undefined ? { url: url.value } : {}) } };
     }
     case "navigate": {
-      const targetId = takeString(raw, "targetId", true);
+      // `targetId` is OPTIONAL on navigate. A model asked to look something up names
+      // the URL, not a tab it has never seen — requiring an id it does not have made
+      // every first research call fail with "navigate needs {targetId, action}".
+      // With no target, navigate opens one at that url: the obvious meaning.
+      const targetId = takeString(raw, "targetId", false);
       if (!targetId.ok) return { ok: false, reason: targetId.reason };
       const url = takeString(raw, "url", true);
       if (!url.ok) return { ok: false, reason: url.reason };
-      return { ok: true, value: { targetId: targetId.value, url: url.value } };
+      return {
+        ok: true,
+        value: {
+          ...(targetId.value !== undefined ? { targetId: targetId.value } : {}),
+          url: searchableUrl(url.value ?? ""),
+        },
+      };
     }
     case "find": {
       const targetId = takeString(raw, "targetId", true);
@@ -489,6 +500,14 @@ export function createBrowserCapability(opts: BrowserCapabilityOptions): Browser
   ): Promise<Result<unknown>> {
     const ownerId = ctx.ownerId;
 
+    // ── THE LAST BOUNDARY BEFORE THE TRANSPORT ────────────────────────────────
+    // Normalising the url in `validateInput` was not enough: every execution
+    // path below reads `input.url` directly, so the validated value was thrown
+    // away and the browser really navigated to the raw address. A Google search
+    // therefore still hit `/sorry/index` and the model was handed a CAPTCHA as
+    // if it were research. Normalise HERE, once, for open / new_tab / navigate.
+    if (typeof input.url === "string") input = { ...input, url: searchableUrl(input.url) };
+
     switch (action) {
       case "open":
       case "new_tab": {
@@ -596,6 +615,20 @@ export function createBrowserCapability(opts: BrowserCapabilityOptions): Browser
         const inspected = await inspectInternal(ctx, targetId, "read");
         if (!inspected.ok) return { ok: false, error: inspected.error };
         const page = inspected.value.page;
+        // A page that blocked us is NOT a page we read. Google answers a scraped
+        // search with /sorry/index and no body text; the model used to receive
+        // that as empty content, concluded it had nothing, and answered a
+        // research request with a canned apology. Say what actually happened, so
+        // the turn can report the block or try another source instead.
+        const blocked = blockedReason(page.url, page.text);
+        if (blocked !== null) {
+          // Retrying the SAME url is pointless — the engine withheld the body —
+          // so `retryable` is false and the message says what to do instead.
+          return {
+            ok: false,
+            error: { code: "PAGE_UNREADABLE", message: blocked, retryable: false, at: new Date().toISOString() },
+          };
+        }
         return {
           ok: true,
           value: {
@@ -612,6 +645,12 @@ export function createBrowserCapability(opts: BrowserCapabilityOptions): Browser
       }
 
       default: {
+        // A navigate with no tab opens one at that url. Nothing else can be driven
+        // without a target, because ownership is per-target.
+        if (action === "navigate" && (input.targetId === undefined || String(input.targetId).length === 0)) {
+          const opened = await invoke("open", { url: input.url }, ctx);
+          return opened;
+        }
         // Everything else drives the page and needs ownership of its target.
         const targetId = String(input.targetId);
         const denied = requireOwner(targetId, ownerId);
@@ -716,4 +755,51 @@ export function createBrowserCapability(opts: BrowserCapabilityOptions): Browser
   };
 
   return capability;
+}
+
+/**
+ * Why this page is not readable, or null when it is.
+ *
+ * Only anti-bot interstitials and empty documents qualify. A short page that a
+ * human would read normally is still a real read.
+ */
+function blockedReason(url: string, text: string | null | undefined): string | null {
+  const where = String(url ?? "");
+  const body = String(text ?? "").trim();
+  if (/google\.[a-z.]+\/sorry\//i.test(where) || /\/sorry\/index/i.test(where)) {
+    return "The search engine served a bot-verification page (CAPTCHA) instead of results, so there is nothing to read. Do not retry the same engine; answer from another source or report the block.";
+  }
+  if (/\/captcha|challenge-platform|\/cdn-cgi\/challenge/i.test(where)) {
+    return "This page served a bot challenge instead of its content. Report the block rather than treating the page as empty.";
+  }
+  if (body.length === 0) {
+    return "The page returned no readable text — it may require sign-in, script execution, or it blocked the request. This is not evidence that the topic has no answer.";
+  }
+  return null;
+}
+
+
+/**
+ * The url to actually open for a search.
+ *
+ * Google answers an automated search from a datacenter address with
+ * `/sorry/index` — a CAPTCHA, and no results at all. Measured here: every
+ * research turn died on that page, so the model received no evidence and
+ * replied with a canned apology while the browser operations looked healthy.
+ * DuckDuckGo's HTML endpoint serves the same query as plain results, so a
+ * Google search url is redirected there rather than being sent to a wall.
+ */
+function searchableUrl(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  const host = parsed.hostname.toLowerCase();
+  const isGoogleSearch = /^(www\.)?google\.[a-z.]+$/.test(host) && parsed.pathname === "/search";
+  if (!isGoogleSearch) return url;
+  const query = parsed.searchParams.get("q");
+  if (query === null || query.trim().length === 0) return url;
+  return `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
 }

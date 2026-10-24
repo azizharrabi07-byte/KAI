@@ -124,8 +124,9 @@ test("stable and volatile sections are distinct, and stable is byte-identical ac
   assert.equal(a.text, [a.stable, a.volatile].filter((p) => p.length > 0).join("\n\n"));
   assert.equal(b.text, [b.stable, b.volatile].filter((p) => p.length > 0).join("\n\n"));
 
-  // Bands in the report agree with the band strings.
-  assert.ok(a.sections.filter((s) => s.band === "stable").every((s) => s.name === "safety" || s.name === "identity" || s.name === "guidance" || s.name === "user-context"));
+  // Bands in the report agree with the band strings. `shark` is stable: the working
+  // method must not be evicted by volatile recall, exactly like guidance.
+  assert.ok(a.sections.filter((s) => s.band === "stable").every((s) => s.name === "safety" || s.name === "identity" || s.name === "guidance" || s.name === "shark" || s.name === "user-context"));
   assert.ok(a.sections.filter((s) => s.band === "volatile").every((s) => s.name === "memory" || s.name === "skills" || s.name === "mission" || s.name === "request"));
 });
 
@@ -174,11 +175,11 @@ test("the total limit is enforced by trimming DATA sections, never safety, ident
     identity: IDENTITY,
     memory: async (_q, o) => bigMem.slice(0, o.limit),
     skills: { relevant: async (_q, l) => bigSkills.slice(0, l) },
-    limits: { total: 3500 },
+    limits: { total: 5200 },
   });
   const res = await composer.compose("please summarise the deployment state now", { mission: MISSION });
 
-  assert.ok(res.totalChars <= 3500, `total ${res.totalChars} <= 3500`);
+  assert.ok(res.totalChars <= 5200, `total ${res.totalChars} <= 5200`);
   assert.ok(res.problems.some((p) => /total limit/.test(p)), "the trim is reported honestly");
   assert.ok(res.sections.some((s) => s.name === "safety"), "safety survived the trim");
   assert.ok(res.sections.some((s) => s.name === "identity"), "identity survived the trim");
@@ -372,6 +373,8 @@ function budgetKeyFor(name: string): keyof typeof DEFAULT_LIMITS {
       return "identity";
     case "guidance":
       return "guidance";
+    case "shark":
+      return "shark";
     case "user-context":
       return "userContext";
     case "memory":

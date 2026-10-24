@@ -20,6 +20,12 @@ desktop UI is the face; the intelligence is KAI Core.
 KAI's character, icon and sounds are original — no upstream brand or artwork is reused. See
 `NOTICE.md`.
 
+> **New here? Read [`docs/HANDOFF_2026-10-24_AUTONOMY.md`](docs/HANDOFF_2026-10-24_AUTONOMY.md)
+> first.** It is the current state of the project: the three separate runtime locations (only one of
+> which is in this repository), the real request path with its known traps, what is verified
+> working versus not built at all, and the prioritized roadmap. The architecture below describes the
+> intended design; the handoff describes what actually runs today.
+
 ## Architecture
 
 ```

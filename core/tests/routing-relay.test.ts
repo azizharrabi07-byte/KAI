@@ -22,7 +22,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -317,4 +317,86 @@ test("F5: an unknown turn with no worker connected is answered by KAI, not piped
   const reply = res.body["reply"] as string;
   assert.match(reply, /no agent is connected/i, `answerUnknown's honest fallback: ${reply}`);
   console.log(`      -> F5 reply: ${JSON.stringify(reply)}`);
+});
+
+// ── F6: a model/provider question is answered from STATE, never from tools ────
+
+test("F6: 'Which API or LLM are you using?' is answered from the live provider, not by listing tools", async (t) => {
+  // The defect a live run falsified: on POST /chat/stream this question reached
+  // the model, whose only concrete "API" surface on the wire is its own tool
+  // catalogue — so it answered by enumerating filesystem and git tools. The
+  // identity intent now owns the question and answers it from the provider's own
+  // description. No model call is made: a wrong answer here cannot be blamed on
+  // the provider.
+  const dir = tempDir();
+  // A seeded credential makes the brain "configured" so the stream route is
+  // reachable at all. The identity answer never calls it, so no network is used;
+  // the endpoint is a closed local port so any stray probe fails immediately,
+  // and the model timeout is pinned low so a probe cannot hold the test open.
+  mkdirSync(join(dir, "model"), { recursive: true });
+  writeFileSync(
+    join(dir, "model", "credentials.json"),
+    JSON.stringify({ baseUrl: "http://127.0.0.1:1/v1", apiKey: "test-only-key", name: "test-model-x", id: "test" }),
+  );
+  const priorTimeout = process.env.KAI_MODEL_TIMEOUT_MS;
+  process.env.KAI_MODEL_TIMEOUT_MS = "1500";
+  const core = createCoreRuntime({
+    dbPath: join(dir, "kai.db"),
+    agents: { mode: "mock" },
+    startScheduler: false,
+    subsystemPaths: { runUpkeepOnStart: false, identityRoot: dir },
+  });
+  const s = await startServer({ core });
+  // ONE hook, in this order: the DB handle must be released BEFORE the directory
+  // is removed, or Windows refuses (EPERM) and the test fails on its own cleanup.
+  t.after(async () => {
+    await s.close();
+    if (priorTimeout === undefined) delete process.env.KAI_MODEL_TIMEOUT_MS;
+    else process.env.KAI_MODEL_TIMEOUT_MS = priorTimeout;
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  });
+
+  async function stream(text: string): Promise<{ reply: string; done: Record<string, unknown> }> {
+    const res = await fetch(`${s.base}/chat/stream`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    assert.equal(res.status, 200, `the stream route must answer: ${res.status}`);
+    const raw = await res.text();
+    const frames = raw
+      .split("\n")
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => JSON.parse(line.slice(5).trim()) as Record<string, unknown>);
+    return {
+      reply: frames.map((f) => (typeof f["delta"] === "string" ? f["delta"] : "")).join(""),
+      done: frames.find((f) => f["done"] === true) ?? {},
+    };
+  }
+
+  const asked = await stream("Which API or LLM are you using right now?");
+  assert.ok(asked.reply.length > 0, "the turn must not be silent");
+  assert.ok(asked.reply.includes("KAI"), `answered as KAI: ${asked.reply}`);
+  // The failure mode itself: a tool catalogue is never the answer to this.
+  assert.doesNotMatch(
+    asked.reply,
+    /filesystem\.|filesystem_|shell\.run|git_status|git_log|git_diff/,
+    `a tool catalogue is not an answer: ${asked.reply}`,
+  );
+  // Reported from real provider state, not guessed: whatever the provider calls
+  // itself is what the reply must name, and the model name comes from the same
+  // description. (Pinning the literal would pin the harness, not the behaviour.)
+  const reportedProvider = String(asked.done["provider"] ?? "");
+  assert.ok(reportedProvider.length > 0, "the terminal frame must report a provider");
+  assert.ok(
+    asked.reply.includes(reportedProvider),
+    `the reply must name the provider the frame reported: ${asked.reply}`,
+  );
+  assert.ok(asked.reply.includes("test-model-x"), `the effective model must be named: ${asked.reply}`);
+  console.log(`      -> F6 reply: ${JSON.stringify(asked.reply)}`);
+
+  // The control: a plain identity question still answers, and does so as KAI.
+  const who = await stream("Who are you?");
+  assert.ok(who.reply.includes("KAI"), who.reply);
+  assert.doesNotMatch(who.reply, /filesystem\.|shell\.run/, who.reply);
 });

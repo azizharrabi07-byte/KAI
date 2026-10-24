@@ -179,6 +179,17 @@ const STEPS: MissionStepInput[] = [
   { title: "report", kind: "agent", target: "hermes" },
 ];
 
+/**
+ * A criterion this suite can genuinely verify, so a lifecycle test can still reach
+ * COMPLETED.
+ *
+ * This is not test noise: completion now REQUIRES an explicit criterion that KAI can
+ * observe, because the old behaviour — completing on the runner's word alone — was the
+ * demonstrated false-success bug. The verifier reads the real `core/package.json`,
+ * which exists in the suite's working directory.
+ */
+const VERIFIABLE_CRITERIA = ["file present: package.json"];
+
 function kaiError(code: KaiError["code"], message: string): KaiError {
   return { code, message, retryable: false, at: new Date(BASE_MS).toISOString() };
 }
@@ -211,7 +222,7 @@ test("createMission builds a DRAFT mission; addStep appends in index order", () 
 });
 
 test("nextRunnableStep skips completed/failed/approval-parked steps", () => {
-  const m = createMission({ title: "t", steps: STEPS }, { idFactory: () => "m2", now: clock().now });
+  const m = createMission({ title: "t", steps: STEPS, metadata: { criteria: VERIFIABLE_CRITERIA } }, { idFactory: () => "m2", now: clock().now });
   m.steps[0]!.status = "COMPLETED";
   assert.equal(nextRunnableStep(m)?.index, 1);
   m.steps[1]!.status = "FAILED";
@@ -236,7 +247,7 @@ test("start runs steps in index order and completes with ordered events", async 
     store, runner, publish, now: format.now, idFactory: counter("ap"),
   });
 
-  const m = createMission({ title: "Job", steps: STEPS }, { publish, now: format.now, idFactory: () => "m1" });
+  const m = createMission({ title: "Job", steps: STEPS, metadata: { criteria: VERIFIABLE_CRITERIA } }, { publish, now: format.now, idFactory: () => "m1" });
   store.upsertMission(m);
 
   const done = await exec.start("m1");
@@ -273,7 +284,7 @@ test("a failing step fails the mission; later steps are not run", async () => {
     return { ok: true };
   };
   const exec = createMissionExecutor({ store, runner, publish, now: format.now, idFactory: counter("ap") });
-  const m = createMission({ title: "Job", steps: STEPS }, { now: format.now, idFactory: () => "m1" });
+  const m = createMission({ title: "Job", steps: STEPS, metadata: { criteria: VERIFIABLE_CRITERIA } }, { now: format.now, idFactory: () => "m1" });
   store.upsertMission(m);
 
   const done = await exec.start("m1");
@@ -304,7 +315,7 @@ function gateReturning(decision: PolicyDecision, sink?: PolicyRequest[]): Policy
 }
 
 test("risk is derived: side-effecting >= WRITE, unknown tool target = EXTERNAL", () => {
-  const m = createMission({ title: "t", steps: STEPS }, { idFactory: () => "m3", now: clock().now });
+  const m = createMission({ title: "t", steps: STEPS, metadata: { criteria: VERIFIABLE_CRITERIA } }, { idFactory: () => "m3", now: clock().now });
   const [manual, tool, agent] = m.steps as [MissionStep, MissionStep, MissionStep];
   assert.equal(riskForStep(manual), "READ");
   assert.equal(riskForStep(agent), "READ");
@@ -324,7 +335,7 @@ test("policy deny fails the step with POLICY_DENIED and stops the mission", asyn
   // Deny every step; the first one must fail before the runner ever sees it.
   const policy = gateReturning({ outcome: "deny", reason: "not allowed" }, requests);
   const exec = createMissionExecutor({ store, runner, policy, now: format.now, idFactory: counter("ap") });
-  const m = createMission({ title: "Job", steps: STEPS }, { now: format.now, idFactory: () => "m1" });
+  const m = createMission({ title: "Job", steps: STEPS, metadata: { criteria: VERIFIABLE_CRITERIA } }, { now: format.now, idFactory: () => "m1" });
   store.upsertMission(m);
 
   const done = await exec.start("m1");
@@ -358,7 +369,7 @@ test("policy needs_approval parks the mission and does NOT call the runner", asy
   const exec = createMissionExecutor({
     store, runner, policy, approvals, publish, now: format.now, idFactory: counter("ap"),
   });
-  const m = createMission({ title: "Job", steps: STEPS }, { now: format.now, idFactory: () => "m1" });
+  const m = createMission({ title: "Job", steps: STEPS, metadata: { criteria: VERIFIABLE_CRITERIA } }, { now: format.now, idFactory: () => "m1" });
   store.upsertMission(m);
 
   const done = await exec.start("m1");
@@ -404,7 +415,7 @@ test("cancel mid-mission stops further steps and is idempotent", async () => {
   };
   exec = createMissionExecutor({ store, runner, publish, now: format.now, idFactory: counter("ap") });
 
-  const m = createMission({ title: "Job", steps: STEPS }, { now: format.now, idFactory: () => "m1" });
+  const m = createMission({ title: "Job", steps: STEPS, metadata: { criteria: VERIFIABLE_CRITERIA } }, { now: format.now, idFactory: () => "m1" });
   store.upsertMission(m);
 
   const result = await exec.start("m1");
@@ -431,6 +442,7 @@ test("recover resumes a mission whose remaining steps are not side-effecting", a
   const m = createMission(
     {
       title: "Job",
+      metadata: { criteria: VERIFIABLE_CRITERIA },
       steps: [
         { title: "done", kind: "manual" },
         { title: "read", kind: "tool", target: "fs.read" },
@@ -461,6 +473,7 @@ test("recover blocks a mission whose next step is side-effecting and never calls
   const m = createMission(
     {
       title: "Job",
+      metadata: { criteria: VERIFIABLE_CRITERIA },
       steps: [
         { title: "done", kind: "manual" },
         { title: "write", kind: "tool", target: "fs.write", sideEffecting: true },
@@ -493,7 +506,7 @@ test("recover settles an all-steps-complete mission without re-running anything"
   const runner: StepRunner = async (step) => { ran.push(step.id); return { ok: true }; };
   const exec = createMissionExecutor({ store, runner, now: format.now, idFactory: counter("ap") });
 
-  const m = createMission({ title: "Job", steps: STEPS }, { now: format.now, idFactory: () => "m1" });
+  const m = createMission({ title: "Job", steps: STEPS, metadata: { criteria: VERIFIABLE_CRITERIA } }, { now: format.now, idFactory: () => "m1" });
   m.status = "RUNNING";
   for (const s of m.steps) s.status = "COMPLETED";
   store.upsertMission(m);
@@ -531,7 +544,7 @@ async function parkOnApproval() {
   const exec = createMissionExecutor({
     store, runner, policy, approvals, now: format.now, idFactory: counter("ap"),
   });
-  const m = createMission({ title: "Job", steps: STEPS }, { now: format.now, idFactory: () => "m1" });
+  const m = createMission({ title: "Job", steps: STEPS, metadata: { criteria: VERIFIABLE_CRITERIA } }, { now: format.now, idFactory: () => "m1" });
   store.upsertMission(m);
 
   const parked = await exec.start("m1");

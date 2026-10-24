@@ -111,3 +111,106 @@ test("withResolvedHermesKey fills a missing key and never replaces a present one
   const nothing = withResolvedHermesKey(loadConfig({}), {}, empty.home);
   assert.equal(nothing.hermes.apiKey, undefined);
 });
+
+// -- A targeted profile --------------------------------------------------------
+//
+// The profile is where the worker's hooks live. Targeting `/p/<profile>` while reading
+// the DEFAULT profile's key (or the reverse) is the mismatch that makes a boundary look
+// installed but never fire, so both halves are pinned here.
+
+/** Writes `<home>/.hermes/profiles/<name>/.env` with the given lines. */
+function writeProfileEnv(home: string, name: string, lines: string[]): void {
+  const dir = join(home, ".hermes", "profiles", name);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, ".env"), `${lines.join("\n")}\n`, "utf8");
+}
+
+test("a targeted profile's own key is used, not the default profile's", (t) => {
+  const { home, cleanup } = tempHome();
+  t.after(cleanup);
+  writeHermesEnv(home, ["API_SERVER_KEY=default-profile-key"]);
+  writeProfileEnv(home, "kai", ["API_SERVER_KEY=profile-key"]);
+
+  assert.equal(resolveHermesKey(undefined, {}, home, "kai"), "profile-key");
+});
+
+test("KAI_HERMES_PROFILE selects the profile when no argument is passed", (t) => {
+  const { home, cleanup } = tempHome();
+  t.after(cleanup);
+  writeHermesEnv(home, ["API_SERVER_KEY=default-profile-key"]);
+  writeProfileEnv(home, "kai", ["API_SERVER_KEY=profile-key"]);
+
+  assert.equal(resolveHermesKey(undefined, { KAI_HERMES_PROFILE: "kai" }, home), "profile-key");
+});
+
+test("the environment still wins over a profile file", (t) => {
+  const { home, cleanup } = tempHome();
+  t.after(cleanup);
+  writeProfileEnv(home, "kai", ["API_SERVER_KEY=profile-key"]);
+
+  assert.equal(
+    resolveHermesKey(undefined, { KAI_HERMES_KEY: "from-env", KAI_HERMES_PROFILE: "kai" }, home),
+    "from-env",
+  );
+});
+
+test("a profile with no key falls back to the install's env file", (t) => {
+  const { home, cleanup } = tempHome();
+  t.after(cleanup);
+  writeHermesEnv(home, ["API_SERVER_KEY=default-profile-key"]);
+  writeProfileEnv(home, "kai", ["SOMETHING_ELSE=1"]);
+
+  assert.equal(resolveHermesKey(undefined, {}, home, "kai"), "default-profile-key");
+});
+
+test("a profile name that could escape profiles/ is refused, never followed", (t) => {
+  const { home, cleanup } = tempHome();
+  t.after(cleanup);
+  writeHermesEnv(home, ["API_SERVER_KEY=default-profile-key"]);
+
+  // If the traversal were honoured this would resolve a key from OUTSIDE profiles/.
+  mkdirSync(join(home, ".hermes", "profiles"), { recursive: true });
+  writeFileSync(join(home, "escaped.env"), "API_SERVER_KEY=escaped-key\n", "utf8");
+  assert.equal(resolveHermesKey(undefined, { KAI_HERMES_PROFILE: "../escaped" }, home), "default-profile-key");
+});
+
+test("withResolvedHermesKey reads the key the targeted profile's route expects", (t) => {
+  const { home, cleanup } = tempHome();
+  t.after(cleanup);
+  writeHermesEnv(home, ["API_SERVER_KEY=default-profile-key"]);
+  writeProfileEnv(home, "kai", ["API_SERVER_KEY=profile-key"]);
+
+  const config = withResolvedHermesKey(loadConfig({ KAI_HERMES_PROFILE: "kai" }), {}, home);
+  assert.equal(config.hermes.profile, "kai");
+  assert.equal(config.hermes.baseUrl, "http://127.0.0.1:8642/p/kai");
+  assert.equal(config.hermes.apiKey, "profile-key");
+});
+
+test("a profile OWNS the route, even over an explicit base URL", () => {
+  // This used to assert the opposite, and that assertion encoded a real defect: the URL
+  // stayed on the default route while `resolveHermesKey` took the PROFILE key, so the
+  // profile's credential was presented to the wrong route and the gateway answered 401
+  // (`AGENT_AUTH_FAILED` on /v1/runs). Measured directly: the install key is 202 on
+  // /v1/runs; the profile key is 202 only on /p/kai/v1/runs. The URL and the credential
+  // must therefore always describe the same route.
+  const config = loadConfig({ KAI_HERMES_PROFILE: "kai", KAI_HERMES_URL: "http://127.0.0.1:9000/worker" });
+  assert.equal(config.hermes.baseUrl, "http://127.0.0.1:9000/worker/p/kai");
+  assert.equal(config.hermes.profile, "kai");
+});
+
+test("an already profile-routed base URL is not routed twice", () => {
+  const config = loadConfig({ KAI_HERMES_PROFILE: "kai", KAI_HERMES_URL: "http://127.0.0.1:8642/p/kai" });
+  assert.equal(config.hermes.baseUrl, "http://127.0.0.1:8642/p/kai");
+});
+
+test("no profile leaves the default URL and profile untouched", () => {
+  const config = loadConfig({});
+  assert.equal(config.hermes.baseUrl, "http://127.0.0.1:8642");
+  assert.equal(config.hermes.profile, undefined);
+});
+
+test("an unusable profile name is absent, not silently a different profile", () => {
+  const config = loadConfig({ KAI_HERMES_PROFILE: "../kai" });
+  assert.equal(config.hermes.profile, undefined);
+  assert.equal(config.hermes.baseUrl, "http://127.0.0.1:8642");
+});

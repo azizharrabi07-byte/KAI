@@ -139,7 +139,21 @@ export type KaiErrorCode =
   | "STORAGE_FAILED"
   | "POLICY_DENIED"
   | "APPROVAL_REQUIRED"
+  /**
+   * An approval was presented a second time. It authorised exactly one dispatch attempt
+   * (Option A), so the attempt has already been made and this call must not make another.
+   * Distinct from POLICY_DENIED: nothing was refused for policy reasons — the grant is
+   * simply spent, and a new one is required for a new attempt.
+   */
+  | "ALREADY_DISPATCHED"
   | "CANCELLED"
+  /**
+   * A page was reached but could not be read as content: an anti-bot interstitial
+   * (CAPTCHA), a challenge page, or a document with no text. Distinct from
+   * NOT_FOUND — the URL exists; its body was withheld — so a caller reports the
+   * block instead of concluding the topic has no answer.
+   */
+  | "PAGE_UNREADABLE"
   | "INTERNAL";
 
 /**
@@ -186,9 +200,18 @@ export type KaiEventType =
   | "core.status_changed"
   | "agent.connected"
   | "agent.disconnected"
+  // The registry's own catalogue changes. Emitted from register()/unregister(),
+  // which are the only two places an adapter enters or leaves the registry.
+  | "agent.registered"
+  | "agent.unregistered"
   | "agent.status_changed"
   | "agent.output"
   | "agent.error"
+  // One worker gateway approval request as KAI actually decided it. Emitted by
+  // an adapter's own sink, which is wired to this bus; it records the decision
+  // KAI made, and is NOT itself an approval — the approval lifecycle above is
+  // produced by the approval service, not by a worker's report of one.
+  | "agent.approval_decided"
   // Subagent run/persona lifecycle (P7-P9). Extended, never reshaped: every
   // event is emitted from actual runtime state in runSubagent/createSubagent,
   // never synthesised. A parked run emits run_started, then run_completed or
@@ -204,11 +227,18 @@ export type KaiEventType =
   | "mission.completed"
   | "mission.failed"
   | "mission.cancelled"
+  // A mission that could not begin because an autonomy switch forbids it.
+  // Distinct from "failed": nothing was attempted, and it can still run later.
+  | "mission.blocked"
   | "notification.created"
   | "notification.read"
   | "approval.requested"
   | "approval.approved"
   | "approval.rejected"
+  // An authority change: the mode that decides what KAI may execute unattended.
+  // It persists because "who widened KAI's authority, and to what" must be
+  // answerable after the fact, exactly like an approval.
+  | "policy.mode_changed"
   | "memory.created"
   | "memory.deleted"
   | "scheduler.started"
@@ -307,10 +337,12 @@ export const PERSISTED_EVENT_TYPES: readonly KaiEventType[] = [
   "mission.completed",
   "mission.failed",
   "mission.cancelled",
+  "mission.blocked",
   "notification.created",
   "approval.requested",
   "approval.approved",
   "approval.rejected",
+  "policy.mode_changed",
   "agent.spawned",
   "agent.run_started",
   "agent.run_completed",
@@ -464,6 +496,15 @@ export interface Approval {
    * a registry refuses a mismatch whenever the field IS present.
    */
   inputHash?: string;
+  /**
+   * When this approval was SPENT, and by what.
+   *
+   * An approval authorises one exact action once. Without this, a worker that was
+   * approved for `read_file X` could replay the same call forever, and one "yes"
+   * would become standing permission. A row with `consumedAt` set can never authorise
+   * again; the worker has to ask afresh.
+   */
+  consumedAt?: string;
 }
 
 // ── Memory ────────────────────────────────────────────────────────────────────
@@ -599,6 +640,16 @@ export interface ApprovalStore {
   getApproval(id: string): Approval | null;
   listApprovals(opts?: { status?: ApprovalStatus; limit?: number }): Approval[];
   decideApproval(id: string, status: ApprovalStatus, decidedAt: string): void;
+  /**
+   * Spend an approval exactly once. Returns false when it was not APPROVED or was
+   * already spent — which is what makes a replayed authorisation impossible.
+   *
+   * OPTIONAL on purpose: a store that cannot persist a "spent" marker (a test double, a
+   * future adapter) still gets single-use semantics for the life of the process, via the
+   * approval service's own record. The shipped SQLite store implements it, so a real
+   * Core's verdict survives a restart.
+   */
+  consumeApproval?(id: string, consumedAt: string): boolean;
 }
 
 export interface ScheduledTaskStore {

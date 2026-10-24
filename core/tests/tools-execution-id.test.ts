@@ -197,7 +197,11 @@ test("INTEGRATION: a mission step's action record joins the acceptance ledger on
       // Mission A — a SIDE-EFFECTING step: the acceptance boundary records it
       // durably, and the action record must join that exact ledger row.
       const mission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
         title: "prove the executionId join",
+        // Completion now requires an explicit, KAI-verifiable criterion: the old
+        // "the runner returned ok" path was the demonstrated false-success bug.
+        metadata: { criteria: ["file present: package.json"] },
         steps: [{ title: "effectful echo", kind: "tool", target: "test.effectful_echo" }],
       });
       assert.equal(mission.status, "COMPLETED");
@@ -236,6 +240,7 @@ test("INTEGRATION: a mission step's action record joins the acceptance ledger on
       // side-effecting steps — writes no row. Derivation and the ledger write
       // are independent, and the record stays honest about which is which.
       const readMission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
         title: "read step",
         steps: [{ title: "read status", kind: "tool", target: "system.get_status" }],
       });

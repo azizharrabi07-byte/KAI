@@ -136,7 +136,7 @@ test("LIVE: a DRAFT plan starts through the executor and manual steps complete",
       { title: "Read the inbox", kind: "manual" },
       { title: "Write the summary", kind: "manual" },
     ],
-    metadata: { plan: true },
+    metadata: { plan: true, criteria: ["file present: package.json"] },
   });
   rt.stores.missions.upsertMission(draft);
   assert.equal(rt.stores.missions.getMission(draft.id)?.status, "DRAFT");

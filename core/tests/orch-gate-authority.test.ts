@@ -22,6 +22,7 @@ import { createBenchmark, type Benchmark } from "../src/orchestration/bench.ts";
 import { createDispatcher } from "../src/orchestration/dispatch.ts";
 import { createTrace } from "../src/orchestration/trace.ts";
 import { createLearning } from "../src/orchestration/learn.ts";
+import { evaluatingDeps } from "./learn-eval-fixture.ts";
 import { createOrchestrator, type Orchestrator } from "../src/orchestration/orchestrator.ts";
 import { createOutcomeContract } from "../src/orchestration/outcome.ts";
 import type { AutonomyPolicy } from "../src/orchestration/types.ts";
@@ -58,7 +59,7 @@ function harness(stores: Stores): Harness {
     capabilities: () => ({ skills: ["typescript", "testing", "review"], tools: ["read", "edit", "test-runner"] }),
   });
   const trace = createTrace({ store: stores.activity, prefs: () => ({ activity: "VERBOSE", reasoning: "SUMMARY" }) as const });
-  const learning = createLearning({ metrics: stores.skillMetrics, validate: () => ({ ok: true }), stage: () => ({ ok: true }) });
+  const learning = createLearning({ metrics: stores.skillMetrics, validate: () => ({ ok: true }), stage: () => ({ ok: true }), ...evaluatingDeps() });
   const published: { type: string; payload: unknown }[] = [];
   const reply = { current: okReply("browser verification passed") };
   const orch = createOrchestrator({

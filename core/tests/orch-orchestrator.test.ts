@@ -23,6 +23,7 @@ import { createBenchmark, type Benchmark } from "../src/orchestration/bench.ts";
 import { createDispatcher } from "../src/orchestration/dispatch.ts";
 import { createTrace } from "../src/orchestration/trace.ts";
 import { createLearning } from "../src/orchestration/learn.ts";
+import { evaluatingDeps } from "./learn-eval-fixture.ts";
 import {
   createOrchestrator,
   type DelegateInput,
@@ -126,6 +127,7 @@ function harness(autonomyLevel: AutonomyPolicy["level"] = 2): Harness {
     metrics: stores.skillMetrics,
     validate: () => ({ ok: true }),
     stage: () => ({ ok: true }),
+    ...evaluatingDeps(),
   });
   const published: { type: string; payload: unknown }[] = [];
   const state: StubState = {

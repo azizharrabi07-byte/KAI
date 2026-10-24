@@ -62,6 +62,7 @@ async function runToolStep(
   templateSideEffecting?: boolean,
 ): Promise<StepView> {
   const mission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
     title: `derivation ${toolId}`,
     steps: [
       {
@@ -103,6 +104,7 @@ test("an agent step is side-effecting and records (it reaches a worker through a
   const rt = boot(dir);
   try {
     const mission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "ask a worker",
       steps: [{ title: "ask hermes", kind: "agent", target: "hermes" }],
     });
@@ -160,6 +162,7 @@ test("regression: a writing step can no longer escape the ledger", async () => {
   const rt = boot(dir);
   try {
     const mission = await rt.createAndStartMission({
+    metadata: { criteria: ["file present: package.json"] },
       title: "ledger completeness",
       steps: [
         { title: "create nested", kind: "tool", target: "missions.create", input: { title: "nested" } },

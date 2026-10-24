@@ -287,6 +287,83 @@ test("hermes: runTask submits, polls from running to completed, and never stops 
   assert.equal(stops.length, 0, "a completed run must not be stopped");
 });
 
+test("hermes: a terminal run publishes the worker RESULT event the Doer supervises", async () => {
+  // The Doer's intake is DOER_RESULT_EVENT_TYPES (orchestration/doer.ts). A run
+  // that finishes without publishing one of those is a completion nothing acts
+  // on: the supervisor never wakes and the user has to ask what happened.
+  const emitFor = async (terminal) => {
+    const clock = instantClock();
+    const seen = [];
+    const fetchImpl = async (url, init) => {
+      const target = String(url);
+      if (target.endsWith("/v1/runs") && init && init.method === "POST") {
+        return json(202, { run_id: "r1" });
+      }
+      if (target.endsWith("/v1/runs/r1/stop")) return noContent(204);
+      if (target.endsWith("/v1/runs/r1")) return json(200, { status: terminal });
+      return json(404, {});
+    };
+    const adapter = createHermesAdapter({
+      fetchImpl,
+      apiKey: "k",
+      pollIntervalMs: 1,
+      runTimeoutMs: 100,
+      now: clock.now,
+      sleep: clock.sleep,
+      onEvent: (type, payload) => seen.push({ type, payload }),
+    });
+    const result = await adapter.runTask({ id: "t-res", input: "go" });
+    return { result, seen };
+  };
+
+  const done = await emitFor("completed");
+  assert.equal(done.result.state, "completed");
+  const completed = done.seen.find((e) => e.type === "agent.run_completed");
+  assert.ok(completed, "a completed run must publish agent.run_completed");
+  // The shape must match the two existing publishers (runtime.ts `runSubagent`
+  // and `settleParkedRunsOnVerdict`): `subagentId`, not `id`.
+  assert.equal(completed.payload.subagentId, "hermes");
+  assert.equal(completed.payload.runId, "r1");
+  assert.equal(completed.payload.state, "completed");
+
+  const bad = await emitFor("failed");
+  assert.equal(bad.result.state, "failed");
+  assert.ok(
+    bad.seen.some((e) => e.type === "agent.run_failed"),
+    "a failed run must publish agent.run_failed",
+  );
+  assert.equal(
+    bad.seen.some((e) => e.type === "agent.run_completed"),
+    false,
+    "a failed run must never publish agent.run_completed",
+  );
+});
+
+test("hermes: the event sink is optional, and its absence is not an error", async () => {
+  // Every emit is gated on `onEvent`. A caller that omits it must still get the
+  // run's real result: the sink is telemetry, never the return value.
+  const clock = instantClock();
+  const fetchImpl = async (url, init) => {
+    const target = String(url);
+    if (target.endsWith("/v1/runs") && init && init.method === "POST") {
+      return json(202, { run_id: "r1" });
+    }
+    if (target.endsWith("/v1/runs/r1")) return json(200, { status: "completed", output: "ok" });
+    return json(404, {});
+  };
+  const adapter = createHermesAdapter({
+    fetchImpl,
+    apiKey: "k",
+    pollIntervalMs: 1,
+    runTimeoutMs: 100,
+    now: clock.now,
+    sleep: clock.sleep,
+  });
+  const result = await adapter.runTask({ id: "t-nosink", input: "go" });
+  assert.equal(result.state, "completed");
+  assert.equal(result.output, "ok");
+});
+
 test("hermes: a failed poll abandons the run and asks it to stop", async () => {
   const clock = instantClock();
   const stops = [];

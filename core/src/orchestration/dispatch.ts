@@ -104,7 +104,13 @@ const EXTERNAL_KEYWORDS = [
   "email",
   "notify",
   "post to",
-  "http",
+  // NOT the bare string "http": naming a URL in an objective is not an external
+  // side effect. It made every "research https://…" task classify as EXTERNAL, so
+  // creating the plan was refused as if KAI were about to act on the network.
+  // An APPROVAL is for actions, not for the words used to describe them.
+  "upload to",
+  "submit to",
+  "call the api",
   "api call",
   "fetch remote",
   "network",
@@ -389,13 +395,28 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
     const best = capable[0];
     if (!best) return askUser("no capable worker is available.", task, ranked);
 
-    if (task.risk === "EXTERNAL" || task.risk === "DESTRUCTIVE" || task.difficulty > 0.7 || policy.review !== "OFF") {
-      const why =
-        task.risk === "EXTERNAL" || task.risk === "DESTRUCTIVE"
-          ? `${task.risk} risk requires review`
-          : task.difficulty > 0.7
-            ? `difficulty ${task.difficulty.toFixed(2)} requires review`
-            : `policy review is ${policy.review}`;
+    // ── Three review policies, three different answers ───────────────────────
+    // The old condition was `... || policy.review !== "OFF"`, which made AUTO
+    // behave EXACTLY like ASK: every ordinary stage parked for a review card even
+    // though the plan was already authorised. AUTO was a setting that did nothing.
+    //
+    //   ASK   review every delegated task (the strictest)
+    //   AUTO  risk-based: EXTERNAL/DESTRUCTIVE always, plus high-difficulty work
+    //   OFF   only EXTERNAL/DESTRUCTIVE — those are never delegated unreviewed
+    // Difficulty stays a QUALITY gate: hard work is always reviewed whatever the
+    // policy, because "the owner turned review off" is not a reason to ship
+    // something nobody checked. What changed is only the policy clause: `AUTO` and
+    // `OFF` no longer force review of ordinary, low-difficulty work — that clause
+    // used to be `review !== "OFF"`, which made AUTO identical to ASK.
+    const risky = task.risk === "EXTERNAL" || task.risk === "DESTRUCTIVE";
+    const hard = task.difficulty > 0.7;
+    const mustReview = risky || hard || policy.review === "ASK";
+    if (mustReview) {
+      const why = risky
+        ? `${task.risk} risk requires review`
+        : hard
+          ? `difficulty ${task.difficulty.toFixed(2)} requires review`
+          : `policy review is ${policy.review}`;
       return {
         decision: "DELEGATE_AND_REVIEW",
         workerIds: [best.workerId],

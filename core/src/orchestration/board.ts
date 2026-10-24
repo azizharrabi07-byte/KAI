@@ -139,6 +139,13 @@ export interface WorkBoard {
   review(id: string, reviewerId: string): BoardResult<WorkItem>;
   changesRequested(id: string, findings: readonly string[]): BoardResult<WorkItem>;
   createChild(parentId: string, input: WorkItemInput, budgets?: WorkBudget): BoardResult<WorkItem>;
+  /**
+   * Edit a task's own METADATA (objective, criteria). Never touches state, evidence,
+   * attempts or history, so renaming cannot fabricate progress or erase verification.
+   * Refused while the item is claimed/reviewing: changing its objective mid-flight
+   * would make its criteria describe work that was never requested.
+   */
+  edit(id: string, changes: { objective?: string; criteria?: readonly string[] }): BoardResult<WorkItem>;
   /** Attach auxiliary outputs (e.g. parked approval linkage). Additive only. */
   annotate(id: string, outputs: unknown): BoardResult<WorkItem>;
   /**
@@ -387,6 +394,31 @@ export function createWorkBoard(store: WorkItemStore, opts: WorkBoardOptions = {
       emit("worker.progress", { id, label, workerId: item.workerId });
       return { ok: true, value: saved };
     },
+
+    edit(id: string, changes): BoardResult<WorkItem> {
+      const item = load(id);
+      if (item === null) return unknownId(id);
+      const busy = item.state === "RUNNING" || item.state === "CLAIMED" || item.state === "REVIEW";
+      if (busy && changes.objective !== undefined && changes.objective.trim() !== item.objective) {
+        return {
+          ok: false,
+          reason: `"${id}" is ${item.state}; pause or cancel it before changing its objective, so its criteria keep describing the work actually done`,
+        };
+      }
+      if (changes.objective !== undefined && changes.objective.trim().length === 0) {
+        return { ok: false, reason: "objective must be a non-empty string when given" };
+      }
+      const next: WorkItem = {
+        ...item,
+        ...(changes.objective !== undefined ? { objective: changes.objective.trim() } : {}),
+        ...(changes.criteria !== undefined
+          ? { criteria: changes.criteria.map((c) => String(c).trim()).filter((c) => c.length > 0) }
+          : {}),
+      };
+      return { ok: true, value: save(next) };
+    },
+
+
 
     recordEvidence(id: string, records: VerifiedEvidence[]): BoardResult<WorkItem> {
       const item = load(id);

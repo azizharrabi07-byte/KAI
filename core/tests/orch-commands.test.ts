@@ -476,7 +476,6 @@ test("prefs: invalid stored values fall back to defaults", () => {
 });
 
 test("prefs: every key validates a good value and refuses one bad value", () => {
-  assert.equal(ORCHESTRATION_KEYS.length, 15);
   const cases: Array<{ key: OrchestrationKey; good: unknown; bad: unknown }> = [
     { key: "orchestration.autonomy", good: 2, bad: "9" },
     { key: "orchestration.workerAuto", good: "AUTO", bad: "AUTO_SAFE" },
@@ -494,8 +493,20 @@ test("prefs: every key validates a good value and refuses one bad value", () => 
     { key: "orchestration.jevMaxCalls", good: 5, bad: 51 },
     // KAI Doer: a two-value switch, so anything else is refused.
     { key: "orchestration.doer", good: "ON", bad: "MAYBE" },
+    // Monster Mode: its own switch and its own enforced budgets.
+    { key: "orchestration.monster", good: "ON", bad: "MAYBE" },
+    { key: "orchestration.monsterMinutes", good: 30, bad: 0 },
+    { key: "orchestration.monsterSteps", good: 24, bad: 0 },
+    { key: "orchestration.monsterParallel", good: 3, bad: 11 },
   ];
-  assert.equal(cases.length, 15);
+  // Derived, never hardcoded: a literal here silently stops covering the moment
+  // a key is added, which is exactly what happened when Monster Mode landed.
+  assert.equal(cases.length, ORCHESTRATION_KEYS.length, "every ORCHESTRATION_KEY has a case");
+  assert.deepEqual(
+    cases.map((c) => c.key).sort(),
+    [...ORCHESTRATION_KEYS].sort(),
+    "the cases name exactly the declared keys",
+  );
   for (const { key, good, bad } of cases) {
     const accepted = validateOrchestrationValue(key, good);
     assert.equal(accepted.ok, true, `${key} accepts ${JSON.stringify(good)}`);
@@ -598,12 +609,17 @@ test("LIVE: work board, bench, and activity answer over real HTTP", async (t) =>
   assert.deepEqual(emptyActivity.events, [], "no activity happened yet");
 
   // With no personas nothing delegates — an honest refusal, not a fake item.
+  // The refusal is a CONFLICT (409), not a 200: answering 200 while persisting
+  // nothing is what let every caller believe a TODO had been created when the
+  // store was still empty. The body still carries the reason.
   const refused = await post("/work-items", { objective: READ_OBJECTIVE });
-  assert.equal(refused.status, 200);
-  const refusedBody = (await refused.json()) as { delegated: boolean; workItemId: string; note: string };
-  assert.equal(refusedBody.delegated, false);
-  assert.equal(refusedBody.workItemId, "");
-  assert.ok(refusedBody.note.length > 0);
+  // 403 when the policy gate refuses up front; 409 when the orchestrator declines
+  // to plan. Both are honest refusals — what must never happen is a 2xx.
+  assert.ok(refused.status === 403 || refused.status === 409, `unexpected refusal status ${refused.status}`);
+  const refusedBody = (await refused.json()) as { error?: boolean; reason?: string };
+  assert.ok(String(refusedBody.reason || '').length > 0, "a refusal must say why");
+  const stillEmpty = (await (await fetch(`${base}/work-items`)).json()) as { items: unknown[] };
+  assert.equal(stillEmpty.items.length, 0, "a refusal must create nothing");
 
   // One persona is enough for a READ objective to route to a worker.
   const spawned = await rt.tools.invoke("workforce.subagent", {

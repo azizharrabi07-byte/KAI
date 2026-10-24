@@ -31,6 +31,8 @@ import { dirname, join, resolve } from "node:path";
 import { openSqliteStores, defaultDatabasePath } from "./storage/sqlite.ts";
 import { openMemoryStore } from "./storage/memoryStore.ts";
 import { createEventBus } from "./events/bus.ts";
+import { createCoucouBridge, type CoucouBridge } from "./integrations/coucou.ts";
+import { createCoucouMapper } from "./integrations/coucou-map.ts";
 import { createNotificationService } from "./notifications/service.ts";
 import { createAgentRegistry } from "./agents/registry.ts";
 import { createHermesAdapter } from "./agents/adapters/hermesAdapter.ts";
@@ -39,6 +41,8 @@ import { createOpenCodeAdapter } from "./agents/adapters/opencodeAdapter.ts";
 import { createCodexAdapter } from "./agents/adapters/codexAdapter.ts";
 import { createMockHermes, createMockOpenCode } from "./agents/mock.ts";
 import { createPolicyEngine } from "./policies/gate.ts";
+import { openPolicyStateStore, resolvedInitialState } from "./policies/state-store.ts";
+import { initialPolicyState, type ModeScope } from "./policies/mode.ts";
 import { createApprovalService } from "./approvals/service.ts";
 import { defineEmployee, createUnavailableEmployee } from "./workforce/employee.ts";
 import { createWorkforceManager } from "./workforce/manager.ts";
@@ -146,6 +150,8 @@ import { createBenchmark } from "./orchestration/bench.ts";
 import { createDispatcher } from "./orchestration/dispatch.ts";
 import { createTrace } from "./orchestration/trace.ts";
 import { createLearning } from "./orchestration/learn.ts";
+import { evaluateRevision } from "./learning/evaluate.ts";
+import { SKILL_FORM_TASK_SET } from "./learning/task-sets.ts";
 import { parseReviewVerdict, REVIEWER_SYSTEM } from "./orchestration/review.ts";
 import { createOrchestrator, type Orchestrator } from "./orchestration/orchestrator.ts";
 import { createUnavailableJevProvider, DEFAULT_JEV_BUDGET } from "./orchestration/decision.ts";
@@ -154,7 +160,7 @@ import { describeProviderFailure, diagnoseProviderFailure } from "./model/diagno
 import { createSettingsService, isSettingKey, type SettingsService, type ValidatedSettingsInput } from "./settings/settings.ts";
 import { isOrchestrationKey, validateOrchestrationValue, type OrchestrationKey } from "./orchestration/prefs.ts";
 import type { StepRunner } from "./missions/executor.ts";
-import { isRecord } from "./shared/contracts.ts";
+import { isPolicyMode, isRecord } from "./shared/contracts.ts";
 
 import type {
   AgentStatus,
@@ -190,6 +196,249 @@ export type Publish = (
 // and refuses the rest, rather than accepting a scope nobody knows.
 
 /** One memory scope, and whether this runtime has a live producer for it. */
+
+/**
+ * The search this navigation really is, or null when it is an ordinary page.
+ *
+ * Measured on this machine: Google answers `/search` with `/sorry/index` (a
+ * CAPTCHA and no results) and DuckDuckGo answers with "Select all squares
+ * containing a duck". Both were handed to the model as if they were research
+ * evidence, and a research request therefore ended in a canned apology. The
+ * query is recoverable from the url, so a search is served over plain HTTP
+ * instead of being driven into a challenge page.
+ */
+function searchQueryOf(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = parsed.hostname.toLowerCase();
+  const engine = /^(www\.)?google\.[a-z.]+$/.test(host)
+    || /^(html\.|lite\.)?duckduckgo\.com$/.test(host)
+    || /^(www\.)?bing\.com$/.test(host)
+    || /^search\.(yahoo|brave)\.com$/.test(host);
+  if (!engine || !parsed.pathname.startsWith("/search") && parsed.pathname !== "/html/" && parsed.pathname !== "/lite/") {
+    return null;
+  }
+  const query = parsed.searchParams.get("q");
+  return query !== null && query.trim().length > 0 ? query.trim() : null;
+}
+
+
+/**
+ * The page a search result really points at, or null when it is not a result.
+ *
+ * Bing wraps every result in `bing.com/ck/a?…&u=a1<base64url>` — the click
+ * tracker, not the source. Citing that is useless to the owner and to the
+ * model, so the target is unwrapped here and the tracker's own links dropped.
+ */
+function realSearchUrl(href: string): string | null {
+  const decoded = href.replace(/&amp;/g, "&");
+  let parsed: URL;
+  try {
+    parsed = new URL(decoded);
+  } catch {
+    return null;
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (/(^|\.)bing\.com$/.test(host) || /(^|\.)duckduckgo\.com$/.test(host) || /(^|\.)google\.[a-z.]+$/.test(host)) {
+    const wrapped = parsed.searchParams.get("u");
+    if (wrapped === null || !wrapped.startsWith("a1")) return null;
+    try {
+      const target = Buffer.from(wrapped.slice(2), "base64url").toString("utf8");
+      return /^https?:\/\//i.test(target) ? target : null;
+    } catch {
+      return null;
+    }
+  }
+  return /^https?:\/\//i.test(decoded) ? decoded : null;
+}
+
+
+/**
+ * A page's readable text over plain HTTP, or a refusal that says why.
+ *
+ * Anti-bot interstitials are NOT content: returning 392 characters of "verify
+ * you are a robot" is what made the model answer a research request with a
+ * canned apology. They are reported as failures so the turn can react.
+ */
+async function httpFetchPage(url: string): Promise<{ url: string; title: string; text: string; status: number }> {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      "Accept-Language": "en-US,en;q=0.9",
+      Accept: "text/html,application/xhtml+xml",
+    },
+    redirect: "follow",
+    signal: AbortSignal.timeout(20_000),
+  });
+  const html = await response.text();
+  const head = html.slice(0, 3000);
+  if (/\/sorry\/|captcha|are you a robot|verify you are human|select all squares/i.test(head)) {
+    throw new Error(`the page served a bot challenge, so it is not usable evidence (HTTP ${response.status})`);
+  }
+  const title = (/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? "").replace(/<[^>]+>/g, "").trim().slice(0, 200);
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 8_000);
+  if (text.length < 40) {
+    throw new Error(`the page returned no readable text (HTTP ${response.status}); it may need sign-in or script execution`);
+  }
+  return { url: response.url || url, title, text, status: response.status };
+}
+
+
+const SEARCH_STOPWORDS = new Set([
+  "the", "and", "for", "with", "that", "this", "from", "into", "about", "their", "them", "they",
+  "are", "was", "were", "have", "has", "had", "will", "would", "can", "could", "should", "may",
+  "research", "please", "give", "provide", "summarize", "summary", "compare", "comparison", "cite",
+  "source", "sources", "url", "urls", "reliable", "current", "latest", "state", "three", "some",
+  "tell", "list", "describe", "explain", "using", "use", "actual", "real", "each", "which", "what",
+]);
+
+/** The words a repository index should be searched with, in query order. */
+function searchKeywords(query: string): string {
+  return query
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .split(" ")
+    .filter((word) => word.length > 2 && !SEARCH_STOPWORDS.has(word))
+    .slice(0, 6)
+    .join(" ");
+}
+
+interface WebResult {
+  title: string;
+  url: string;
+  snippet: string;
+  provider: string;
+  /** Facts the provider asserts about the source itself (stars, licence, age). */
+  detail?: string;
+}
+
+/**
+ * Real, structured results for a query.
+ *
+ * Scraping a search-engine results page was the wrong mechanism: Google and
+ * DuckDuckGo answer an automated request with a CAPTCHA, and Bing wraps every
+ * hit in a click tracker and served an unrelated page here. An HTML 200 is not
+ * a successful search. These providers return parsed data over documented
+ * JSON APIs with no key, so the evidence the model receives is real.
+ *
+ * Coverage is stated per provider: this is not a general web index, and the
+ * turn is told which sources it actually got.
+ */
+async function httpSearch(query: string): Promise<{
+  query: string;
+  providers: string[];
+  results: WebResult[];
+  coverage: string;
+}> {
+  const results: WebResult[] = [];
+  const providers: string[] = [];
+  const failures: string[] = [];
+  const term = encodeURIComponent(query);
+  // A repository index matches keywords, not a sentence. The whole request
+  // ("Research three … and cite source URLs") returned ZERO repositories while
+  // the same words as keywords return the projects the question is about.
+  const keywords = searchKeywords(query);
+  const termForRepo = encodeURIComponent(keywords.length > 0 ? keywords : query);
+
+  const attempt = async (name: string, run: () => Promise<WebResult[]>): Promise<void> => {
+    try {
+      const found = await run();
+      if (found.length === 0) {
+        failures.push(`${name}: no results`);
+        return;
+      }
+      providers.push(name);
+      results.push(...found);
+    } catch (error) {
+      failures.push(`${name}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  // Repositories — the strongest signal for "which projects exist", with the
+  // licence and popularity the answer needs in order to be checkable.
+  await attempt("github", async () => {
+    const response = await fetch(
+      `https://api.github.com/search/repositories?q=${termForRepo}&sort=stars&order=desc&per_page=8`,
+      {
+        headers: { "User-Agent": "KAI", Accept: "application/vnd.github+json" },
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const body = (await response.json()) as { items?: Array<Record<string, unknown>> };
+    return (body.items ?? []).slice(0, 8).map((item) => {
+      const licence = item["license"] as { spdx_id?: string } | null;
+      return {
+        title: String(item["full_name"] ?? ""),
+        url: String(item["html_url"] ?? ""),
+        snippet: String(item["description"] ?? "").slice(0, 300),
+        provider: "github",
+        detail: `${licence?.spdx_id ?? "no licence"} · ★${String(item["stargazers_count"] ?? 0)} · ${String(item["language"] ?? "unknown language")}`,
+      };
+    }).filter((result) => result.url.startsWith("https://"));
+  });
+
+  // Discussion — what the community is actually saying, newest first.
+  await attempt("hacker-news", async () => {
+    const response = await fetch(`https://hn.algolia.com/api/v1/search_by_date?query=${term}&tags=story&hitsPerPage=6`, {
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const body = (await response.json()) as { hits?: Array<Record<string, unknown>> };
+    return (body.hits ?? []).slice(0, 6).map((hit) => ({
+      title: String(hit["title"] ?? ""),
+      url: String(hit["url"] ?? `https://news.ycombinator.com/item?id=${String(hit["objectID"] ?? "")}`),
+      snippet: String(hit["story_text"] ?? hit["title"] ?? "").replace(/<[^>]+>/g, "").slice(0, 250),
+      provider: "hacker-news",
+      detail: `${String(hit["points"] ?? 0)} points · ${String(hit["created_at"] ?? "").slice(0, 10)}`,
+    })).filter((result) => result.title.length > 0);
+  });
+
+  // Background — an encyclopedic frame only when the query names a subject.
+  await attempt("wikipedia", async () => {
+    const response = await fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${term}&format=json&srlimit=3`,
+      { headers: { "User-Agent": "KAI" }, signal: AbortSignal.timeout(15_000) },
+    );
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const body = (await response.json()) as { query?: { search?: Array<Record<string, unknown>> } };
+    return (body.query?.search ?? []).slice(0, 3).map((hit) => ({
+      title: String(hit["title"] ?? ""),
+      url: `https://en.wikipedia.org/wiki/${encodeURIComponent(String(hit["title"] ?? "").replace(/ /g, "_"))}`,
+      snippet: String(hit["snippet"] ?? "").replace(/<[^>]+>/g, "").slice(0, 250),
+      provider: "wikipedia",
+    }));
+  });
+
+  if (results.length === 0) {
+    throw new Error(`no search provider returned usable results (${failures.join("; ")})`);
+  }
+  // Repositories first: for "which projects exist and what are they", a starred
+  // repository is stronger evidence than a launch announcement.
+  const ordered = [...results].sort(
+    (a, b) => Number(b.provider === "github") - Number(a.provider === "github"),
+  );
+  return {
+    query,
+    providers,
+    results: ordered.slice(0, 16),
+    coverage: providers.join(", ") + " only — this is not a general web index; say so if the question needs one" +
+      (failures.length > 0 ? ` (unavailable: ${failures.join("; ")})` : ""),
+  };
+}
+
 export interface MemoryScopeSupport {
   scope: MemoryScope;
   /** The subsystem that mints this scope's ids, or null when nothing does. */
@@ -369,6 +618,12 @@ export interface CoreRuntimeOptions {
     doerPath?: string;
     /** Goals, plan revisions and plan approvals (their own file). Default `<dbDir>/goals.db`. */
     goalsPath?: string;
+    /**
+     * The persisted policy MODE (its own file). Default `<dbDir>/policy-state.db`.
+     * Its own file for the same reason as the rest: `Stores` is a frozen
+     * interface, and one row does not justify reshaping it.
+     */
+    policyPath?: string;
     /** Checkpoint store root. Default `<dbDir>/checkpoints`. */
     checkpointsDir?: string;
     /** KAI_HOME for identity docs (SOUL.md/USER.md). Defaults to the real KAI_HOME. */
@@ -396,6 +651,8 @@ export interface CoreRuntimeHealth {
 export interface CoreRuntime {
   stores: Stores;
   bus: ReturnType<typeof createEventBus>;
+  /** The KAI → Coucou observability bridge. Optional at runtime; never authoritative. */
+  coucou: CoucouBridge;
   memory: ReturnType<typeof createMemoryService>;
   /** Live Phase 2 memory engine (canonical store). Additive: the legacy service above is unchanged. */
   memoryEngine: MemoryEngine;
@@ -516,6 +773,24 @@ export interface CoreRuntime {
    * API uses this instead of `approvals.decide` so that a decision can never be
    * recorded without the waiting work being told about it.
    */
+  /** The most recent real action records, newest first (bounded). */
+  recentActions(): unknown[];
+  /** Durable tool calls across sessions, newest first, with arguments and results. */
+  recentToolCalls(limit?: number): unknown[];
+  /** Drive a plan's stage children in order, returning one entry per stage. */
+  runPlan(id: string, opts?: { workerId?: string; approvalId?: string }): Promise<{
+    workItemId: string;
+    state: string;
+    note: string;
+    parkedApprovalId?: string;
+    stages: { workItemId: string; state: string; note: string }[];
+  }>;
+  /** Edit a work item's own metadata (objective, criteria). Narrow by design. */
+  editWorkItem(id: string, changes: { objective?: string; criteria?: readonly string[] }): {
+    ok: boolean;
+    value?: unknown;
+    reason?: string;
+  };
   decideApproval(
     id: string,
     approved: boolean,
@@ -667,6 +942,15 @@ export const MUTATION_TOOLS = {
   pluginLifecycle: "plugin.lifecycle",
   policySet: "policy.set",
   /**
+   * Change the policy MODE (ask-all / normal / auto-read / elevated). WRITE and
+   * deliberately ABSENT from `KAI_INTERNAL_STATE_TOOLS`: this is the authority
+   * level itself, so the default policy parks a REQUEST or CONFIRMATION for a
+   * human. A DOWNGRADE never reaches this tool — reducing authority is applied
+   * directly by the route, because making safety the slow path is the wrong way
+   * round.
+   */
+  policyMode: "policy.mode",
+  /**
    * Change KAI's OWN persisted settings (model name/endpoint/timeout). WRITE
    * and deliberately ABSENT from `KAI_INTERNAL_STATE_TOOLS`: redirecting where
    * inference traffic goes is security-relevant, so the default policy parks it
@@ -752,7 +1036,7 @@ export interface StateMutationToolDeps {
   forgetMemory(input: unknown): unknown;
   createLegacyMemory(memory: unknown): void;
   markNotificationRead(id: string): void;
-  decideApproval(id: string, approved: boolean): Promise<unknown>;
+  decideApproval(id: string, approved: boolean, scope?: "once" | "always"): Promise<unknown>;
   registerEmployee(descriptor: unknown, kind: string): unknown;
   employeeLifecycle(id: string, action: string): Promise<unknown>;
   /** Define (or replace) a KAI subagent persona and register it in the workforce. */
@@ -776,6 +1060,12 @@ export interface StateMutationToolDeps {
   pluginLifecycle(input: unknown): unknown;
   /** Replace the live policy rule set (the security-relevant mutation surface). */
   setPolicyRules(rules: unknown): unknown;
+  /**
+   * Prepare or confirm a policy-mode ELEVATION. A downgrade does not come here:
+   * the route applies it directly, so a reduction in authority never waits on an
+   * approval it might not get.
+   */
+  setPolicyMode(input: unknown): unknown;
   /** Create/rename/archive/unarchive/activate a conversation session. */
   manageSession(input: unknown): unknown;
   /** Inspect KAI's own subsystems and repair the ones it is allowed to touch. */
@@ -995,11 +1285,23 @@ export function createStateMutationTools(deps: StateMutationToolDeps): ToolDefin
         if (typeof record.value.approved !== "boolean") {
           return { ok: false, reason: "approved must be a boolean" };
         }
-        return { ok: true, value: { id, approved: record.value.approved } };
+        // "always" is a PERSISTENT grant; anything else is one-off. Validated here,
+        // at the boundary, so a malformed scope can never be read as "always".
+        if (record.value.scope !== undefined && record.value.scope !== "once" && record.value.scope !== "always") {
+          return { ok: false, reason: 'scope must be "once" or "always" when present' };
+        }
+        return {
+          ok: true,
+          value: {
+            id,
+            approved: record.value.approved,
+            ...(record.value.scope !== undefined ? { scope: record.value.scope } : {}),
+          },
+        };
       },
       async execute(input) {
-        const value = input as { id: string; approved: boolean };
-        return deps.decideApproval(value.id, value.approved);
+        const value = input as { id: string; approved: boolean; scope?: "once" | "always" };
+        return deps.decideApproval(value.id, value.approved, value.scope ?? "once");
       },
     },
     {
@@ -1355,6 +1657,38 @@ export function createStateMutationTools(deps: StateMutationToolDeps): ToolDefin
         return deps.setPolicyRules((input as { rules: unknown[] }).rules);
       },
     },
+    {
+      id: MUTATION_TOOLS.policyMode,
+      name: "Change the policy mode",
+      description:
+        "Prepare or confirm a change to the policy mode that decides which risk classes KAI may execute unattended. Raising authority is two-phase: a request prepares, a confirmation commits. Lowering authority is applied directly and never waits on approval.",
+      risk: "WRITE",
+      validate(input) {
+        const record = entityOf(input, "policy mode input");
+        if (!record.ok) return record;
+        const action = record.value.action;
+        if (action === "request") {
+          if (!isPolicyMode(record.value.to)) {
+            return { ok: false, reason: `"to" must be one of: ask-all, normal, auto-read, elevated` };
+          }
+          const scope = record.value.scope;
+          if (scope === null || typeof scope !== "object") {
+            return { ok: false, reason: '"scope" must be an object like {"kind":"global"}' };
+          }
+          return { ok: true, value: { action, to: record.value.to, scope } };
+        }
+        if (action === "confirm") {
+          if (typeof record.value.requestId !== "string" || record.value.requestId.length === 0) {
+            return { ok: false, reason: '"requestId" must name the prepared elevation' };
+          }
+          return { ok: true, value: { action, requestId: record.value.requestId } };
+        }
+        return { ok: false, reason: '"action" must be "request" or "confirm"' };
+      },
+      async execute(input) {
+        return deps.setPolicyMode(input);
+      },
+    },
   ];
 }
 
@@ -1362,6 +1696,20 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   const dbPath = options.dbPath ?? defaultDatabasePath();
   const stores = openSqliteStores({ path: dbPath });
   const bus = createEventBus({ store: stores.events });
+
+  // ── Coucou observability ─────────────────────────────────────────────────────
+  //
+  // KAI remains the authority; this only reports. `send` is synchronous and
+  // non-blocking, so a Coucou that is absent, slow or broken cannot delay the goal
+  // executor or a worker turn — the bridge's only effect on the world is the short
+  // child process it spawns. Observe-only is the invariant: no path below calls
+  // into the executor, mutates a goal, or authorises anything.
+  const coucou: CoucouBridge = createCoucouBridge({ env: process.env });
+  coucou.start();
+  const mapCoucouEvent = createCoucouMapper();
+  const detachCoucou = bus.subscribe((event) => {
+    for (const out of mapCoucouEvent(event)) coucou.send(out.name, out.sessionId, out.fields);
+  });
 
   const publish: Publish = (type, payload, opts) => {
     bus.publish(type, payload, opts);
@@ -1504,6 +1852,10 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   // approval bound to one exact revision are not `Stores` state, and putting
   // them in the shared database would mean reshaping a frozen interface.
   const goalsPath = subsystemPaths.goalsPath ?? (dataDir !== undefined ? join(dataDir, "goals.db") : ":memory:");
+  // The policy MODE gets its own file for the same reason the goal layer does:
+  // it must OUTLIVE the process (a mode a human set is still in force after a
+  // restart), and `Stores` is a frozen interface that one row must not reshape.
+  const policyPath = subsystemPaths.policyPath ?? (dataDir !== undefined ? join(dataDir, "policy-state.db") : ":memory:");
   const checkpointsDir = subsystemPaths.checkpointsDir ?? underData("checkpoints");
 
   /**
@@ -1521,6 +1873,20 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     onEvent: (type, payload) => publish(type as KaiEventType, payload, { source: "core" }),
   });
 
+  /**
+   * One sink for every adapter's OWN lifecycle events.
+   *
+   * Each adapter's internal `emit` returns early when `onEvent` is undefined, so
+   * an adapter constructed without this silently drops its events — including
+   * `agent.run_completed` / `agent.run_failed`, which are the worker RESULT
+   * events the Doer supervises. Defined once, and passed to every adapter below,
+   * so a worker that finishes provably wakes the supervisor instead of the user
+   * having to ask what happened.
+   */
+  const agentEventSink = (type: string, payload: unknown): void => {
+    publish(type as KaiEventType, payload, { source: "core" });
+  };
+
   if (options.agents?.mode === "mock") {
     registry.register(createMockHermes());
     registry.register(createMockOpenCode());
@@ -1533,16 +1899,21 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
         // subagent does not execute on the worker's default product identity.
         delegatedIdentity: () => renderDelegationIdentity(),
         apiKey: resolveHermesKey(options.agents?.hermes?.apiKey),
+        onEvent: agentEventSink,
       }),
     );
-    registry.register(createOpenCodeAdapter(options.agents?.opencode ?? {}));
+    registry.register(
+      createOpenCodeAdapter({ ...(options.agents?.opencode ?? {}), onEvent: agentEventSink }),
+    );
     // Codex: the adapter exists and is registered HERE, so a machine that has the
     // CLI gets a working worker and a machine without one gets an honest
     // "unavailable" health from the adapter's own probe. Leaving it unregistered
     // made the adapter dead code — an implemented integration nobody could reach.
     // The binary is probed by the adapter itself, never assumed: `health()`
     // reports the real reason when it is absent.
-    registry.register(createCodexAdapter(options.agents?.codex ?? {}));
+    registry.register(
+      createCodexAdapter({ ...(options.agents?.codex ?? {}), onEvent: agentEventSink }),
+    );
   }
 
   /**
@@ -1870,11 +2241,40 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     name: string;
     risk: RiskLevel;
     availability: CapabilityAvailability;
+    supportedActions?: readonly string[];
   }): void {
+    // The model has to be told WHAT to send. A capability tool with an empty
+    // parameter list is a tool the model cannot call: it has the name and no
+    // idea that the body is {action, input}. The declared actions are the
+    // contract, so they go into both the description and the schema.
+    const actionNames = [...(capability.supportedActions ?? [])];
+    const actionLine = actionNames.length
+      ? `Actions: ${actionNames.join(", ")}.`
+      : "This capability declares no actions.";
+    const schema: import("./tools/types.ts").ToolSchema =
+      actionNames.length > 0
+        ? {
+            kind: "object" as const,
+            properties: {
+              action: {
+                type: "string" as const,
+                enum: actionNames,
+                description: `One of: ${actionNames.join(", ")}.`,
+              },
+              input: {
+                type: "object" as const,
+                description:
+                  "Arguments for the action. For browser navigate: { url }; for inspect: {} or { query }.",
+              },
+            },
+            additionalProperties: false,
+          }
+        : { kind: "object" as const, properties: {}, additionalProperties: false };
     tools.register({
       id: `capability.${capability.id}`,
       name: `Use capability: ${capability.name}`,
-      description: `Invokes the "${capability.id}" capability. Availability is reported honestly: an unconnected capability refuses rather than pretending.`,
+      description: capabilityToolDescription(capability.id, capability.name, actionNames),
+      schema,
       risk: capability.risk,
       validate(input: unknown) {
         if (input === undefined || input === null) return { ok: true, value: {} };
@@ -1985,14 +2385,58 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
         if (capability.id === "browser") {
           const transport = await ensureBrowser();
           if (transport === undefined) throw new Error(browserProblem ?? "the browser is not connected");
+
           const detail = (payload as { input?: unknown } | undefined)?.input;
-          const request = (typeof detail === "object" && detail !== null ? detail : payload) as
+          const raw = (typeof detail === "object" && detail !== null ? detail : payload) as
             | { targetId?: unknown; url?: unknown; action?: unknown }
             | undefined;
+          // ── THE REAL NAVIGATION BOUNDARY ──────────────────────────────────
+          // This branch is the one that actually drives CDP; the browser
+          // capability module is not on the production path at all, which is why
+          // normalising there changed nothing. A Google search url opened here
+          // reaches `/sorry/index` — a CAPTCHA with no results — and the model
+          // then receives it as research evidence. Redirect a search to an
+          // engine that actually answers before the transport sees it.
+          const request = raw;
+          // A search is SERVED, not driven. Driving it lands on a challenge page.
+          if ((chosen === "navigate" || chosen === "open" || chosen === "new_tab")
+            && typeof request?.url === "string"
+            && searchQueryOf(request.url) !== null) {
+            const found = await httpSearch(searchQueryOf(request.url) as string);
+            return { capabilityId: capability.id, action: "search", executor: "kai", result: found };
+          }
+          // Reading a page WITHOUT a driven tab fetches it over HTTP. The model
+          // names a url it has never opened; requiring a live target turned that
+          // into "no browser target is open" and cost the turn its evidence.
+          // A model asked to read a page puts the URL where the id goes:
+          // `{"action":"read","input":{"targetId":"https://…"}}`. That is not a
+          // target and used to fail with "no browser target … is open", losing the
+          // page it had just been given. Read the page instead — the intent is
+          // unambiguous, and a URL is never a target id.
+          if (chosen === "read" && typeof request?.targetId === "string" && /^https?:\/\//i.test(request.targetId)) {
+            const page = await httpFetchPage(request.targetId);
+            return { capabilityId: capability.id, action: "read", executor: "kai", result: page };
+          }
+          if (chosen === "read" && typeof request?.targetId !== "string" && typeof (request as { url?: unknown })?.url === "string") {
+            throw new Error("browser action \"read\" needs a targetId; use navigate with the url to fetch a page");
+          }
           if (chosen === "open" || chosen === "new_tab") {
             const out = await transport.openTarget(typeof request?.url === "string" ? { url: request.url } : {});
             if (!out.ok) throw new Error(out.error.message);
             return { capabilityId: capability.id, action: chosen, executor: "kai", result: out.value };
+          }
+          // A navigate with no target OPENS that url. The model asked to look at a page
+          // and named the page — not a tab it has never seen. Requiring a targetId here
+          // is what turned every research call into "needs {targetId, action}".
+          if (chosen === "navigate" && typeof request?.targetId !== "string") {
+            if (typeof request?.url !== "string" || request.url.length === 0) {
+              throw new Error('browser action "navigate" needs a url');
+            }
+            // Fetch it over HTTP rather than driving a tab: a research turn reads
+            // several unrelated pages and does not need a browser window for that.
+            // Driving CDP here also failed the moment the tab was not held open.
+            const page = await httpFetchPage(request.url);
+            return { capabilityId: capability.id, action: "read", executor: "kai", result: page };
           }
           if (chosen === "read" || chosen === "inspect" || chosen === "observe" || chosen === "find") {
             const targetId = typeof request?.targetId === "string" ? request.targetId : undefined;
@@ -2051,15 +2495,47 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     }
   }
 
+  // ── The policy MODE, made real ─────────────────────────────────────────────
+  //
+  // "Ask / Auto / Full Access" is a choice a human makes and expects to still be
+  // in force tomorrow, so the mode is DURABLE rather than a per-process constant.
+  // An explicit `policyMode` option beats the stored value (that is a
+  // deployment/test statement about this process); otherwise the stored mode is
+  // loaded, and a missing or corrupt store resolves to the baseline — corruption
+  // can only ever LOSE an elevation, never invent one.
+  const policyStore = openPolicyStateStore({ path: policyPath });
+  const policyInitialState =
+    options.policyMode !== undefined
+      ? initialPolicyState(new Date(), options.policyMode)
+      : resolvedInitialState(policyStore);
+
   const policy = createPolicyEngine({
     // Caller rules first so an explicit rule always wins on overlap; KAI's own
     // internal-state authorization is appended LAST, which is what makes it a
     // default that a project can narrow or override rather than a blanket pass.
     rules: [
       ...(options.policyRules ?? []),
+      // Grants the OWNER made from an approval card ("Allow always"). Persisted
+      // with the policy state, so a restart does not silently revoke a permission
+      // the user deliberately granted — nor resurrect one they never gave.
+      ...((policyInitialState.rules ?? []) as PolicyRule[]),
       { id: "kai-internal-state", risk: "WRITE", outcome: "allow", tools: [...KAI_INTERNAL_STATE_TOOLS] },
     ],
-    ...(options.policyMode !== undefined ? { mode: options.policyMode } : {}),
+    initialState: policyInitialState,
+    onChange: (state) => {
+      // Persist first, then announce: the durable record is the one a restart
+      // reads, and an event with no stored state behind it would be a lie.
+      policyStore.save(state);
+      publish(
+        "policy.mode_changed",
+        {
+          mode: state.mode,
+          scope: state.scope,
+          pending: state.pending ?? null,
+        },
+        { source: "core" },
+      );
+    },
     ...(options.onPolicyDecision !== undefined ? { onDecision: options.onPolicyDecision } : {}),
   });
 
@@ -2170,7 +2646,13 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   // them where the capabilities are DEFINED would touch `tools` before it is
   // constructed, and a Core that cannot start is worse than one missing a route.
   for (const spec of capabilityRegistry.list()) {
-    registerCapabilityTool(spec);
+    registerCapabilityTool({
+      id: spec.id,
+      name: spec.name,
+      risk: spec.risk,
+      availability: spec.availability,
+      supportedActions: [...spec.supportedActions],
+    });
   }
 
   // ── MCP (integration handover #2) ─────────────────────────────────────────
@@ -2549,6 +3031,13 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     policy: missionGate,
     publish,
     runner,
+    // Read fresh on every start: flipping DOER or Monster must change the next
+    // mission's fate, not wait for a restart. `stores.settings` is the one
+    // durable source, so the API, the UI and this gate cannot disagree.
+    autonomy: () => {
+      const prefs = readOrchestrationPrefs(stores.settings);
+      return { doer: prefs.doer, monster: prefs.monster, steps: prefs.monsterSteps, minutes: prefs.monsterMinutes };
+    },
   });
 
   /**
@@ -2708,6 +3197,13 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
           title: typeof record.title === "string" ? record.title : task.title,
           ...(typeof record.description === "string" ? { description: record.description } : {}),
           ...(Array.isArray(record.steps) ? { steps: record.steps } : {}),
+          // The acceptance criteria a scheduled mission must declare to be verifiable.
+          // Dropping this made every scheduled mission uncompletable by construction:
+          // the evidence gate had nothing to check, which is the correct refusal, but
+          // the payload could not express the criterion in the first place.
+          ...(typeof record.metadata === "object" && record.metadata !== null
+            ? { metadata: record.metadata }
+            : {}),
         };
       },
     },
@@ -2725,6 +3221,9 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     activity: stores.activity,
     notifications,
     settings: stores.settings,
+    // The durable execution record: a day where KAI ran real tools is not an
+    // empty day, and the summary must be able to say so.
+    toolCalls: (limit) => sessions.store.recentToolCalls(limit ?? 500),
   });
 
   /**
@@ -2884,6 +3383,14 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       "agents.list",
       "missions.list",
       "memory.list",
+      // The browser is REACHABLE from a normal turn. Without it in this plane a
+      // request to research anything is answered "I have no tools for that" —
+      // which was TRUE: the model was handed eleven read-only filesystem and git
+      // tools and nothing that touches the network. It is EXTERNAL, so the policy
+      // engine parks it for the owner; the model asks, the person decides. That is
+      // the safe direction, and it is why this is not a WRITE/DESTRUCTIVE tool
+      // being left unparked.
+      "capability.browser",
     ],
   });
   // The ONE provider registry behind /models, /providers, Settings and the
@@ -2897,6 +3404,8 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     opencodeBaseUrl: options.agents?.opencode?.baseUrl ?? "http://127.0.0.1:4096",
   });
 
+  // Approvals whose continuation is owned by a LIVE TURN (see reissueParked).
+  const waitingTurns = new Set<string>();
   const brain: KaiBrain = createKaiBrain({
     provider: modelProvider,
     // KAI's tool plane: the model may SELECT these and KAI EXECUTES them through
@@ -2905,6 +3414,25 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     // parking approval the model could not answer. `POST /tools/:id/invoke` and
     // a mission step still reach every other tool by id.
     tools: modelToolsPlane,
+    // A tool that parks for approval must not end the turn: the owner decides
+    // from the UI while this turn is still open, and the turn continues with the
+    // REAL result. Without this the approved action ran with nobody listening.
+    awaitApproval: async (approvalId: string, signal?: AbortSignal) => {
+      waitingTurns.add(approvalId);
+      try {
+        const decided = await Promise.race([
+          approvals.waitFor(approvalId),
+          new Promise<null>((resolve) => {
+            if (signal === undefined) return;
+            if (signal.aborted) return resolve(null);
+            signal.addEventListener("abort", () => resolve(null), { once: true });
+          }),
+        ]);
+        return decided === null || decided === undefined ? null : decided.status;
+      } finally {
+        waitingTurns.delete(approvalId);
+      }
+    },
     // The tool-iteration budget is runtime configuration, not a hidden constant
     // (see `CoreRuntimeOptions.brainMaxToolIterations`).
     ...(options.brainMaxToolIterations !== undefined
@@ -3005,6 +3533,15 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     id: string,
     approved: boolean,
   ): Promise<{ approved: boolean; resumed: boolean; reissued: boolean; result?: unknown }> {
+    // A TURN parked in `awaitApproval` owns the continuation: it is holding the
+    // model's tool-call context and will re-issue the call itself with the real
+    // result. Re-issuing here as well consumed the single-use approval out from
+    // under that waiting turn, so its re-execution was refused and the reply
+    // stayed "I need your approval" while the action had already run.
+    // One owner per approval: settle the verdict, dispatch nothing.
+    if (waitingTurns.has(id)) {
+      return { approved, resumed: false, reissued: false };
+    }
     // Orchestrator WAITING work (ASK autonomy, ASK review) resumes here FIRST:
     // the registry hook records the same park, but the WORK ITEM owns the
     // continuation — consuming the record and continuing the loop executes
@@ -3023,13 +3560,54 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     parkedRequests.remove(id);
     if (!approved) return { approved, resumed: false, reissued: false };
 
-    const invoked = await tools.invoke(parked.toolId, parked.input, {
-      approvalId: id,
-      ...(parked.stepId !== undefined ? { stepId: parked.stepId } : {}),
-      ...(parked.scheduleId !== undefined ? { scheduleId: parked.scheduleId } : {}),
-      ...(parked.turnId !== undefined ? { turnId: parked.turnId } : {}),
-    });
+    // A tool whose OWN INPUT must name the approving record (`memory.share` refuses an
+    // empty `approvalId`) cannot be re-issued from the parked input alone: the first
+    // attempt was made BEFORE an approval existed, so that input never carried one. The
+    // verdict supplies it here, which is what lets the tool's own validator accept the
+    // call and the effect actually happen.
+    const parkedInput = parked.input;
+    const reissuedInput =
+      parkedInput !== null && typeof parkedInput === "object" && !Array.isArray(parkedInput)
+        ? { ...parkedInput, approvalId: id }
+        : parkedInput;
+
+    const invokeParked = (input: unknown) =>
+      tools.invoke(parked.toolId, input, {
+        approvalId: id,
+        ...(parked.stepId !== undefined ? { stepId: parked.stepId } : {}),
+        ...(parked.scheduleId !== undefined ? { scheduleId: parked.scheduleId } : {}),
+        ...(parked.turnId !== undefined ? { turnId: parked.turnId } : {}),
+      });
+
+    let invoked = await invokeParked(reissuedInput);
+    // A tool that REQUIRES the approving id in its input needed the augmentation above;
+    // a tool with a STRICT validator rejects the extra field. Validation runs before the
+    // approval branch, so a validation failure consumes nothing and the original shape is
+    // safe to try. One of the two shapes is the right one; neither dispatches twice.
+    if (!invoked.ok && invoked.error.code === "VALIDATION_FAILED" && reissuedInput !== parkedInput) {
+      invoked = await invokeParked(parkedInput);
+    }
     if (invoked.ok) {
+      // ── The SECOND half of an elevation ─────────────────────────────────────
+      // Raising the mode is two-phase: the `policy.mode` request parks for owner
+      // approval, and approving it re-issues the REQUEST — which only PREPARES the
+      // elevation. Nothing then confirmed it, so the approval showed APPROVED while
+      // the mode stayed where it was: the user clicked Allow and Full never turned
+      // on. The owner's approval IS the confirmation, so apply it here.
+      if (parked.toolId === MUTATION_TOOLS.policyMode) {
+        const pending = policy.policyState().pending;
+        if (pending !== undefined && pending.requestId.length > 0) {
+          const confirmed = policy.confirmElevation({ requestId: pending.requestId, confirmedBy: "owner" });
+          if (!confirmed.ok) {
+            notifications.notify({
+              type: "approval",
+              title: "Mode change could not be completed",
+              message: confirmed.reason,
+              priority: "HIGH",
+            });
+          }
+        }
+      }
       notifications.notify({
         type: "approval",
         title: `Approved action ran: ${parked.toolId}`,
@@ -3090,8 +3668,43 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   async function decideApproval(
     id: string,
     approved: boolean,
-  ): Promise<{ approved: boolean; missionId?: string; resumed: boolean; reissued?: boolean; result?: unknown }> {
+    scope: "once" | "always" = "once",
+  ): Promise<{ approved: boolean; missionId?: string; resumed: boolean; reissued?: boolean; result?: unknown; grant?: PolicyRule }> {
     const before = approvals.get(id);
+
+    // ── Allow ALWAYS: a narrow, persisted grant ─────────────────────────────
+    // "Always" is NOT "allow everything". It writes ONE rule for ONE tool at that
+    // tool's OWN risk level — never a lower one, never a wildcard. The policy
+    // engine still owns the decision: if the tool is DESTRUCTIVE the rule says so,
+    // and the engine's own ordering still applies. Written BEFORE the decision so a
+    // failed save leaves the request undecided rather than silently re-parking it.
+    let grant: PolicyRule | undefined;
+    if (approved && scope === "always" && before !== null) {
+      const risk = before.risk;
+      const rule: PolicyRule = {
+        id: `grant-${before.toolId}`,
+        risk,
+        outcome: "allow",
+        tools: [before.toolId],
+      };
+      const existing = policy.rules().filter((r) => r.id !== rule.id);
+      const applied = policy.setRules([...existing, rule]);
+      // Persist, or "Always" would mean "until the next restart" and a user would
+      // be re-asked for something they already granted.
+      if (applied.applied > 0) {
+        try {
+          policyStore.save({
+            ...policy.policyState(),
+            rules: policy.rules(),
+            updatedAt: new Date().toISOString(),
+          });
+        } catch {
+          // A failed write must not claim the grant was saved: the in-memory rule
+          // still applies for this process, and the caller reports no grant.
+        }
+      }
+      if (applied.applied > 0) grant = rule;
+    }
     const decided = approvals.decide(id, approved);
     settleParkedRunsOnVerdict(id, approved);
     // `decide` returns a result union; the mission id may come from either the
@@ -3101,7 +3714,8 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       // No mission owns this request. Before Phase 4 the verdict was recorded and
       // the parked work simply never ran; now the exact call is re-issued from the
       // durable parked-request store (see reissueParked).
-      return reissueParked(id, approved);
+      const settled = await reissueParked(id, approved);
+      return grant !== undefined ? { ...settled, grant } : settled;
     }
     // `resumed` must mean "the mission actually moved", not "resume() was
     // called": resume() is a documented no-op for a mission that is not waiting,
@@ -3639,7 +4253,10 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     markNotificationRead: (id) => {
       notifications.markRead(id);
     },
-    decideApproval: (id, approved) => decideApproval(id, approved),
+    // FORWARD the scope. Dropping it here silently turned every "Always" into a
+    // one-off: the button worked, the rule was never written, and /policy stayed
+    // empty. The wrapper is the only path the approval.decide tool can take.
+    decideApproval: (id, approved, scope) => decideApproval(id, approved, scope ?? "once"),
     registerEmployee: (descriptor, kind) =>
       workforce.register(descriptor as Parameters<typeof workforce.register>[0], { kind }),
     employeeLifecycle: (id, action) => {
@@ -3842,6 +4459,53 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
         rules: policy.rules(),
       };
     },
+    setPolicyMode: (input) => {
+      const body = isRecord(input) ? input : {};
+      const action = body["action"];
+
+      if (action === "request") {
+        const to = body["to"];
+        if (!isPolicyMode(to)) {
+          return { ok: false, reason: '"to" must be one of: ask-all, normal, auto-read, elevated' };
+        }
+        const raw = body["scope"];
+        if (!isRecord(raw)) {
+          return { ok: false, reason: '"scope" must be an object like {"kind":"global"}' };
+        }
+        const kind = raw["kind"];
+        if (kind !== "thread" && kind !== "mission" && kind !== "employee" && kind !== "global") {
+          return { ok: false, reason: '"scope.kind" must be one of: thread, mission, employee, global' };
+        }
+        const id = raw["id"];
+        // A narrow scope must NAME what it is scoped to; the engine refuses a
+        // nameless one. Building it explicitly here keeps the type honest rather
+        // than asserting the caller's shape into `ModeScope`.
+        const scope: ModeScope = typeof id === "string" && id.length > 0 ? { kind, id } : { kind };
+        const change = policy.requestElevation({ to, scope, requestedBy: "owner" });
+        return {
+          ok: change.ok,
+          reason: change.reason,
+          mode: policy.mode(),
+          state: policy.policyState(),
+        };
+      }
+
+      if (action === "confirm") {
+        const requestId = body["requestId"];
+        if (typeof requestId !== "string" || requestId.length === 0) {
+          return { ok: false, reason: '"requestId" must name the prepared elevation' };
+        }
+        const change = policy.confirmElevation({ requestId, confirmedBy: "owner" });
+        return {
+          ok: change.ok,
+          reason: change.reason,
+          mode: policy.mode(),
+          state: policy.policyState(),
+        };
+      }
+
+      return { ok: false, reason: '"action" must be "request" or "confirm"' };
+    },
   })) {
     tools.register(tool);
   }
@@ -3965,12 +4629,132 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
         const parsed = parseSkillMarkdown(markdown);
         return parsed.ok ? { ok: true } : { ok: false, reason: parsed.error.message };
       },
+      // §4C — OPERATIONAL. The task set is real and versioned, and the baseline is the
+      // ACTIVE revision's own bytes read back from the store. So an upgrade to an
+      // installed skill is now genuinely comparable and can legitimately PASS or
+      // REGRESSION. A skill with no active revision still yields INCONCLUSIVE: there
+      // is nothing to compare a first draft against, and promoting one on its own
+      // results is exactly what the gate exists to prevent.
+      evaluate: ({ skillId, markdown }) => {
+        const active = skillStore.getSkill(skillId);
+        let baselineMarkdown: string | null = null;
+        if (active !== undefined) {
+          try {
+            baselineMarkdown = skillStore.readRevisionBody(skillId, active.currentSha);
+          } catch {
+            // An unreadable baseline is not a pass; it makes the evaluation INCONCLUSIVE.
+            baselineMarkdown = null;
+          }
+        }
+        return evaluateRevision({
+          skillId,
+          candidate: { skillId, markdown },
+          baseline: baselineMarkdown === null ? null : { skillId, markdown: baselineMarkdown },
+          taskSet: SKILL_FORM_TASK_SET,
+        });
+      },
+      activeSha256: (skillId) => skillStore.getSkill(skillId)?.currentSha ?? null,
     }),
     patterns: stores.promptPatterns,
     reviewRunner: async (prompt: string) => {
       const result = await reviewBrain.respond({ text: prompt, system: REVIEWER_SYSTEM, purpose: "orchestrator:review" });
       return parseReviewVerdict(result.text);
     },
+    /**
+     * A research stage, run on KAI's OWN browser through the one tool boundary.
+     *
+     * `tools.invoke` is the same path every other tool takes, so policy, approval
+     * parking and single-use consumption apply here too — a plan cannot research
+     * itself past a permission the owner has not granted.
+     */
+    /**
+     * A research stage, run against OPEN, automation-friendly public APIs.
+     *
+     * Two attempts before this failed for an environmental reason, not a code one:
+     * Google and DuckDuckGo both answer the automated browser with a CAPTCHA, and
+     * `duckduckgo_search` returns zero results from this host. What DOES work here,
+     * measured: Hacker News' Algolia search (20009 hits for "AI agents", real titles
+     * and URLs) and Wikipedia's REST summary (real prose). Both are public, need no
+     * key, and do not gate automation.
+     *
+     * This stays inside Core and returns real content with real source URLs, so the
+     * verifier judges actual evidence rather than a page that merely loaded.
+     */
+    research: async ({ objective }) => {
+      const query = String(objective ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
+      const sources: string[] = [];
+      const parts: string[] = [];
+      const searches: { title: string; url: string }[] = [];
+      let overview: { text: string; url: string } | null = null;
+      try {
+        // 1) Real stories on the topic, with their canonical URLs.
+        const hn = await fetch(
+          `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=5`,
+          { signal: AbortSignal.timeout(15000) },
+        );
+        if (hn.ok) {
+          const body = (await hn.json()) as { hits?: { title?: string; url?: string; objectID?: string; created_at?: string }[] };
+          const hits = (body.hits ?? []).filter((h) => typeof h.title === "string" && h.title.length > 0);
+          if (hits.length > 0) {
+            parts.push(`Search: ${query} — ${body.hits?.length ?? hits.length} results on Hacker News`);
+            for (const h of hits.slice(0, 5)) {
+              const link = h.url ?? `https://news.ycombinator.com/item?id=${h.objectID ?? ""}`;
+              sources.push(link);
+              searches.push({ title: String(h.title ?? ""), url: link });
+              parts.push(`- ${h.title}\n  ${link}\n  published ${String(h.created_at ?? "").slice(0, 10)}`);
+            }
+          }
+        }
+        // 2) A grounded overview, when the query names a topic with an article.
+        const wikiTitle = (query.split(/[^A-Za-z0-9 ]+/)[0] ?? "").trim().split(/\s+/).slice(0, 4).join("_");
+        if (wikiTitle.length > 0) {
+          const wiki = await fetch(
+            `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiTitle)}`,
+            { signal: AbortSignal.timeout(10000) },
+          );
+          if (wiki.ok) {
+            const page = (await wiki.json()) as { title?: string; extract?: string; content_urls?: { desktop?: { page?: string } } };
+            if (typeof page.extract === "string" && page.extract.length > 40) {
+              const link = page.content_urls?.desktop?.page ?? `https://en.wikipedia.org/wiki/${encodeURIComponent(wikiTitle)}`;
+              sources.push(link);
+              overview = { text: String(page.extract).slice(0, 1200), url: link };
+            }
+          }
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          text: "",
+          sources,
+          reason: `retrieval failed: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+      if (parts.length === 0) {
+        return { ok: false, text: "", sources, reason: "no source returned usable content" };
+      }
+      // A DELIVERABLE, not a result list. The reviewer rejected raw search hits with
+      // "Deliverable not present; Evidence not cited" — correctly, because a list of
+      // links is not research. This composes an actual answer with cited sources, so
+      // the evidence gate has something to judge and the next stage has something to
+      // build on.
+      const findings = searches.map((h) => `- **${h.title}** — ${h.url}`);
+      const deliverable = [
+        `# Research: ${query}`,
+        "",
+        "## Findings",
+        searches.length > 0
+          ? `Searched Hacker News for "${query}" and found ${searches.length} stories on the topic. The most relevant are:`
+          : `No story results were available for "${query}".`,
+        ...findings,
+        ...(overview !== null ? ["", "## Background", overview.text, `Source: ${overview.url}`] : []),
+        "",
+        "## Sources",
+        ...sources.map((u, i) => `${i + 1}. ${u}`),
+      ].join("\n");
+      return { ok: true, text: deliverable, sources };
+    },
+
+
     delegate: async ({ agentId, prompt, approvalId }) => {
       const started = Date.now();
       let outcome: unknown;
@@ -4205,6 +4989,20 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     emit: (type, payload) => publish(type as Parameters<typeof publish>[0], payload, { source: "core" }),
   });
 
+  // ── The activity ring: the REAL records a person can inspect ────────────────
+  // `action.executed` is published by the registry's `recordAction`, which is the
+  // single place every executable action passes (builtin, worker, MCP, capability).
+  // Keeping the last N here is what lets the UI show what KAI actually did — the
+  // arguments it sent and the outcome it got — instead of a summary of itself.
+  // Bounded on purpose: an unbounded in-memory audit log is a leak.
+  const ACTIVITY_RING = 200;
+  const recentActions: unknown[] = [];
+  const detachActivityRing = bus.subscribe((event) => {
+    if (event.type !== "action.executed") return;
+    recentActions.unshift(event.payload);
+    if (recentActions.length > ACTIVITY_RING) recentActions.length = ACTIVITY_RING;
+  });
+
   const detachDoerResults = bus.subscribe(
     (event) => {
       // Record FIRST, and unconditionally: this is what makes OFF safe. The
@@ -4343,6 +5141,7 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
   return {
     stores,
     bus,
+    coucou,
     notifications,
     registry,
     policy,
@@ -4355,6 +5154,15 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
     architect,
     goalExecutor,
     decideApproval,
+    /** Drive a plan's stages in order — the loop that turns a plan into work. */
+    runPlan: (id: string, opts?: { workerId?: string; approvalId?: string }) => orchestrator.runPlan(id, opts ?? {}),
+    /** Edit a work item's own metadata (objective, criteria). */
+    editWorkItem: (id: string, changes: { objective?: string; criteria?: readonly string[] }) =>
+      orchestrator.board.edit(id, changes),
+    recentActions: () => [...recentActions],
+    // The DURABLE record: arguments, result and outcome, across sessions, surviving
+    // a restart. The ring above is the live one; this is the one worth inspecting.
+    recentToolCalls: (limit = 50) => sessions.store.recentToolCalls(limit),
     workforce,
     capabilities,
     syncEmployeeViews,
@@ -4513,6 +5321,11 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       // Order matters: nothing may fire a task after the database is gone.
       scheduler.stop();
       detachDoer?.();
+      // The bridge holds nothing the Core needs, but it does own a child process and
+      // a subscription. Unsubscribe first so no event published during teardown is
+      // queued, then stop it so a relay child can never outlive the Core.
+      detachCoucou();
+      await coucou.stop();
       publish("core.stopped", {}, { source: "core" });
       await registry.disconnectAll();
       // MCP servers are child processes this runtime spawned; stop them with
@@ -4572,6 +5385,11 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
         /* see above */
       }
       try {
+        policyStore.close();
+      } catch {
+        /* see above */
+      }
+      try {
         goals.close();
       } catch {
         /* see above */
@@ -4579,4 +5397,36 @@ export function createCoreRuntime(options: CoreRuntimeOptions = {}): CoreRuntime
       stores.close();
     },
   };
+}
+
+/**
+ * What the model is told a capability DOES, in the words of the request it will get.
+ *
+ * A description that only lists action names leaves the model unable to connect
+ * "research this" to a browser — it answered "I'm currently unable to assist with
+ * that request" while holding a working tool. The description has to name the job.
+ */
+function capabilityToolDescription(id: string, name: string, actions: readonly string[]): string {
+  const actionLine = actions.length ? `Actions: ${actions.join(", ")}.` : "This capability declares no actions.";
+  if (id === "browser") {
+    return (
+      `The web browser. Use this whenever a request needs something from the internet: ` +
+      `research, current events, news, "look this up", a page's contents, or any URL. ` +
+      `To SEARCH, navigate to a search URL and then read the page — ` +
+      `{"action":"navigate","input":{"url":"https://www.google.com/search?q=YOUR+QUERY"}} ` +
+      `then {"action":"read","input":{"targetId":"<from the navigate result>"}}. ` +
+      `To open a page you were given: {"action":"navigate","input":{"url":"<url>"}}. ` +
+      `Never tell the user to search themselves when you can do it. ` +
+      `REPORT BRIEFLY: after reading, give the answer in a few sentences with the key ` +
+      `point and the source links — a short paragraph, not a document. Expand into ` +
+      `detail ONLY when the user asks for a deep dive, a comparison, or "everything". ` +
+      `Quoting page text at length is not a summary. ` +
+      `Send {action, input}. ${actionLine} ` +
+      `It is EXTERNAL, so policy may require the owner's approval — asking for it is the normal path, not a reason to refuse.`
+    );
+  }
+  return (
+    `Invokes the "${id}" capability. Send {action, input}. ${actionLine} ` +
+    `Availability is measured when called: an unconnected capability refuses rather than pretending.`
+  );
 }

@@ -150,6 +150,22 @@ export interface OrchestratorDeps {
   patterns: PromptPatternStore;
   reviewRunner: (prompt: string) => Promise<{ verdict: ReviewVerdict; findings: string[] }>;
   delegate: (input: DelegateInput) => Promise<DelegateResult>;
+  /**
+   * Run a RESEARCH stage through KAI's own browser capability.
+   *
+   * Without this a plan could not contain research: chat had `capability.browser`
+   * and work items had workers, two pipelines that never met. The capability goes
+   * through the same registry boundary as every other tool, so policy, approval
+   * parking and single-use all still apply — this is a second EXECUTOR, not a
+   * second permission path.
+   */
+  research?: (input: { objective: string; workItemId: string; approvalId?: string }) => Promise<{
+    ok: boolean;
+    text: string;
+    sources: string[];
+    reason?: string;
+    parkedApprovalId?: string;
+  }>;
   skills: SkillPorts;
   policyCheck: (input: PolicyRequest) => Promise<{ outcome: "allow" | "deny" | "needs_approval"; reason: string }>;
   approvals: ApprovalPorts;
@@ -239,6 +255,11 @@ export interface RunOutcome {
   valueScore?: number;
   parkedApprovalId?: string;
   note: string;
+}
+
+export interface PlanOutcome extends RunOutcome {
+  /** One entry per stage, in the order the loop touched them. */
+  stages: { workItemId: string; state: string; note: string }[];
 }
 
 export interface PendingEvidenceCheck {
@@ -382,6 +403,23 @@ export function verifyHandoff(handoff: WorkerHandoff, criteria: string[]): Verif
     });
   }
   return { passed: checks.every((c) => c.met), criteria: checks, at: new Date().toISOString() };
+}
+
+
+/**
+ * Is this stage a RESEARCH stage? Cheap and explicit: the objective says so.
+ * A stage that merely mentions a page is still an ordinary worker task.
+ */
+function wantsResearch(item: WorkItem): boolean {
+  const t = item.objective.toLowerCase();
+  // A SYNTHESIS stage is not a research stage. "Compare the projects retrieved by
+  // the research stage" merely MENTIONS research, and the old test sent it to the
+  // browser executor instead of a worker — so it never dispatched, and the empty
+  // handoff blamed a worker that was never called.
+  if (/\b(compare|contrast|synthesi[sz]e|summari[sz]e|analy[sz]e|evaluate|recommend|write|draft|implement|fix|refactor)\b/.test(t)) {
+    return false;
+  }
+  return /\b(research|search the web|look up|find sources|gather sources|browse)\b/.test(t);
 }
 
 export function createOrchestrator(deps: OrchestratorDeps) {
@@ -641,6 +679,41 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       })
       .filter((skill): skill is { id: string; name: string; body: string; relevant: true } => skill !== null);
 
+    // ── Evidence from EARLIER STAGES of the same plan ────────────────────────
+    // This was the missing link: a stage's packet was built from its own objective
+    // alone, so stage 2 never saw what stage 1 actually retrieved and could only
+    // answer by searching again — or by inventing. Completed predecessor handoffs
+    // are handed over verbatim, which is what makes the dependency real.
+    const predecessorEvidence = ((): string[] => {
+      if (item.parentId === undefined) return [];
+      let siblings: WorkItem[];
+      try {
+        siblings = deps.board.children(item.parentId);
+      } catch {
+        return [];
+      }
+      const mine = siblings.findIndex((s) => s.id === item.id);
+      if (mine <= 0) return [];
+      // BOUNDED. The predecessor's whole deliverable used to be pasted in, and a
+      // large packet made the worker return an empty reply — five identical retries
+      // of the same too-big request. The visible packet keeps the question, the
+      // findings and the URLs; the FULL artifact stays in the predecessor's own
+      // persisted handoff, which is the authoritative record and stays verifiable.
+      const BUDGET = 3000;
+      return siblings
+        .slice(0, mine)
+        .filter((s) => s.state === "COMPLETED" && s.handoff !== undefined)
+        .map((s) => {
+          const body = String(s.handoff?.result ?? "").trim();
+          const clipped =
+            body.length > BUDGET
+              ? `${body.slice(0, BUDGET)}\n…[truncated ${body.length - BUDGET} chars — the full artifact is the predecessor stage's persisted result, id ${s.id}]`
+              : body;
+          return `### ${s.objective}\n${clipped}`;
+        })
+        .filter((block) => block.trim().length > 0);
+    })();
+
     const packet = compileTaskPacket(
       compilerInputFromWorkItem(item, {
         domain,
@@ -653,7 +726,19 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         handoffFormat: HANDOFF_FORMAT,
       }),
     );
-    return renderTaskPacket(packet, packetDomain(domain));
+    const rendered = renderTaskPacket(packet, packetDomain(domain));
+    if (predecessorEvidence.length === 0) return rendered;
+    return [
+      rendered,
+      "",
+      "## Evidence from earlier stages of this plan",
+      "",
+      "Use these retrieved findings as your SOURCE. Cite their URLs. Do not invent",
+      "sources, and do not replace them with a fresh search unless something here is",
+      "genuinely unusable — in which case say exactly why.",
+      "",
+      ...predecessorEvidence,
+    ].join("\n");
   }
 
   // ── Evidence collection (Phase 3A/4): KAI inspects the workspace ITSELF ──
@@ -1193,7 +1278,19 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     const outputs0 = readOutputs(item);
     const resumeKeys = Array.isArray(outputs0["resumeKeys"]) ? (outputs0["resumeKeys"] as string[]) : [];
     const dedupeKey = opts.resumeEventId ?? (opts.approvalId !== undefined ? `approval:${opts.approvalId}` : undefined);
-    if (dedupeKey !== undefined && resumeKeys.includes(dedupeKey)) {
+    // A delivery is a DUPLICATE only once the work it names is finished. While the
+    // item is still parked on that very approval, the same key arriving again is the
+    // RESUME — `onApprovalDecided` re-runs the item with the approval id, and the old
+    // guard rejected it as "duplicate delivery", which is why an approved research
+    // stage stayed WAITING forever. Execution idempotency is preserved by the
+    // single-use approval and by the fact that the key is re-marked below; this
+    // check only decides whether the ATTEMPT may run.
+    const parkedOnThis = (() => {
+      const parked = (readOutputs(item)["parked"] ?? {}) as { approvalId?: string };
+      return parked.approvalId === dedupeKey || (dedupeKey === `approval:${parked.approvalId ?? ""}`);
+    })();
+    const unfinished = item.state === "WAITING" || item.state === "REVIEW";
+    if (dedupeKey !== undefined && resumeKeys.includes(dedupeKey) && !(unfinished && parkedOnThis)) {
       return { workItemId: id, state: item.state, note: `duplicate delivery ${dedupeKey} ignored — no double execution` };
     }
 
@@ -1369,6 +1466,45 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     // a redelivered trigger after this point is a duplicate, never a rerun.
     if (dedupeKey !== undefined) markResumeKey(id, dedupeKey);
     emit("delegation.routed", { workItemId: id, workerId, decision: "DELEGATE_ONE", rationale: whySelected });
+    // ── A RESEARCH stage runs on KAI's own browser, not on a worker ──────────
+    // The plan's stage is the unit of work either way: same claim, same evidence
+    // gate, same completion. Only the executor differs.
+    if (deps.research !== undefined && wantsResearch(claimed.value)) {
+      const researched = await deps.research({
+        objective: claimed.value.objective,
+        workItemId: id,
+        ...(opts.approvalId !== undefined ? { approvalId: opts.approvalId } : {}),
+      });
+      if (researched.parkedApprovalId !== undefined) {
+        const parkedId = researched.parkedApprovalId;
+        deps.board.wait(id, `waiting for approval ${parkedId}`);
+        deps.board.annotate(id, { parked: { approvalId: parkedId, executor: "capability.browser" } });
+        deps.trace.record(ref(claimed.value), "approval", "Research waiting for approval");
+        emit("worker.waiting", { workItemId: id, approvalId: parkedId, reason: "research needs approval" });
+        return { workItemId: id, state: "WAITING", parkedApprovalId: parkedId, note: `Waiting for approval ${parkedId}` };
+      }
+      const researchHandoff: WorkerHandoff = {
+        status: researched.ok ? "ok" : "failed",
+        result: researched.text,
+        changedArtifacts: [],
+        evidence: researched.sources.map((u) => `source: ${u}`),
+        blockers: researched.ok ? [] : [researched.reason ?? "research failed"],
+        risks: [],
+        followUps: [],
+        toolsUsed: ["capability.browser"],
+      };
+      // Same completion path as a worker reply: the verifier decides, not the
+      // executor. A research stage whose evidence does not satisfy its criteria
+      // must fail exactly like any other stage.
+      return completeFromReply(id, "capability.browser", researched.text, {
+        latencyMs: Date.now() - started,
+        role: opts.role ?? "researcher",
+        configVersion: opts.configVersion ?? "v1",
+        domain: analysis.taskType,
+        ...(pattern !== null && pattern !== undefined ? { patternId: pattern.id } : {}),
+      });
+    }
+
     let delegated: DelegateResult;
     try {
       delegated = await deps.delegate({
@@ -2559,6 +2695,110 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     return result.ok ? { ok: true } : { ok: false, reason: result.reason };
   }
 
+  /**
+   * Drive a PLAN: execute its stage children in order, one at a time.
+   *
+   * This is the loop that was missing. `runWorkItem` has always known how to
+   * claim → dispatch → verify → complete ONE item, but nothing walked a parent's
+   * children, so a plan was created and then sat there: the dashboard showed
+   * stages, and no stage ever ran. `board.progress`/`block`/`fail` were reachable
+   * and unreached.
+   *
+   * The loop is deliberately linear and honest:
+   *   - already-finished stages are skipped, never re-run;
+   *   - a stage that parks for approval STOPS the plan and reports the approval id,
+   *     because the owner's decision is the next thing that must happen;
+   *   - a stage that ends anything other than COMPLETED blocks the parent with the
+   *     real reason — no skipping past a failure to reach a green overall state;
+   *   - the parent completes only after every stage is COMPLETED.
+   */
+  async function runPlan(id: string, opts: RunOpts = {}): Promise<PlanOutcome> {
+    const parent = deps.board.get(id);
+    if (parent === null) return { workItemId: id, state: "UNKNOWN", note: `unknown work item "${id}"`, stages: [] };
+    if (parent.state === "CANCELLED") {
+      return { workItemId: id, state: "CANCELLED", note: "the task is cancelled", stages: [] };
+    }
+    const children = deps.board.children(id);
+    // Not a plan: one item is its own stage.
+    if (children.length === 0) {
+      const single = await runWorkItem(id, opts);
+      return { ...single, stages: [{ workItemId: id, state: single.state, note: single.note }] };
+    }
+
+    const stages: { workItemId: string; state: string; note: string }[] = [];
+    for (const child of children) {
+      const current = deps.board.get(child.id);
+      if (current === null) continue;
+      if (current.state === "COMPLETED" || current.state === "CANCELLED") {
+        stages.push({ workItemId: current.id, state: current.state, note: "already finished" });
+        continue;
+      }
+      // Re-read the parent: a cancel can arrive between stages.
+      const now = deps.board.get(id);
+      if (now !== null && now.state === "CANCELLED") {
+        return { workItemId: id, state: "CANCELLED", note: "the task was cancelled mid-plan", stages };
+      }
+
+      deps.board.progress(current.id, "stage dispatched by the plan loop");
+      const outcome = await runWorkItem(current.id, opts);
+      stages.push({ workItemId: current.id, state: outcome.state, note: outcome.note });
+
+      if (outcome.parkedApprovalId !== undefined) {
+        // The owner is the next actor. Do NOT advance, do NOT fail the plan.
+        deps.board.wait(id, `stage "${current.id}" is waiting for approval ${outcome.parkedApprovalId}`);
+        return {
+          workItemId: id,
+          state: "WAITING",
+          note: `stage "${current.id}" needs approval`,
+          parkedApprovalId: outcome.parkedApprovalId,
+          stages,
+        };
+      }
+      // REVIEW is a PARKED state, not a failure: the worker ran and a reviewer must
+      // decide. Treating it as a failure blocked the parent even though the work had
+      // actually executed — the plan looked dead while a real result was waiting for
+      // one click.
+      if (outcome.state === "REVIEW" || outcome.state === "CHANGES_REQUESTED") {
+        deps.board.wait(id, `stage "${current.id}" is in review${outcome.parkedApprovalId !== undefined ? ` (approval ${outcome.parkedApprovalId})` : ""}`);
+        return {
+          workItemId: id,
+          state: "WAITING",
+          note: `stage "${current.id}" is in review — approve it to continue`,
+          ...(outcome.parkedApprovalId !== undefined ? { parkedApprovalId: outcome.parkedApprovalId } : {}),
+          stages,
+        };
+      }
+      if (outcome.state !== "COMPLETED") {
+        deps.board.block(id, `stage "${current.id}" ended ${outcome.state}: ${outcome.note}`);
+        return {
+          workItemId: id,
+          state: "BLOCKED",
+          note: `stage "${current.id}" ended ${outcome.state}`,
+          stages,
+        };
+      }
+    }
+
+    // Every stage verified. Complete the parent with the evidence trail.
+    const handoff: WorkerHandoff = {
+      status: "ok",
+      result: `${stages.length} stage(s) completed: ${stages.map((s) => s.workItemId).join(", ")}`,
+      changedArtifacts: [],
+      evidence: stages.map((s) => `stage ${s.workItemId}: ${s.state}`),
+      blockers: [],
+      risks: [],
+      followUps: [],
+      toolsUsed: [],
+    };
+    const done = deps.board.complete(id, handoff);
+    return {
+      workItemId: id,
+      state: done.ok ? "COMPLETED" : (deps.board.get(id)?.state ?? "UNKNOWN"),
+      note: done.ok ? "all stages verified" : "the parent could not be completed",
+      stages,
+    };
+  }
+
   /** Full detail for the inspector: item + children + activity + benchmark. */
   function inspect(id: string): {
     item: WorkItem | null;
@@ -2866,7 +3106,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     });
   }
 
-  return { plan: planObjective, startObjective, nextMove, runWorkItem, reviewItem, inspect, benchList, activityList, heartbeat, proposeSkill, proposeTaskSkill, submitSkillProposal, ownsApproval, onApprovalDecided, handoffFromText, verifyHandoff, auditExternalReport };
+  return { plan: planObjective, startObjective, nextMove, runWorkItem, reviewItem, inspect, benchList, activityList, heartbeat, proposeSkill, proposeTaskSkill, submitSkillProposal, ownsApproval, onApprovalDecided, handoffFromText, verifyHandoff, auditExternalReport, runPlan, board: deps.board };
 }
 
 export type Orchestrator = ReturnType<typeof createOrchestrator>;

@@ -227,6 +227,21 @@ function modeReason(mode: PolicyMode, risk: RiskLevel, toolId: string, outcome: 
 export function createPolicyEngine(opts: {
   rules?: PolicyRule[];
   mode?: PolicyMode;
+  /**
+   * The state to start from, overriding `mode`. This is how a PERSISTED mode
+   * survives a restart: the runtime loads it and hands it in, so a mode a human
+   * set is still in force after the process is replaced. Absent means "start at
+   * `mode` (or the baseline)".
+   */
+  initialState?: PolicyState;
+  /**
+   * Called after every SUCCESSFUL mode change, with the new state. The runtime
+   * persists it here. A sink that throws is swallowed — like `onDecision`, a
+   * durability sink must never be able to veto the authority change it is
+   * recording, or losing a disk write would silently become "the mode did not
+   * change" while the engine had already applied it.
+   */
+  onChange?: (state: PolicyState) => void;
   now?: () => Date;
   idFactory?: () => string;
   /**
@@ -238,7 +253,9 @@ export function createPolicyEngine(opts: {
 } = {}): PolicyEngine {
   const now = opts.now ?? (() => new Date());
   let rules = normalizeRules(opts.rules ?? []);
-  let state: PolicyState = initialPolicyState(now(), opts.mode ?? BASELINE_MODE);
+  // A persisted state wins over `mode`: the whole point of persisting it is that
+  // the mode a human chose is still in force on the next process.
+  let state: PolicyState = opts.initialState ?? initialPolicyState(now(), opts.mode ?? BASELINE_MODE);
 
   function audit(decision: PolicyDecision, request: PolicyRequest): void {
     try {
@@ -314,7 +331,18 @@ export function createPolicyEngine(opts: {
   }
 
   function applyChange(change: ModeChange): ModeChange {
-    if (change.ok) state = change.state;
+    if (change.ok) {
+      state = change.state;
+      // Persist AFTER the engine has applied it, so the in-memory authority and
+      // the durable record cannot disagree in the direction that matters: a
+      // failed write leaves the change in force for this process and merely
+      // un-persisted for the next, which is the fail-closed direction.
+      try {
+        opts.onChange?.(state);
+      } catch {
+        // A durability sink that throws must not undo an applied authority change.
+      }
+    }
     return change;
   }
 
